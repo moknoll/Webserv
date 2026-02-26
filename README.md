@@ -57,3 +57,10 @@ curl -v http://localhost:8080
 - **Non-blocking I/O:** Uses `fcntl(O_NONBLOCK)` and `poll()`.
 - **Socket Management:** Handles `socket`, `bind`, `listen`, and `accept`.
 - **Client Handling:** Manages multiple clients simultaneously using a vector of `pollfd`.
+
+
+## Ressources 
+- https://www.cs.columbia.edu/~danr/courses/6761/Fall00/hw/pa1/6761-sockhelp.pdf
+- https://developer.mozilla.org/de/docs/Web/HTTP/Guides/Messages
+- https://datatracker.ietf.org/doc/html/rfc7230#section-3
+- https://www.youtube.com/watch?v=gntyAFoZp-E
