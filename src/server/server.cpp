@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/02/26 14:52:59 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/13 11:30:19 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -127,7 +127,17 @@ void Server::_handleClientMessage(int fd)
 		// this is up to parsing
 
 		// Here we would parse the request and generate a response, for now we just send a static message back
-		_clients.at(fd).responseBuffer = "Hello from Class-Server!\n";
+		std::string html = "<html><body><h1>Hello from Webserv!</h1><p>Server is running on port " + std::to_string(_port) + "</p></body></html>";
+		
+		std::string response = "HTTP/1.1 200 OK\r\n"
+							  "Content-Type: text/html\r\n"
+							  "Content-Length: " + std::to_string(html.size()) + "\r\n"
+							  "Connection: close\r\n"
+							  "\r\n" +
+							  html;
+		
+		_clients.at(fd).responseBuffer = response;
+		//create_Http_response()
 
 		// Change Poll event to writing
 		for(size_t i = 0; i < _pollfds.size(); i++)

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   client.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/25 12:56:51 by mknoll            #+#    #+#             */
-/*   Updated: 2026/02/26 14:51:51 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/13 10:49:25 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
 
 	if (argc != 2)
 	{
-		std::cout << "usage: getip address" << std::endl;
+		std::cout << "usage: get ip address" << std::endl;
 		exit(1);
 	}
 

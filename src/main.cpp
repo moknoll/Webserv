@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:52 by mknoll            #+#    #+#             */
-/*   Updated: 2026/03/26 11:08:06 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/13 12:01:08 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -33,12 +33,14 @@ int checkArguments(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-	if (checkArguments(argc, argv) == 0)
-		return 1;
-	std::string filename = argv[1];
+	// if (checkArguments(argc, argv) == 0)
+	// 	return 1;
+	(void)argc;
+	(void)argv; 
+	// std::string filename = argv[1];
 	try {
-		ConfigParser parser(filename);
-		ServerConfig config = parser.parse();
+		// ConfigParser parser(filename);
+		// ServerConfig config = parser.parse();
 		// std::cout << "Config parsed successfully:" << std::endl;
 		// std::cout << "Port: " << config.port << std::endl;
 		// std::cout << "Host: " << config.host << std::endl;
@@ -49,8 +51,8 @@ int main(int argc, char *argv[])
 		// TODO: Use the parsed config to initialize and run the server
 
 		Server webserver(MYPORT); // <--------- This needs to be config (ans not my port), but for testing we will use the defined MYPORT
-		// webserver.init();
-		// webserver.run();
+		webserver.init();
+		webserver.run();
 	} catch (const std::exception& e) {
 		std::cout << "Error: " << e.what() << std::endl;
 	
