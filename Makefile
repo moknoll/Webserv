@@ -1,14 +1,23 @@
 # Compiler
 CXX = c++
 CXX_FLAGS = -Wall -Werror -Wextra -std=c++98
+INCLUDE_FLAGS = -I./src
 
 # Sources
-SERVER_SRC = server.cpp main.cpp
-CLIENT_SRC = client.cpp
+SERVER_SRC = src/main.cpp \
+			 src/server/server.cpp \
+			 src/ConfigParser/ConfigParser.cpp \
+			 src/ConfigParser/ServerConfig.cpp
+
+CLIENT_SRC = src/server/client.cpp
 
 # Objects
-SERVER_OBJ = $(SERVER_SRC:.cpp=.o)
-CLIENT_OBJ = $(CLIENT_SRC:.cpp=.o)
+SERVER_OBJ = obj/server/main.o \
+			 obj/server/server.o \
+			 obj/ConfigParser/ConfigParser.o \
+			 obj/ConfigParser/ServerConfig.o
+
+CLIENT_OBJ = obj/server/client.o
 
 # Executables
 SERVER_NAME = server
@@ -23,11 +32,20 @@ $(SERVER_NAME): $(SERVER_OBJ)
 $(CLIENT_NAME): $(CLIENT_OBJ)
 	$(CXX) $(CXX_FLAGS) $(CLIENT_OBJ) -o $(CLIENT_NAME)
 
-%.o: %.cpp
-	$(CXX) $(CXX_FLAGS) -c $< -o $@
+obj/server/%.o: src/server/%.cpp
+	@mkdir -p obj/server
+	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
+
+obj/ConfigParser/%.o: src/ConfigParser/%.cpp
+	@mkdir -p obj/ConfigParser
+	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
+
+obj/server/main.o: src/main.cpp
+	@mkdir -p obj/server
+	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
 
 clean:
-	rm -f $(SERVER_OBJ) $(CLIENT_OBJ)
+	rm -rf obj/
 
 fclean: clean
 	rm -f $(SERVER_NAME) $(CLIENT_NAME)
