@@ -6,12 +6,11 @@
 /*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:17:41 by mknoll            #+#    #+#             */
-/*   Updated: 2026/02/26 14:01:27 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/14 11:51:39 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef CLIENT_HPP
-#define CLIENT_HPP
+#pragma once
 
 #include <string>
 
@@ -31,5 +30,3 @@ class Client {
 			isReadyToWrite = false;
 		}
 };
-
-#endif

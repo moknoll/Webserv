@@ -6,12 +6,11 @@
 /*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/25 09:16:08 by mknoll            #+#    #+#             */
-/*   Updated: 2026/02/26 14:50:44 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/14 13:06:59 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef SOCKETS_HPP
-#define SOCKETS_HPP
+#pragma once
 
 #include <sys/socket.h>	// socket()
 #include <netinet/in.h>	// 
@@ -35,7 +34,5 @@
 #define MYPORT 16000 // Port users will be connecting to 
 #define LOCALHOST "127.0.0.1"
 #define SOCKET_ERROR -1
-#define BACKLOG 10 // How may pendiing connections queue will hold 
-#define MAXDATASIZE 100 // max number ob bytes we can get at once 
-
-#endif
+#define BACKLOG 10 // How may pending connections queue will hold 
+#define MAXDATASIZE 100 // max number ob bytes we can get at once

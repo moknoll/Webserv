@@ -1,5 +1,4 @@
-#ifndef CONFIGPARSER_HPP
-#define CONFIGPARSER_HPP
+#pragma once
 
 #include "ServerConfig.hpp"
 #include <string>
@@ -15,5 +14,3 @@ class ConfigParser {
 		~ConfigParser();
 
 };
-
-#endif
