@@ -1,10 +1,10 @@
-NAME = libutils.a
+NAME = libws.a
 
 SRC = string_utils.cpp \
 
 OBJ = $(SRC:.cpp=.o)
 
-HEADERS = utilities.hpp
+HEADERS = ws.hpp
 
 CXX = c++
 CXXFLAGS = -Wall -Wextra -Werror -std=c++98

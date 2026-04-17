@@ -3,3 +3,5 @@ webserv
 client.exe
 .build
 data.json
+libutils.a
+libws.a
