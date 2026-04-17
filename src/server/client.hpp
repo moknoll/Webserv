@@ -14,19 +14,23 @@
 
 #include <string>
 
-class Client {
-	public:
-		int 		fd; // file descriptor for the client socket
-		std::string requestBuffer; // buffer to store incoming request data
-		std::string responseBuffer; // buffer to store response data to be sent back to the client
-		bool		isReadyToWrite; // flag to indicate if the full request has been received
+class Client
+{
+  public:
+	int         fd;             // file descriptor for the client socket
+	std::string requestBuffer;  // buffer to store incoming request data
+	std::string responseBuffer; // buffer to store response data to be sent back
+	                            // to the client
+	bool        isReadyToWrite; // flag to indicate if the full request has been
+	                            // received
 
-		Client(int clientFD) : fd(clientFD), isReadyToWrite(false) {}
-		~Client() {}
+	Client(int clientFD) : fd(clientFD), isReadyToWrite(false) {}
+	~Client() {}
 
-		void clearBuffers() {
-			requestBuffer.clear();
-			responseBuffer.clear();
-			isReadyToWrite = false;
-		}
+	void clearBuffers()
+	{
+		requestBuffer.clear();
+		responseBuffer.clear();
+		isReadyToWrite = false;
+	}
 };

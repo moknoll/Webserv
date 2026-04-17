@@ -12,6 +12,7 @@
 
 #include "server.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
+#include "../http/request/HttpHeader.hpp"
 
 Server::Server(std::vector<ServerConfig> configs): _configs(configs){}
 
@@ -134,9 +135,10 @@ void Server::_handleClientMessage(int fd)
 		// put data into clientbuffer
 		_clients.at(fd).requestBuffer.append(buffer, bytes);
 		std::cout << "Received: " << _clients.at(fd).requestBuffer << std::endl;
+		HttpHeader	buffer(_clients.at(fd).requestBuffer);
 
 		// Plceholder fo Request complete (\r\b\r\b) 
-		// this is up to parsing
+		// this is up to parsingLH ,
 
 		// Here we would parse the request and generate a response, for now we just send a static message back
 		_clients.at(fd).responseBuffer = "Hello from Class-Server!\n";

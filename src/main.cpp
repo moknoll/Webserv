@@ -10,13 +10,13 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "server/server.hpp"
 #include "ConfigParser/ConfigParser.hpp"
 #include "ConfigParser/ServerConfig.hpp"
+#include "server/server.hpp"
 
 #include <iostream>
 
-int checkArguments(int argc, char *argv[])
+int checkArguments(int argc, char* argv[])
 {
 	if (argc != 2)
 	{
@@ -25,23 +25,24 @@ int checkArguments(int argc, char *argv[])
 	}
 	if (std::string(argv[1]) != "config.conf")
 	{
-		std::cout << "Error: Config file must be named 'config.conf'" << std::endl;
+		std::cout << "Error: Config file must be named 'config.conf'"
+		          << std::endl;
 		return 0;
 	}
 	return 1;
 }
 
-std::vector<ServerConfig> setupConfigDefaultToTest()
+std::vector< ServerConfig > setupConfigDefaultToTest()
 {
-	std::vector<ServerConfig> configs;
-	ServerConfig config1, config2;
+	std::vector< ServerConfig > configs;
+	ServerConfig                config1, config2;
 	config1.port = MYPORT;
 	config1.host = "localhost";
 	config1.root = "./www";
 	config1.index = "index.html";
 	config1.client_max_body_size = 1024 * 1024; // 1MB
 	configs.push_back(config1);
-	
+
 	config2.port = MYPORT + 1;
 	config2.host = "localhost";
 	config2.root = "./www2";
@@ -51,17 +52,17 @@ std::vector<ServerConfig> setupConfigDefaultToTest()
 	return configs;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
 	// if (checkArguments(argc, argv) == 0)
 	// 	return 1;
 	// std::string filename = argv[1];
-	(void)argc;
-	(void)argv;
-	try {
-		
-		std::vector<ServerConfig> configs = setupConfigDefaultToTest();
-		
+	(void) argc;
+	(void) argv;
+	try
+	{
+		std::vector< ServerConfig > configs = setupConfigDefaultToTest();
+
 		std::cout << "Parsed Configurations:" << std::endl;
 		for (size_t i = 0; i < configs.size(); i++)
 		{
@@ -70,16 +71,18 @@ int main(int argc, char *argv[])
 			std::cout << "  Host: " << configs[i].host << std::endl;
 			std::cout << "  Root: " << configs[i].root << std::endl;
 			std::cout << "  Index: " << configs[i].index << std::endl;
-
 		}
-		//TODO: Use the parsed config to initialize and run the server
+		// TODO: Use the parsed config to initialize and run the server
 
-		Server webserver(configs); // <--------- This needs to be config (ans not my port), but for testing we will use the defined MYPORT
+		Server webserver(
+		    configs); // <--------- This needs to be config (ans not my port),
+		              // but for testing we will use the defined MYPORT
 		webserver.init();
 		webserver.run();
-	} catch (const std::exception& e) {
+	}
+	catch (const std::exception& e)
+	{
 		std::cout << "Error: " << e.what() << std::endl;
-	
-	}	
+	}
 	return 0;
 }

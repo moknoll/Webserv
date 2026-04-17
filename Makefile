@@ -1,55 +1,68 @@
-# Compiler
-CXX = c++
-CXX_FLAGS = -Wall -Werror -Wextra -std=c++98
-INCLUDE_FLAGS = -I./src
+NAME		:= webserv
 
-# Sources
-SERVER_SRC = src/main.cpp \
-			 src/server/server.cpp \
-			 src/ConfigParser/ConfigParser.cpp \
-			 src/ConfigParser/ServerConfig.cpp
+CXX			:= c++
+CXXFLAGS	:= -Wall -Wextra -Werror -std=c++98 -g
+RM			:= rm -f
+RMDIR		:= rm -rf
+MKDIR		:= mkdir -p
+OBJDIR		:= .build
 
-CLIENT_SRC = src/server/client.cpp
+SRC			:= src/main.cpp \
+			   src/server/server.cpp \
+			   src/ConfigParser/ConfigParser.cpp \
+			   src/ConfigParser/ServerConfig.cpp \
+			   src/http/request/HttpHeader.cpp \
 
-# Objects
-SERVER_OBJ = obj/server/main.o \
-			 obj/server/server.o \
-			 obj/ConfigParser/ConfigParser.o \
-			 obj/ConfigParser/ServerConfig.o
+OBJ			:= $(OBJDIR)/main.o \
+			   $(OBJDIR)/server/server.o \
+			   $(OBJDIR)/ConfigParser/ConfigParser.o \
+			   $(OBJDIR)/ConfigParser/ServerConfig.o \
+			   $(OBJDIR)/http/request/HttpHeader.o \
 
-CLIENT_OBJ = obj/server/client.o
+LIB_NAME	:= libutils.a
+LIB_DIR		:= src/lib/
+LIB			:= $(LIB_DIR)$(LIB_NAME)
 
-# Executables
-SERVER_NAME = server
-CLIENT_NAME = client
 
-# Rules
-all: $(SERVER_NAME) $(CLIENT_NAME)
+#################################################
+CLIENT 		:= client.exe
+CLIENT_DIR	:=	src/client/
 
-$(SERVER_NAME): $(SERVER_OBJ)
-	$(CXX) $(CXX_FLAGS) $(SERVER_OBJ) -o $(SERVER_NAME)
+################################################
 
-$(CLIENT_NAME): $(CLIENT_OBJ)
-	$(CXX) $(CXX_FLAGS) $(CLIENT_OBJ) -o $(CLIENT_NAME)
+# OBJ			:= $(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SRC))
 
-obj/server/%.o: src/server/%.cpp
-	@mkdir -p obj/server
-	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
+all: $(NAME) $(CLIENT)
 
-obj/ConfigParser/%.o: src/ConfigParser/%.cpp
-	@mkdir -p obj/ConfigParser
-	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
+$(NAME): $(OBJ) $(LIB)
+	$(CXX) $(CXXFLAGS) $(OBJ) $(LIB) -o $(NAME)
 
-obj/server/main.o: src/main.cpp
-	@mkdir -p obj/server
-	$(CXX) $(CXX_FLAGS) $(INCLUDE_FLAGS) -c $< -o $@
+# $(OBJDIR)/%.o: src/%.cpp | $(OBJDIR)
+$(OBJDIR)/%.o: src/%.cpp
+	$(MKDIR) $(dir $@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# $(OBJDIR):
+	# $(MKDIR) $(OBJDIR)
+	# $(MKDIR) $(dir $@)
+
+$(LIB):
+	# @make -C $(LIB_DIR) --no-print-directory
+	@make -C $(LIB_DIR)
+
+$(CLIENT):
+	@make -C $(CLIENT_DIR)
 
 clean:
-	rm -rf obj/
+	$(RM) $(OBJ)
+	$(RMDIR) $(OBJDIR)
+	@make clean -C $(LIB_DIR) --no-print-directory
 
 fclean: clean
-	rm -f $(SERVER_NAME) $(CLIENT_NAME)
+	$(RM) $(NAME)
+	@make fclean -C $(LIB_DIR) --no-print-directory
+	@make fclean -C $(CLIENT_DIR) --no-print-directory
 
 re: fclean all
 
-.PHONY: all clean fclean re
+.PHONY: clean fclean, all, re
