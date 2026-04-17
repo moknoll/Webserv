@@ -2,13 +2,16 @@
 
 std::string ws::strip(const std::string& s)
 {
-	const char* whilespaces = " \t\n\r\f\v";
-	size_t      begin = s.find_first_not_of(whilespaces);
+	const char* whitespaces = " \t\n\r\f\v";
+	size_t      begin = s.find_first_not_of(whitespaces);
 
 	if (begin == std::string::npos)
 		return "";
 
-	size_t end = s.find_last_not_of(whilespaces);
+	size_t end = s.find_last_not_of(whitespaces);
+
+	if (end == std::string::npos)
+		return "";
 
 	return s.substr(begin, end - begin + 1);
 }
