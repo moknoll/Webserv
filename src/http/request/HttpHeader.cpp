@@ -54,6 +54,26 @@ HttpHeader& HttpHeader::operator=(const HttpHeader& other)
 	return *this;
 }
 
+std::string HttpHeader::gethost()
+{
+	return this->_host;
+}
+
+std::string HttpHeader::geturi()
+{
+	return this->_uri;
+}
+
+std::string HttpHeader::getmethod()
+{
+	return this->_method;
+}
+
+std::string HttpHeader::gethttpversion()
+{
+	return this->_http_version;
+}
+
 void HttpHeader::_parse_start_line(const std::string& buffer)
 {
 	size_t end_startl_pos = buffer.find("\r\n");

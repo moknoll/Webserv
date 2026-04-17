@@ -13,6 +13,11 @@ class HttpHeader
 
 	HttpHeader& operator=(const HttpHeader& other);
 
+	std::string gethost();
+	std::string getmethod();
+	std::string geturi();
+	std::string gethttpversion();
+
   private:
 	std::string                          _method;
 	std::string                          _uri;
