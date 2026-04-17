@@ -3,16 +3,16 @@
 /*                                                        :::      ::::::::   */
 /*   server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/14 13:16:03 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/17 16:29:34 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "server.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
-#include "../http/request/HttpHeader.hpp"
+// #include "../http/request/HttpHeader.hpp"
 
 Server::Server(std::vector<ServerConfig> configs): _configs(configs){}
 
@@ -135,7 +135,7 @@ void Server::_handleClientMessage(int fd)
 		// put data into clientbuffer
 		_clients.at(fd).requestBuffer.append(buffer, bytes);
 		std::cout << "Received: " << _clients.at(fd).requestBuffer << std::endl;
-		HttpHeader	buffer(_clients.at(fd).requestBuffer);
+		// HttpHeader	buffer(_clients.at(fd).requestBuffer);
 
 		// Plceholder fo Request complete (\r\b\r\b) 
 		// this is up to parsingLH ,
