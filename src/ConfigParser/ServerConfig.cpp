@@ -8,3 +8,8 @@ ServerConfig::ServerConfig()
 	host = "";
 	client_max_body_size = 0;
 }
+
+int ServerConfig::_getPort()
+{
+	return this->port;
+}

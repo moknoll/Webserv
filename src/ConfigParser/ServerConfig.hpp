@@ -1,5 +1,4 @@
-#ifndef SERVERCONFIG_HPP
-#define SERVERCONFIG_HPP
+#pragma once
 
 #include <string>
 
@@ -12,6 +11,5 @@ class ServerConfig {
 		size_t 		client_max_body_size;
 
 		ServerConfig();
+		int _getPort();
 };
-
-#endif

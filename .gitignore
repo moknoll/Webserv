@@ -1,3 +1,5 @@
 *.o
-server
-client
+webserv
+client.exe
+.build
+data.json

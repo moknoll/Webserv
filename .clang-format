@@ -1,0 +1,67 @@
+# **************************************************************************** #
+#                                                                              #
+#                                                         :::      ::::::::    #
+#    .clang-format                                      :+:      :+:    :+:    #
+#                                                     +:+ +:+         +:+      #
+#    By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+         #
+#                                                 +#+#+#+#+#+   +#+            #
+#    Created: 2025/10/07 20:04:34 by nmagomad          #+#    #+#              #
+#    Updated: 2025/10/07 20:04:37 by nmagomad         ###   ########.fr        #
+#                                                                              #
+# **************************************************************************** #
+
+Language: Cpp
+
+AlignConsecutiveDeclarations:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  AlignFunctionPointers: true
+  AlignFunctionDeclarations: true
+AlignEscapedNewlines: LeftWithLastLine
+BinPackParameters: OnePerLine
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: Empty
+# # AllowAllDeclarationsOnOneLine: false # Устаревшая опция, deprecated
+# AlwaysBreakAfterReturnType: None  This option is renamed to BreakAfterReturnType.
+BreakAfterReturnType: Automatic
+AlwaysBreakBeforeMultilineStrings: false
+AlignOperands: AlignAfterOperator
+BreakBeforeBinaryOperators: NonAssignment  # рекомендуется вместе с AlignAfterOperator
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 2
+BinPackArguments: false
+BreakBeforeBraces: Allman
+BreakBeforeTernaryOperators: false
+BreakTemplateDeclarations: Yes # The template declaration breaking style to use. (BTDS_Leave, BTDS_No, BTDS_MultiLine, BTDS_Yes)
+ColumnLimit: 80
+KeepEmptyLines:
+  AtEndOfFile: true
+  AtStartOfBlock: false
+  AtStartOfFile: false
+MaxEmptyLinesToKeep: 1
+PointerAlignment: Left
+# PenaltyBreakBeforeFirstCallParameter: 1
+# PenaltyBreakString: 1
+# PenaltyExcessCharacter: 0
+SpaceAfterTemplateKeyword: true
+SpacesInAngles: Always
+# SpacesInAnglesStyle: Always
+Standard: Cpp03
+SpaceAfterCStyleCast: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpacesInSquareBrackets: false
+SpacesInParens: Custom
+SpacesInParensOptions: # SpacesInParentheses: false
+  ExceptDoubleParentheses: false
+  InConditionalStatements: false
+  InCStyleCasts: false # SpacesInCStyleCastParentheses: false
+  InEmptyParentheses: false # SpaceInEmptyParentheses: false
+TabWidth: 4
+UseTab: ForIndentation
+IndentWidth: 4
+IndentCaseLabels: true

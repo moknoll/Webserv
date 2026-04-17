@@ -10,7 +10,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "sockets.hpp"
+#include "../server/sockets.hpp"
 
 int main(int argc, char *argv[])
 {

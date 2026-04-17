@@ -6,57 +6,70 @@
 /*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/13 11:30:19 by moritzknoll      ###   ########.fr       */
+/*   Updated: 2026/04/17 16:52:18 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "server.hpp"
+#include "../ConfigParser/ServerConfig.hpp"
+// #include "../http/request/HttpHeader.hpp"
 
-Server::Server(int port) : _port(port), _serverfd(-1) {}
+Server::Server(std::vector<ServerConfig> configs): _configs(configs){}
 
 Server::~Server()
 {
-	if(_serverfd != -1)
-		close(_serverfd);
+	// for(size_t i = 0; i < _serverfds.size(); i++)
+	// {
+	// 	if(_serverfds[i] != -1)
+	// 		close(_serverfds[i]);
+	// }
+	//Check later on how to close? 
 }
 
 void Server::init()
 {
 	int yes = 1;
 
-	// 1. Create socket
-	if((_serverfd = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR)
-		throw std::runtime_error("Socket Creation failed");
+	for (size_t i = 0; i < _configs.size(); i++)
+	{
+		int sock_fd = -1;		
+		// 1. Create socket
+		if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR)
+			throw std::runtime_error("Socket Creation failed"); 
+
+		// 2. Set socket opt to reset address/port
+		if((setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))) == SOCKET_ERROR)
+			throw std::runtime_error("Setsockopt failed");
 	
-	// 2. Set socket opt to reset
-	if((setsockopt(_serverfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))) == SOCKET_ERROR)
-		throw std::runtime_error("Setsockopt failed");
+		// 3. Set serverFD to non block
+		if((fcntl(sock_fd, F_SETFL, O_NONBLOCK)) == SOCKET_ERROR)
+			throw std::runtime_error("Fcntl failed");
 	
-	// 3. Set serverFD to non block
-	if((fcntl(_serverfd, F_SETFL, O_NONBLOCK)) == SOCKET_ERROR)
-		throw std::runtime_error("Fcntl failed");
+		// 4. Bind server adress to socket
+		struct sockaddr_in serverAddr;
+		serverAddr.sin_family = AF_INET; // Set IPv4
+		serverAddr.sin_port = htons(_configs[i].port); // set port
+		serverAddr.sin_addr.s_addr = INADDR_ANY; // allow in from any IP
+		bzero(&(serverAddr.sin_zero), 8);
 	
-	// 4. Bind server adress to socket
-	struct sockaddr_in serverAddr;
-	serverAddr.sin_family = AF_INET; // Set IPv4
-	serverAddr.sin_port = htons(_port); // set port
-	serverAddr.sin_addr.s_addr = INADDR_ANY; // allow in from any IP
-	bzero(&(serverAddr.sin_zero), 8);
+		if ((bind(sock_fd, (struct sockaddr *)&serverAddr, sizeof(struct sockaddr))) == SOCKET_ERROR)
+			throw std::runtime_error("Bind failed");
 	
-	if ((bind(_serverfd, (struct sockaddr *)&serverAddr, sizeof(struct sockaddr))) == SOCKET_ERROR)
-		throw std::runtime_error("Bind failed");
+		// 5. Listen 
+		if((listen(sock_fd, BACKLOG)) == SOCKET_ERROR)	// backlog = number of connections allowed on queue
+			throw std::runtime_error("listen failed");
 	
-	// 5. Listen 
-	if((listen(_serverfd, BACKLOG)) == SOCKET_ERROR)	// backlog = number of connections allowed on queue
-		throw std::runtime_error("listen failed");
-	
-	// 6. Set server FD to pull vector 
-	struct pollfd pfd;
-	pfd.fd = _serverfd;
-	pfd.events = POLLIN;
-	_pollfds.push_back(pfd);
-	
-	std::cout << "Server listening on port " << _port << std::endl;
+		// 6. Set server FD to pull vector 
+		struct pollfd pfd;
+		pfd.fd = sock_fd;
+		pfd.events = POLLIN;
+		_pollfds.push_back(pfd);
+
+		// 7. Save server fd and config in map
+		_serverfds[sock_fd] = _configs[i];
+		std::cout << "Server listening on port " << _configs[i].port << std::endl;
+		std::cout << "On fd: " << sock_fd << std::endl;
+	}
 }
 
 void Server::run()
@@ -73,8 +86,8 @@ void Server::run()
 			// Case A: Read(POLLIN)
 			if(_pollfds[i].revents & POLLIN)
 			{
-				if(_pollfds[i].fd == _serverfd)
-					_acceptNewClient();
+				if(_serverfds.count(_pollfds[i].fd))
+					_acceptNewClient(_pollfds[i].fd);
 				else 
 					_handleClientMessage(_pollfds[i].fd);
 			}
@@ -86,11 +99,11 @@ void Server::run()
 	}	
 }
 
-void Server::_acceptNewClient()
+void Server::_acceptNewClient(int fd)
 {
 	struct sockaddr_in clientAddr;
 	socklen_t addrLen = sizeof(clientAddr);
-	int newClientFd = accept(_serverfd,(struct sockaddr *)&clientAddr, &addrLen);
+	int newClientFd = accept(fd,(struct sockaddr *)&clientAddr, &addrLen);
 	
 	if(newClientFd == SOCKET_ERROR)
 		return;
@@ -122,21 +135,12 @@ void Server::_handleClientMessage(int fd)
 		// put data into clientbuffer
 		_clients.at(fd).requestBuffer.append(buffer, bytes);
 		std::cout << "Received: " << _clients.at(fd).requestBuffer << std::endl;
+		// HttpHeader	buffer(_clients.at(fd).requestBuffer);
 
 		// Plceholder fo Request complete (\r\b\r\b) 
-		// this is up to parsing
+		// this is up to parsingLH ,
 
-		// Here we would parse the request and generate a response, for now we just send a static message back
-		std::string html = "<html><body><h1>Hello from Webserv!</h1><p>Server is running on port " + std::to_string(_port) + "</p></body></html>";
-		
-		std::string response = "HTTP/1.1 200 OK\r\n"
-							  "Content-Type: text/html\r\n"
-							  "Content-Length: " + std::to_string(html.size()) + "\r\n"
-							  "Connection: close\r\n"
-							  "\r\n" +
-							  html;
-		
-		_clients.at(fd).responseBuffer = response;
+		// _clients.at(fd).responseBuffer = response;
 		//create_Http_response()
 
 		// Change Poll event to writing
@@ -200,4 +204,3 @@ void Server::_cleanupClient(int fd)
 	
 	std::cout << "Client disconnected" << std::endl;
 }
-
