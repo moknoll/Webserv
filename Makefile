@@ -19,7 +19,7 @@ OBJ			:= $(OBJDIR)/main.o \
 			   $(OBJDIR)/ConfigParser/ServerConfig.o \
 			#    $(OBJDIR)/http/request/HttpHeader.o \
 
-LIB_NAME	:= libutils.a
+LIB_NAME	:= libws.a
 LIB_DIR		:= src/lib/
 LIB			:= $(LIB_DIR)$(LIB_NAME)
 

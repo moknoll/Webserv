@@ -6,7 +6,7 @@
 /*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/17 16:52:18 by moritzknoll      ###   ########.fr       */
+/*   Updated: 2026/04/18 12:47:46 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -139,6 +139,9 @@ void Server::_handleClientMessage(int fd)
 
 		// Plceholder fo Request complete (\r\b\r\b) 
 		// this is up to parsingLH ,
+		std::string response = "Hello from Server"; 
+        
+        _clients.at(fd).responseBuffer = response;
 
 		// _clients.at(fd).responseBuffer = response;
 		//create_Http_response()
@@ -172,7 +175,7 @@ void Server::_sendResponseToClient(int fd)
 	{
 		msg.clear();
 		_clients.at(fd).requestBuffer.clear(); // Empty for new request
-		
+		std::cout << "Response send" << std::endl; 
 		// reset Poll event : To reading
 		for(size_t i = 0; i < _pollfds.size(); i++)
 		{
