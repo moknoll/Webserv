@@ -13,6 +13,7 @@
 #include "ConfigParser/ConfigParser.hpp"
 #include "ConfigParser/ServerConfig.hpp"
 #include "server/server.hpp"
+#include "logger/Logger.hpp"
 
 #include <iostream>
 
@@ -59,6 +60,8 @@ int main(int argc, char* argv[])
 	// std::string filename = argv[1];
 	(void) argc;
 	(void) argv;
+	Logger::getInstance().setLevel(DEBUG);
+	
 	try
 	{
 		std::vector< ServerConfig > configs = setupConfigDefaultToTest();

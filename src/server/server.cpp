@@ -12,6 +12,8 @@
 
 #include "server.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
+#include "../logger/Logger.hpp"
+#include "client.hpp"
 // #include "../http/request/HttpHeader.hpp"
 
 Server::Server(std::vector<ServerConfig> configs): _configs(configs){}
@@ -120,7 +122,8 @@ void Server::_acceptNewClient(int fd)
 	// 2. Create new client object and safe into map 
 	_clients.insert(std::make_pair(newClientFd, Client(newClientFd)));
 	
-	std::cout << "New Client connected: " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+	// std::cout << "New Client connected: " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+	LOG_DEBUG( "New client connected");
 }
 
 void Server::_handleClientMessage(int fd)
@@ -134,7 +137,8 @@ void Server::_handleClientMessage(int fd)
 	{
 		// put data into clientbuffer
 		_clients.at(fd).requestBuffer.append(buffer, bytes);
-		std::cout << "Received: " << _clients.at(fd).requestBuffer << std::endl;
+		// std::cout << "Received: " << _clients.at(fd).requestBuffer << std::endl;
+		Logger::getInstance().log(INFO, "Received", _clients.at(fd).requestBuffer);
 		// HttpHeader	buffer(_clients.at(fd).requestBuffer);
 
 		// Plceholder fo Request complete (\r\b\r\b) 
@@ -205,5 +209,7 @@ void Server::_cleanupClient(int fd)
 	// delete from client map
 	_clients.erase(fd);
 	
-	std::cout << "Client disconnected" << std::endl;
+	// std::cout << "Client disconnected" << std::endl;
+	LOG_DEBUG("Client disconnected");
+	// Logger::log(DEBUG, "client disconnected");
 }
