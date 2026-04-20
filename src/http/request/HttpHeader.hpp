@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <sstream>
 
 class HttpHeader
 {
@@ -36,3 +37,10 @@ class HttpHeader
 	void _parse_header(const std::string& header);
 };
 
+template < typename T >
+std::string to_string(const T& value)
+{
+	std::ostringstream oss;
+	oss << value;
+	return oss.str();
+}

@@ -12,8 +12,8 @@
 
 #include "ConfigParser/ConfigParser.hpp"
 #include "ConfigParser/ServerConfig.hpp"
-#include "server/server.hpp"
 #include "logger/Logger.hpp"
+#include "server/server.hpp"
 
 #include <iostream>
 
@@ -38,14 +38,14 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	std::vector< ServerConfig > configs;
 	ServerConfig                config1, config2;
 	config1.port = MYPORT;
-	config1.host = "localhost";
+	config1.host = "server1.com";
 	config1.root = "./www";
 	config1.index = "index.html";
 	config1.client_max_body_size = 1024 * 1024; // 1MB
 	configs.push_back(config1);
 
 	config2.port = MYPORT + 1;
-	config2.host = "localhost";
+	config2.host = "server2.org";
 	config2.root = "./www2";
 	config2.index = "index.html";
 	config2.client_max_body_size = 1024 * 1024; // 1MB
@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
 	(void) argc;
 	(void) argv;
 	Logger::getInstance().setLevel(DEBUG);
-	
+
 	try
 	{
 		std::vector< ServerConfig > configs = setupConfigDefaultToTest();

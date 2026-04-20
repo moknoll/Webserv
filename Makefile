@@ -48,6 +48,9 @@ $(OBJDIR)/%.o: src/%.cpp
 	# $(MKDIR) $(OBJDIR)
 	# $(MKDIR) $(dir $@)
 
+run: $(NAME)
+	./webserv | cat -e
+
 $(LIB):
 	# @make -C $(LIB_DIR) --no-print-directory
 	@make -C $(LIB_DIR)
