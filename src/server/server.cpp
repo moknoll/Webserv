@@ -3,15 +3,17 @@
 /*                                                        :::      ::::::::   */
 /*   server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
+/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/17 16:52:18 by moritzknoll      ###   ########.fr       */
+/*   Updated: 2026/04/20 13:06:58 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "server.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
+#include "../logger/Logger.hpp"
+#include "client.hpp"
 // #include "../http/request/HttpHeader.hpp"
 
 Server::Server(std::vector<ServerConfig> configs): _configs(configs){}
@@ -120,7 +122,8 @@ void Server::_acceptNewClient(int fd)
 	// 2. Create new client object and safe into map 
 	_clients.insert(std::make_pair(newClientFd, Client(newClientFd)));
 	
-	std::cout << "New Client connected: " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+	// std::cout << "New Client connected: " << inet_ntoa(clientAddr.sin_addr) << std::endl;
+	LOG_DEBUG( "New client connected");
 }
 
 void Server::_handleClientMessage(int fd)
@@ -134,11 +137,15 @@ void Server::_handleClientMessage(int fd)
 	{
 		// put data into clientbuffer
 		_clients.at(fd).requestBuffer.append(buffer, bytes);
-		std::cout << "Received: " << _clients.at(fd).requestBuffer << std::endl;
+		// std::cout << "Received: " << _clients.at(fd).requestBuffer << std::endl;
+		Logger::getInstance().log(INFO, "Received", _clients.at(fd).requestBuffer);
 		// HttpHeader	buffer(_clients.at(fd).requestBuffer);
 
 		// Plceholder fo Request complete (\r\b\r\b) 
 		// this is up to parsingLH ,
+		std::string response = "Hello from Server"; 
+        
+        _clients.at(fd).responseBuffer = response;
 
 		// _clients.at(fd).responseBuffer = response;
 		//create_Http_response()
@@ -172,7 +179,7 @@ void Server::_sendResponseToClient(int fd)
 	{
 		msg.clear();
 		_clients.at(fd).requestBuffer.clear(); // Empty for new request
-		
+		std::cout << "Response send" << std::endl; 
 		// reset Poll event : To reading
 		for(size_t i = 0; i < _pollfds.size(); i++)
 		{
@@ -202,5 +209,7 @@ void Server::_cleanupClient(int fd)
 	// delete from client map
 	_clients.erase(fd);
 	
-	std::cout << "Client disconnected" << std::endl;
+	// std::cout << "Client disconnected" << std::endl;
+	LOG_DEBUG("Client disconnected");
+	// Logger::log(DEBUG, "client disconnected");
 }

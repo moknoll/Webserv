@@ -29,7 +29,6 @@ void ConfigParser::parseDirective(const std::string& line, ServerConfig& config)
 	
 	if(!(iss >> key >> value))
 		throw std::runtime_error("Invalid directive format: " + line);
-	
 	if (key == "listen")
 	{
 		// Check for duplicate listen directive
@@ -60,7 +59,7 @@ void ConfigParser::requiredFieldsValidation(const ServerConfig& config, bool fou
 		throw std::runtime_error("Missing required directive: host");
 	if (config.root.empty())
 		throw std::runtime_error("Missing required directive: root");
-	if (config.index.empty())
+	if (config.index.empty()) 
 		throw std::runtime_error("Missing required directive: index");
 	if (bracketCount != 0)
 		throw std::runtime_error("Unbalanced brackets in config file");
