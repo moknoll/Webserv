@@ -1,0 +1,225 @@
+#include "HttpResponse.hpp"
+#include "../lib/ws.hpp"
+#include "HttpRequest.hpp"
+
+#include <cstddef>
+#include <fstream>
+#include <iostream>
+#include <iterator>
+#include <map>
+#include <string>
+#include <sys/stat.h>
+
+HttpResponse::HttpResponse(const std::string& status_text, int status)
+    : _status(status), _status_text(status_text), _body("")
+{
+}
+
+HttpResponse::HttpResponse(const HttpResponse& other)
+    : _status(other._status), _status_text(other._status_text),
+      _headers(other._headers), _body(other._body)
+{
+}
+
+HttpResponse::~HttpResponse() {}
+
+HttpResponse& HttpResponse::operator=(const HttpResponse& other)
+{
+	if (this != &other)
+	{
+		_status = other._status;
+		_status_text = other._status_text;
+		_headers = other._headers;
+		_body = other._body;
+	}
+	return *this;
+}
+
+const std::string getFileExtension(const std::string& path)
+{
+	size_t lastSalsh = path.find_last_of('/');
+
+	size_t lastDot = path.find_last_of('.');
+
+	if (lastDot == std::string::npos
+	    || (lastSalsh != std::string::npos && lastDot < lastSalsh))
+		return "";
+
+	std::string extension = path.substr(lastDot + 1);
+
+	ws::toLowerCase(extension);
+	return extension;
+}
+
+/*
+ * HTTP/1.1 200 OK\r\n
+ * Server: webserv\r\n
+ * Date: Fri, 21 Apr 2026 12:52:34 GMT\r\n
+ * Content-Length: 555\r\n
+ * Content-Type: text/html\r\n
+ *
+ * <html><body>Some code</body></html>
+ */
+
+std::string HttpResponse::build_response(const std::string& path)
+{
+	std::string response = "HTTP/1.1 ";
+
+	response += ws::to_string(_status);
+	response += " " + _status_text + "\r\n";
+	response += "Server: webserv\r\n";
+
+	std::string extension = getFileExtension(path);
+	std::string Content_type;
+
+	Content_type = _getMimeType(extension);
+
+	response += "Content-Type: " + Content_type + "\r\n";
+
+	std::string   body;
+
+	std::ifstream file(path.c_str(), std::ios::binary);
+	if (file.is_open())
+	{
+		std::string body_file((std::istreambuf_iterator< char >(file)),
+		                      std::istreambuf_iterator< char >());
+
+		response +=
+		    "Content-Length: " + ws::to_string(body_file.size()) + "\r\n\r\n";
+		// std::string bb = std::string(body_file.begin(), body_file.end());
+		response += body_file;
+		std::cout << "BODY size: " << body_file.size();
+	}
+	else
+	{
+		// response error 5xx
+		body = build_err_page(HTTP_INTERNAL_SERVER_ERROR);
+		response +=
+		    "Content-Length: " + ws::to_string(body.size()) + "\r\n\r\n";
+		response += body;
+	}
+
+	return response;
+}
+
+std::string HttpResponse::build_err_page(int err_status)
+{
+	std::map< int, std::string > errors_messages;
+
+	errors_messages[HTTP_BAD_REQUEST] = "400 Bad Request";
+	errors_messages[HTTP_FORBIDDEN] = "403 Forbidden";
+	errors_messages[HTTP_NOT_FOUND] = "404 Not Found";
+	errors_messages[HTTP_REQUEST_URI_TOO_LARGE] = "414 URI Too Long";
+	errors_messages[HTTP_REQUEST_ENTITY_TOO_LARGE] = "413 Content Too Large";
+	errors_messages[HTTP_INTERNAL_SERVER_ERROR] = "500 Internal Server Error";
+	errors_messages[HTTP_NOT_IMPLEMENTED] = "501 Not Implemented";
+	errors_messages[HTTP_BAD_GATEWAY] = "502 Bad Gateway";
+
+	return "<html><head><title>" + errors_messages[err_status]
+	     + "</title></head><body><center><h1>" + errors_messages[err_status]
+	     + "</h1></center><hr><center>webserv</center></body></html>";
+}
+
+std::string HttpResponse::_getMimeType(const std::string& extension)
+{
+	std::map< std::string, std::string > m;
+	m["3gp"] = "video/3gpp";
+	m["3gpp"] = "video/3gpp";
+	m["adp"] = "audio/adpcm";
+	m["apng"] = "image/apng";
+	m["bmp"] = "image/bmp";
+	m["conf"] = "text/plain";
+	m["css"] = "text/css";
+	m["csv"] = "text/csv";
+	m["deb"] = "application/octet-stream";
+	m["doc"] = "application/msword";
+	m["dot"] = "application/msword";
+	m["epub"] = "application/epub+zip";
+	m["gif"] = "image/gif";
+	m["gz"] = "application/gzip";
+	m["h261"] = "video/h261";
+	m["h263"] = "video/h263";
+	m["h264"] = "video/h264";
+	m["heic"] = "image/heic";
+	m["heics"] = "image/heic-sequence";
+	m["heif"] = "image/heif";
+	m["htm"] = "text/html";
+	m["html"] = "text/html";
+	m["img"] = "application/octet-stream";
+	m["in"] = "text/plain";
+	m["ini"] = "text/plain";
+	m["ink"] = "application/inkml+xml";
+	m["iso"] = "application/octet-stream";
+	m["jpeg"] = "image/jpeg";
+	m["jpf"] = "image/jpx";
+	m["jpg"] = "image/jpeg";
+	m["jpx"] = "image/jpx";
+	m["js"] = "application/javascript";
+	m["json"] = "application/json";
+	m["json5"] = "application/json5";
+	m["jsonld"] = "application/ld+json";
+	m["jsonml"] = "application/jsonml+json";
+	m["jsx"] = "text/jsx";
+	m["kar"] = "audio/midi";
+	m["list"] = "text/plain";
+	m["log"] = "text/plain";
+	m["m1v"] = "video/mpeg";
+	m["m2a"] = "audio/mpeg";
+	m["m2v"] = "video/mpeg";
+	m["m3a"] = "audio/mpeg";
+	m["m4a"] = "audio/mp4";
+	m["m4p"] = "application/mp4";
+	m["map"] = "application/json";
+	m["mar"] = "application/octet-stream";
+	m["markdown"] = "text/markdown";
+	m["mb"] = "application/mathematica";
+	m["md"] = "text/markdown";
+	m["mid"] = "audio/midi";
+	m["midi"] = "audio/midi";
+	m["mj2"] = "video/mj2";
+	m["mjp2"] = "video/mj2";
+	m["mjs"] = "application/javascript";
+	m["mov"] = "video/quicktime";
+	m["mp2"] = "audio/mpeg";
+	m["mp2a"] = "audio/mpeg";
+	m["mp3"] = "audio/mpeg";
+	m["mp4"] = "video/mp4";
+	m["mp4a"] = "audio/mp4";
+	m["mp4s"] = "application/mp4";
+	m["mp4v"] = "video/mp4";
+	m["mpe"] = "video/mpeg";
+	m["mpeg"] = "video/mpeg";
+	m["mpg"] = "video/mpeg";
+	m["mpg4"] = "video/mp4";
+	m["mpga"] = "audio/mpeg";
+	m["msh"] = "model/mesh";
+	m["oga"] = "audio/ogg";
+	m["ogg"] = "audio/ogg";
+	m["ogv"] = "video/ogg";
+	m["ogx"] = "application/ogg";
+	m["owl"] = "application/rdf+xml";
+	m["pdf"] = "application/pdf";
+	m["png"] = "image/png";
+	m["ps"] = "application/postscript";
+	m["sgi"] = "image/sgi";
+	m["shf"] = "application/shf+xml";
+	m["shtml"] = "text/html";
+	m["so"] = "application/octet-stream";
+	m["spx"] = "audio/ogg";
+	m["sru"] = "application/sru+xml";
+	m["srx"] = "application/sparql-results+xml";
+	m["ssdl"] = "application/ssdl+xml";
+	m["svg"] = "image/svg+xml";
+	m["svgz"] = "image/svg+xml";
+	m["text"] = "text/plain";
+	m["txt"] = "text/plain";
+	m["uri"] = "text/uri-list";
+	m["wav"] = "audio/wav";
+	m["webm"] = "video/webm";
+	m["webp"] = "image/webp";
+	m["xml"] = "application/xml";
+
+	if (m.find(extension) == m.end())
+		return m["txt"];
+	return m[extension];
+}

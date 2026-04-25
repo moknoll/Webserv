@@ -1,5 +1,5 @@
 #include "HttpHeader.hpp"
-#include "../../lib/ws.hpp"
+#include "../lib/ws.hpp"
 #include <cstddef>
 #include <cstdlib>
 #include <iostream>

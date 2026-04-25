@@ -14,8 +14,14 @@
 #include "ConfigParser/ServerConfig.hpp"
 #include "logger/Logger.hpp"
 #include "server/server.hpp"
+#include "server/sockets.hpp"
 
+#include <cstdio>
+#include <ctime>
+#include <fcntl.h>
 #include <iostream>
+#include <string>
+#include <sys/stat.h>
 
 int checkArguments(int argc, char* argv[])
 {
@@ -53,6 +59,31 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	return configs;
 }
 
+void file_stat(const char* name)
+{
+	struct stat filestat;
+	if (stat(name, &filestat) == 0)
+	{
+		struct timespec tm = filestat.st_atim;
+		struct timespec tm2 = filestat.st_ctim;
+
+		std::cout << "time in sec: " << tm.tv_sec << std::endl;
+		std::cout << "time in sec: " << tm2.tv_sec << std::endl;
+
+		std::cout << "size: " << filestat.st_size << std::endl;
+		std::cout << "mode: " << filestat.st_mode << std::endl;
+		std::cout << "atime: " << filestat.st_atime << std::endl;
+		std::cout << "ctime: " << filestat.st_ctime << std::endl;
+		std::cout << "is file: " << S_ISREG(filestat.st_mode);
+		std::cout << "is dir: " << S_ISDIR(filestat.st_mode);
+	}
+	else
+	{
+		perror("stat error: ");
+		// std::cout << "error stat\n";
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	// if (checkArguments(argc, argv) == 0)
@@ -61,6 +92,7 @@ int main(int argc, char* argv[])
 	(void) argc;
 	(void) argv;
 	Logger::getInstance().setLevel(DEBUG);
+
 
 	try
 	{

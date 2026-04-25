@@ -12,16 +12,21 @@
 
 #include "server.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
-#include "../http/request/HttpHeader.hpp"
+#include "../http/HttpRequest.hpp"
+#include "../http/HttpResponse.hpp"
+#include "../lib/ws.hpp"
 #include "../logger/Logger.hpp"
 #include "client.hpp"
+
+#include <cerrno>
+#include <cstddef>
+#include <cstdio>
 #include <cstring>
-#include <fstream>
-#include <ios>
+#include <errno.h>
 #include <iostream>
-#include <iterator>
-#include <sstream>
+#include <map>
 #include <string>
+#include <unistd.h>
 #include <vector>
 // #include "../http/request/HttpHeader.hpp"
 
@@ -160,45 +165,29 @@ void Server::_handleClientMessage(int fd)
 		// HttpHeader	buffer(_clients.at(fd).requestBuffer);
 		//
 
-		std::stringstream ss;
-		ss << std::strlen(buffer);
-		LOG_DEBUG("buffer bytes size: " + ss.str());
-		HttpHeader  httprequest(buffer);
-		std::string path = "./src/www";
-		if (httprequest.geturi() == "/")
-			path += "/index.html";
+		HttpRequest  request(buffer);
+		HttpResponse respons("OK", 200);
+
+		std::string  root = "/";
+		char         pwd[256];
+		if (getcwd(pwd, 256) != NULL)
+			root = std::string(pwd) + "/src/www/";
+
+		std::string path = request.get_uri();
+		if (path == "/")
+			path = root + "index.html";
 		else
-			path += httprequest.geturi();
-		std::string resp =
-		    "HTTP/1.1 200 OK\r\nContent-Type: text/html;\r\nContent-Length: ";
+			path = root + path;
 
-		std::ifstream file(path.c_str(), std::ios::binary);
-
-		if (file.is_open())
-		{
-			file.seekg(0, std::ios::end);
-			size_t file_size = file.tellg();
-			file.seekg(0, std::ios::beg);
-			std::vector< char > body(file_size);
-			// std::vector<char>	body((std::istream_iterator<char>(file)),
-			// std::istream_iterator<char>());
-			file.read(&body[0], file_size);
-			std::string content_length = to_string(file_size);
-			resp += content_length;
-			resp += " \r\n\r\n";
-			resp += std::string(body.begin(), body.end());
-			LOG_DEBUG(content_length);
-		}
+		std::string resp = respons.build_response(path);
+		_clients.at(fd).responseBuffer = resp;
 
 		// Plceholder fo Request complete (\r\b\r\b)
 		// this is up to parsingLH ,
 
-		// Here we would parse the request and generate a response, for now we
-		// just send a static message back
+		// Here we would parse the request and generate a response, for now
+		// we just send a static message back
 		// _clients.at(fd).responseBuffer = "Hello from Class-Server!\n";
-		std::cout << "resp size: " << resp.size();
-		_clients.at(fd).responseBuffer = resp;
-		std::cout << _clients.at(fd).responseBuffer.size();
 
 		// Change Poll event to writing
 		for (size_t i = 0; i < _pollfds.size(); i++)
@@ -219,11 +208,32 @@ void Server::_sendResponseToClient(int fd)
 		return;
 
 	std::string& msg = _clients.at(fd).responseBuffer;
+	const char*  buffer = msg.c_str();
+	size_t       buffer_size = msg.size();
 
 	if (msg.empty())
 		return;
 
-	int bytesSent = send(fd, msg.c_str(), msg.size(), 0);
+	LOG_DEBUG(ws::to_string(msg.size()));
+	int bytesSent = 0;
+	while (buffer_size > 0)
+	{
+		bytesSent = send(fd, msg.c_str(), msg.size(), 0);
+
+		if (bytesSent == -1 && errno == EAGAIN)
+			LOG_DEBUG("Buffer is full");
+		if (bytesSent == -1)
+		{
+			perror("erro in sendin");
+			return;
+		}
+
+
+		LOG_DEBUG("SENT BYTES: " + ws::to_string(bytesSent));
+		buffer += bytesSent;
+		buffer_size -= bytesSent;
+	}
+
 
 	if (bytesSent >= 0)
 	{
