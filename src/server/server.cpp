@@ -162,8 +162,8 @@ void Server::_handleClientMessage(int fd)
 		// std::endl;
 		Logger::getInstance().log(
 		    INFO, "Received", _clients.at(fd).requestBuffer);
-		// HttpHeader	buffer(_clients.at(fd).requestBuffer);
-		//
+
+		LOG_DEBUG(_clients.at(fd).requestBuffer);
 
 		HttpRequest  request(buffer);
 		HttpResponse respons("OK", 200);
@@ -173,6 +173,7 @@ void Server::_handleClientMessage(int fd)
 		if (getcwd(pwd, 256) != NULL)
 			root = std::string(pwd) + "/src/www/";
 
+		std::cout << _clients.at(fd).requestBuffer;
 		std::string path = request.get_uri();
 		if (path == "/")
 			path = root + "index.html";

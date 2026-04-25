@@ -67,6 +67,16 @@ class ws
 	static bool                       is_dir(const std::string& path);
 
 	/**
+	 * @brief Extracts and normalizes the file extension from a given file path.
+	 * @param path The file path (e.g., "/home/file.TXT" or "archive.tar.gz").
+	 * @return The lowercase file extension without the dot (e.g., "txt", "gz").
+	 *         Returns an empty string if no valid extension is found.
+	 * @note Ignores dots in directory names. Only the last dot after the last
+	 * slash is considered as the extension delimiter.
+	 */
+	static const std::string                 getFileExtension(const std::string& path);
+
+	/**
 	 * @brief Converts a value of any type to its string representation.
 	 *
 	 * Convert the given value to a

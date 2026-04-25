@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <map>
 #include <string>
 
 class HttpResponse
 {
   public:
+	HttpResponse();
 	HttpResponse(const std::string& status_text, int status);
 	HttpResponse(const HttpResponse& other);
 	~HttpResponse();
@@ -15,14 +17,21 @@ class HttpResponse
 	void          Get(const std::string& content);
 	std::string   build_response(const std::string& path);
 
+	std::string   getHeader(const std::string& header_name) const;
+	void setHeader(const std::string& header_name, const std::string& v);
+
   private:
 	int                                  _status;
-	std::string                          _status_text;
+	std::string                          _statusText;
+	std::string                          _httpVersion;
+	std::string                          _contentType;
+	size_t                               _contentLength;
 	std::map< std::string, std::string > _headers;
 	std::string                          _body;
 
-	std::string                          build_err_page(int err_status);
+	size_t                               build_err_page(int err_status);
 
-	std::string _getMimeType(const std::string& extension);
+	std::string        _getMimeType(const std::string& extension);
+	static const char* getStatusStr(int status);
 };
 

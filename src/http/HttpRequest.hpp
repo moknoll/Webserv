@@ -57,6 +57,7 @@ class HttpRequest
 	std::string                          _host;
 	std::string                          _body;
 	std::string                          _ContentLenght;
+	std::string                          _extension;
 	std::map< std::string, std::string > _headers;
 
 	int  _parser(const std::string& req_message);

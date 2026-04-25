@@ -10,13 +10,17 @@
 #include <string>
 #include <sys/stat.h>
 
+HttpResponse::HttpResponse() : _status(200), _statusText("OK"), _httpVersion("HTTP/1.1")
+{
+}
+
 HttpResponse::HttpResponse(const std::string& status_text, int status)
-    : _status(status), _status_text(status_text), _body("")
+    : _status(status), _statusText(status_text), _body("")
 {
 }
 
 HttpResponse::HttpResponse(const HttpResponse& other)
-    : _status(other._status), _status_text(other._status_text),
+    : _status(other._status), _statusText(other._statusText),
       _headers(other._headers), _body(other._body)
 {
 }
@@ -28,28 +32,13 @@ HttpResponse& HttpResponse::operator=(const HttpResponse& other)
 	if (this != &other)
 	{
 		_status = other._status;
-		_status_text = other._status_text;
+		_statusText = other._statusText;
 		_headers = other._headers;
 		_body = other._body;
 	}
 	return *this;
 }
 
-const std::string getFileExtension(const std::string& path)
-{
-	size_t lastSalsh = path.find_last_of('/');
-
-	size_t lastDot = path.find_last_of('.');
-
-	if (lastDot == std::string::npos
-	    || (lastSalsh != std::string::npos && lastDot < lastSalsh))
-		return "";
-
-	std::string extension = path.substr(lastDot + 1);
-
-	ws::toLowerCase(extension);
-	return extension;
-}
 
 /*
  * HTTP/1.1 200 OK\r\n
@@ -66,10 +55,10 @@ std::string HttpResponse::build_response(const std::string& path)
 	std::string response = "HTTP/1.1 ";
 
 	response += ws::to_string(_status);
-	response += " " + _status_text + "\r\n";
+	response += " " + _statusText + "\r\n";
 	response += "Server: webserv\r\n";
 
-	std::string extension = getFileExtension(path);
+	std::string extension = ws::getFileExtension(path);
 	std::string Content_type;
 
 	Content_type = _getMimeType(extension);
@@ -93,31 +82,55 @@ std::string HttpResponse::build_response(const std::string& path)
 	else
 	{
 		// response error 5xx
-		body = build_err_page(HTTP_INTERNAL_SERVER_ERROR);
+		size_t body_size = build_err_page(HTTP_INTERNAL_SERVER_ERROR);
 		response +=
-		    "Content-Length: " + ws::to_string(body.size()) + "\r\n\r\n";
+		    "Content-Length: " + ws::to_string(body_size) + "\r\n\r\n";
 		response += body;
 	}
 
 	return response;
 }
 
-std::string HttpResponse::build_err_page(int err_status)
+
+const char*	HttpResponse::getStatusStr(int status)
 {
-	std::map< int, std::string > errors_messages;
+	switch (status)
+	{
+		case HTTP_OK:
+			return "200 OK";
+		case HTTP_CREATED:
+			return "201 Created";
+		case HTTP_NO_CONTENT:
+			return "204 No Content";
+		case HTTP_FORBIDDEN:
+			return "403 Forbidden";
+		case HTTP_NOT_FOUND:
+			return  "404 Not Found";
+		case HTTP_REQUEST_URI_TOO_LARGE:
+			return  "414 URI Too Long";
+		case HTTP_REQUEST_ENTITY_TOO_LARGE:
+			return  "413 Content Too Large";
+		case HTTP_INTERNAL_SERVER_ERROR:
+			return  "500 Internal Server Error";
+		case HTTP_NOT_IMPLEMENTED:
+			return  "501 Not Implemented";
+		case HTTP_BAD_GATEWAY:
+			return  "502 Bad Gateway";
+		default:
+			return "500 Internal Server Error";
+	}
+}
 
-	errors_messages[HTTP_BAD_REQUEST] = "400 Bad Request";
-	errors_messages[HTTP_FORBIDDEN] = "403 Forbidden";
-	errors_messages[HTTP_NOT_FOUND] = "404 Not Found";
-	errors_messages[HTTP_REQUEST_URI_TOO_LARGE] = "414 URI Too Long";
-	errors_messages[HTTP_REQUEST_ENTITY_TOO_LARGE] = "413 Content Too Large";
-	errors_messages[HTTP_INTERNAL_SERVER_ERROR] = "500 Internal Server Error";
-	errors_messages[HTTP_NOT_IMPLEMENTED] = "501 Not Implemented";
-	errors_messages[HTTP_BAD_GATEWAY] = "502 Bad Gateway";
+size_t	HttpResponse::build_err_page(int err_status)
+{
+	this->_body = "<html><head><title>";
+	
+	this->_body += getStatusStr(err_status);
+	this->_body += "</title></head><body><center><h1>";
+	this->_body += getStatusStr(err_status);
+	this->_body += "</h1></center><hr><center>webserv</center></body></html>";
 
-	return "<html><head><title>" + errors_messages[err_status]
-	     + "</title></head><body><center><h1>" + errors_messages[err_status]
-	     + "</h1></center><hr><center>webserv</center></body></html>";
+	return this->_body.size();
 }
 
 std::string HttpResponse::_getMimeType(const std::string& extension)
@@ -172,12 +185,7 @@ std::string HttpResponse::_getMimeType(const std::string& extension)
 	m["map"] = "application/json";
 	m["mar"] = "application/octet-stream";
 	m["markdown"] = "text/markdown";
-	m["mb"] = "application/mathematica";
 	m["md"] = "text/markdown";
-	m["mid"] = "audio/midi";
-	m["midi"] = "audio/midi";
-	m["mj2"] = "video/mj2";
-	m["mjp2"] = "video/mj2";
 	m["mjs"] = "application/javascript";
 	m["mov"] = "video/quicktime";
 	m["mp2"] = "audio/mpeg";

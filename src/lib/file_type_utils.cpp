@@ -42,3 +42,20 @@ size_t ws::get_file_size(const std::string& path)
 
 	return file_size;
 }
+
+const std::string getFileExtension(const std::string& path)
+{
+	size_t lastSlash = path.find_last_of('/');
+
+	size_t lastDot = path.find_last_of('.');
+
+	if (lastDot == std::string::npos
+	    || (lastSlash != std::string::npos && lastDot < lastSlash))
+		return "";
+
+	std::string extension = path.substr(lastDot + 1);
+
+	ws::toLowerCase(extension);
+	return extension;
+}
+
