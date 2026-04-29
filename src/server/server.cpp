@@ -6,7 +6,7 @@
 /*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/29 08:44:54 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/29 15:00:43 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,14 +31,6 @@ Server::~Server()
 
 /**
  * @brief Initializes the server by setting up listening sockets.
- * 
- * Creates and configures a socket for each serve	// Logger::log(DEBUG, "client disconnected");r configuration in _configs.
- * For each socket, this method:
- * - Creates an IPv4 TCP socket
- * - Enables socket address reuse to avoid TIME_WAIT issues
- * - Sets the socket to non-blocking mode for event-driven I/O
- * - Binds the socket to the configured port
- * - Initiates listening for incoming client connections
  * 
  * @throws std::runtime_error if socket creation, configuration, binding, or
  *         listening fails
@@ -95,11 +87,6 @@ void Server::init()
 
 /**
  * @brief Runs the main event loop for the server.
- *
- * Continuously waits for activity on all registered sockets using poll().
- * When a listening socket becomes readable, it accepts a new client.
- * When a client socket becomes readable, it reads and handles the request.
- * When a client socket is writable, it sends the pending response.
  *
  * @throws std::runtime_error if poll() fails
  */
@@ -159,12 +146,6 @@ bool Server::_isCompleteRequest(std::string &request)
 /**
 * @brief Accepts a new incoming connection on a listening server socket.
 *
-* Performs accept() on the provided server socket file descriptor, looks up
-* the associated ServerConfig, sets the new client socket to non-blocking
-* mode, registers it for polling, constructs a Client object and stores
-* it in the internal client map. Logs debug information about the new
-* connection.
-*
 * @param serverSocketFd File descriptor of the listening server socket to
 *                       accept a new client from.
 * @return void
@@ -206,22 +187,6 @@ void Server::_acceptNewClient(int serverSocketFd)
 /**
  * @brief Reads incoming data from a client socket and prepares a response.
  *
- * This function performs the request-handling step for an active client:
- * - calls recv() to read data from the socket
- * - closes and removes the client if the connection was closed or an error
- *   occurred
- * - appends the received bytes to the client's request buffer
- * - logs the received request data for debugging
- * - checks whether the request is complete before generating a response
- * - stores the response in the client object and switches the socket to
- *   writable mode so the response can be sent later
- *
- * Good practice:
- * - always validate socket reads for disconnects and errors
- * - keep request parsing separate from network I/O when possible
- * - avoid assuming one recv() call contains a full HTTP request
- * - update poll events only after the response is ready
- *
  * @param clientSocketFd File descriptor of the connected client socket
  * @return void
  */
@@ -261,13 +226,6 @@ void Server::_handleClientMessage(int clientSocketFd)
 /**
  * @brief Sends the prepared response to a connected client and resets client state.
  *
- * Verifies the client is tracked, obtains a reference to the client's
- * responseBuffer and returns immediately if it's empty. Attempts a single
- * send() of the buffer. If send() returns a non-negative value, the function:
- *  - clears the responseBuffer,
- *  - clears the requestBuffer to prepare for the next request,
- *  - switches the client's poll entry back to POLLIN (ready for reading).
- *
  * Notes:
  * - Currently treats any non-negative send() result as success and does not
  *   handle partial writes or EAGAIN/EWOULDBLOCK retries.
@@ -306,14 +264,8 @@ void Server::_sendResponseToClient(int clientSocketFd)
 }
 
 
-
 /**
  * @brief Clean up and remove a disconnected client.
- *
- * Performs all necessary teardown for a client that has disconnected or
- * encountered an error: closes the socket, removes the file descriptor
- * from the poll vector so it is no longer monitored, erases the client
- * entry from the internal client map, and logs the disconnection.
  *
  * @param clientSocketFd File descriptor of the client to clean up
  */
