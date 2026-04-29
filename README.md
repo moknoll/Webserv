@@ -1,4 +1,13 @@
 ### TO DO 
 
-**Moritz**
-- Connect each client to config and give it to the http pasing
+ autoindex off; ?? 
+
+ servername? Server +"fd"
+
+ error pages html
+
+ struct for CGI ? 
+
+ 
+
+
