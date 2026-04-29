@@ -11,18 +11,18 @@ SRC			:= src/main.cpp \
 			   src/server/server.cpp \
 			   src/ConfigParser/ConfigParser.cpp \
 			   src/ConfigParser/ServerConfig.cpp \
-			   src/http/HttpHeader.cpp \
 			   src/http/HttpRequest.cpp \
 			   src/http/HttpResponse.cpp \
+			   src/http/HttpHandler.cpp \
 			   src/logger/Logger.cpp \
 
 OBJ			:= $(OBJDIR)/main.o \
 			   $(OBJDIR)/server/server.o \
 			   $(OBJDIR)/ConfigParser/ConfigParser.o \
 			   $(OBJDIR)/ConfigParser/ServerConfig.o \
-			   $(OBJDIR)/http/HttpHeader.o \
 			   $(OBJDIR)/http/HttpRequest.o \
 			   $(OBJDIR)/http/HttpResponse.o \
+			   $(OBJDIR)/http/HttpHandler.o \
 			   $(OBJDIR)/logger/Logger.o \
 
 LIB_NAME	:= libws.a

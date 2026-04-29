@@ -1,8 +1,12 @@
+#include "../http/http.hpp"
 #include "ws.hpp"
 
+#include <cerrno>
 #include <cstddef>
+#include <fcntl.h>
 #include <string>
 #include <sys/stat.h>
+#include <unistd.h>
 
 bool ws::is_file(const std::string& path)
 {
@@ -43,7 +47,7 @@ size_t ws::get_file_size(const std::string& path)
 	return file_size;
 }
 
-const std::string getFileExtension(const std::string& path)
+const std::string ws::getFileExtension(const std::string& path)
 {
 	size_t lastSlash = path.find_last_of('/');
 
@@ -58,4 +62,25 @@ const std::string getFileExtension(const std::string& path)
 	ws::toLowerCase(extension);
 	return extension;
 }
+
+int ws::checkFile(const char* path)
+{
+	int fd = open(path, O_RDONLY);
+	if (fd != -1)
+	{
+		close(fd);
+		return HTTP_OK;
+	}
+
+	switch (errno)
+	{
+		case ENOENT:
+			return HTTP_NOT_FOUND;
+		case EACCES:
+			return HTTP_FORBIDDEN;
+		default:
+			return HTTP_INTERNAL_SERVER_ERROR;
+	}
+}
+
 

@@ -22,7 +22,13 @@ AlignEscapedNewlines: LeftWithLastLine
 BinPackParameters: OnePerLine
 AllowAllArgumentsOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: false
+  AlignCaseColons: false
 AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortFunctionsOnASingleLine: Empty
 # # AllowAllDeclarationsOnOneLine: false # Устаревшая опция, deprecated
 # AlwaysBreakAfterReturnType: None  This option is renamed to BreakAfterReturnType.

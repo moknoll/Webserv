@@ -26,6 +26,7 @@ struct ServerConfig
     std::map<int, std::string>      error_pages;            // 404 -> "./www/404.html"
     std::vector<Location>           locations;
 }
+```
 
 ### Questions / Notes
 1. Do we need `server_name`?

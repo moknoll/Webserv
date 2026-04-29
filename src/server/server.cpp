@@ -12,8 +12,9 @@
 
 #include "server.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
+#include "../http/HttpHandler.hpp"
 #include "../http/HttpRequest.hpp"
-#include "../http/HttpResponse.hpp"
+// #include "../http/HttpResponse.hpp"
 #include "../lib/ws.hpp"
 #include "../logger/Logger.hpp"
 #include "client.hpp"
@@ -101,7 +102,9 @@ void Server::run()
 		int ret = poll(_pollfds.data(), _pollfds.size(), -1);
 
 		if (ret == -1)
+		{
 			throw std::runtime_error("Poll failed");
+		}
 
 		for (size_t i = 0; i < _pollfds.size(); i++)
 		{
@@ -127,8 +130,7 @@ void Server::_acceptNewClient(int fd)
 	socklen_t          addrLen = sizeof(clientAddr);
 	int newClientFd = accept(fd, (struct sockaddr*) &clientAddr, &addrLen);
 
-	if (newClientFd == SOCKET_ERROR)
-		return;
+	if (newClientFd == SOCKET_ERROR) return;
 
 	// Set to non-blocking
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
@@ -163,25 +165,11 @@ void Server::_handleClientMessage(int fd)
 		Logger::getInstance().log(
 		    INFO, "Received", _clients.at(fd).requestBuffer);
 
-		LOG_DEBUG(_clients.at(fd).requestBuffer);
+		HttpHandler  h(_configs[0]);
+		HttpRequest  req(_clients.at(fd).requestBuffer);
+		HttpResponse res = h.getHandle(req);
 
-		HttpRequest  request(buffer);
-		HttpResponse respons("OK", 200);
-
-		std::string  root = "/";
-		char         pwd[256];
-		if (getcwd(pwd, 256) != NULL)
-			root = std::string(pwd) + "/src/www/";
-
-		std::cout << _clients.at(fd).requestBuffer;
-		std::string path = request.get_uri();
-		if (path == "/")
-			path = root + "index.html";
-		else
-			path = root + path;
-
-		std::string resp = respons.build_response(path);
-		_clients.at(fd).responseBuffer = resp;
+		_clients.at(fd).responseBuffer = res.buildResponse();
 
 		// Plceholder fo Request complete (\r\b\r\b)
 		// this is up to parsingLH ,
@@ -205,15 +193,13 @@ void Server::_handleClientMessage(int fd)
 void Server::_sendResponseToClient(int fd)
 {
 	// check that clients exists
-	if (_clients.find(fd) == _clients.end())
-		return;
+	if (_clients.find(fd) == _clients.end()) return;
 
 	std::string& msg = _clients.at(fd).responseBuffer;
 	const char*  buffer = msg.c_str();
 	size_t       buffer_size = msg.size();
 
-	if (msg.empty())
-		return;
+	if (msg.empty()) return;
 
 	LOG_DEBUG(ws::to_string(msg.size()));
 	int bytesSent = 0;
@@ -221,20 +207,18 @@ void Server::_sendResponseToClient(int fd)
 	{
 		bytesSent = send(fd, msg.c_str(), msg.size(), 0);
 
-		if (bytesSent == -1 && errno == EAGAIN)
-			LOG_DEBUG("Buffer is full");
+		if (bytesSent == -1 && errno == EAGAIN) LOG_DEBUG("Buffer is full");
+
 		if (bytesSent == -1)
 		{
-			perror("erro in sendin");
+			LOG_DEBUG("Error when sending");
 			return;
 		}
-
 
 		LOG_DEBUG("SENT BYTES: " + ws::to_string(bytesSent));
 		buffer += bytesSent;
 		buffer_size -= bytesSent;
 	}
-
 
 	if (bytesSent >= 0)
 	{

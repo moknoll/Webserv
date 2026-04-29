@@ -74,7 +74,9 @@ class ws
 	 * @note Ignores dots in directory names. Only the last dot after the last
 	 * slash is considered as the extension delimiter.
 	 */
-	static const std::string                 getFileExtension(const std::string& path);
+	static const std::string          getFileExtension(const std::string& path);
+
+	static int                        checkFile(const char* path);
 
 	/**
 	 * @brief Converts a value of any type to its string representation.

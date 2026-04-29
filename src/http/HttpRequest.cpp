@@ -1,6 +1,6 @@
 #include "HttpRequest.hpp"
 #include "../lib/ws.hpp"
-#include <iostream>
+#include "http.hpp"
 #include <string>
 #include <vector>
 
@@ -11,7 +11,7 @@ HttpRequest::HttpRequest(const std::string& req_message)
 
 HttpRequest::HttpRequest(const HttpRequest& other)
     : _method(other._method), _uri(other._uri),
-      _http_version(other._http_version), _start_line(other._start_line),
+      _http_version(other._http_version), _request_line(other._request_line),
       _host(other._host), _body(other._body), _headers(other._headers)
 {
 }
@@ -25,7 +25,7 @@ HttpRequest& HttpRequest::operator=(const HttpRequest& other)
 		this->_method = other._method;
 		this->_uri = other._uri;
 		this->_http_version = other._http_version;
-		this->_start_line = other._start_line;
+		this->_request_line = other._request_line;
 		this->_host = other._host;
 		this->_body = other._body;
 		this->_headers = other._headers;
@@ -35,8 +35,7 @@ HttpRequest& HttpRequest::operator=(const HttpRequest& other)
 
 int HttpRequest::_parser(const std::string& req_message)
 {
-	if (_parse_start_line(req_message) != HTTP_OK)
-		return HTTP_BAD_REQUEST;
+	if (_parse_request_line(req_message) != HTTP_OK) return HTTP_BAD_REQUEST;
 
 	size_t start_header = req_message.find("\r\n");
 	size_t end_header = req_message.find("\r\n\r\n");
@@ -46,43 +45,52 @@ int HttpRequest::_parser(const std::string& req_message)
 	std::string headers =
 	    req_message.substr(start_header + 2, end_header - start_header + 2);
 
-	_parse_header(headers);
+	_parse_headers(headers);
 
-	if (this->_method == "POST" || this->_method == "DELETE")
-		this->_body = end_header + 4;
+	this->_body = req_message.substr(end_header + 4);
 
 	return HTTP_OK;
 }
 
-
-
-int HttpRequest::_parse_start_line(const std::string& req_message)
+int HttpRequest::_parse_request_line(const std::string& req_message)
 {
 	size_t end_start_line = req_message.find("\r\n");
 
 	if (end_start_line == std::string::npos)
+	{
+		this->_err_status = HTTP_BAD_REQUEST;
 		return HTTP_BAD_REQUEST;
+	}
 
-	this->_start_line = req_message.substr(0, end_start_line);
+	this->_request_line = req_message.substr(0, end_start_line);
 
-	std::vector< std::string > toks = ws::strSplit(_start_line, " ");
+	std::vector< std::string > toks = ws::strSplit(_request_line, " ");
 	if (toks.size() != 3)
+	{
+		this->_err_status = HTTP_BAD_REQUEST;
 		return HTTP_BAD_REQUEST;
+	}
 
-	this->_method = ws::strip(toks[0]);
-
-	if (_method != "GET" && _method != "POST" && _method != "DELETE")
+	if (toks[0] == "GET")
+		_method = HTTP_GET;
+	else if (toks[0] == "POST")
+		_method = HTTP_POST;
+	else if (toks[0] == "DELETE")
+		_method = HTTP_DELETE;
+	else
+	{
+		_method = HTTP_UNKNOWN;
+		this->_err_status = HTTP_BAD_REQUEST;
 		return HTTP_BAD_REQUEST;
+	}
 
 	this->_uri = ws::strip(toks[1]);
 	this->_http_version = ws::strip(toks[2]);
-	if (ws::is_file(this->_uri))
-		this->_extension = ws::getFileExtension(this->_uri);
 
 	return HTTP_OK;
 }
 
-void HttpRequest::_parse_header(const std::string& header)
+void HttpRequest::_parse_headers(const std::string& header)
 {
 	std::vector< std::string >           toks = ws::strSplit(header, "\r\n");
 
@@ -101,10 +109,16 @@ void HttpRequest::_parse_header(const std::string& header)
 		return;
 	}
 	this->_host = this->_headers.at("Host");
-
 }
 
-std::string HttpRequest::get_uri()
+std::string HttpRequest::get_uri() const
 {
 	return this->_uri;
+}
+
+std::string HttpRequest::get_header(const std::string& name)
+{
+	if (_headers.find(name) != _headers.end()) return _headers.at(name);
+
+	return "";
 }
