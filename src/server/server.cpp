@@ -6,7 +6,7 @@
 /*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/27 14:16:45 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/29 08:44:54 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,47 +29,54 @@ Server::~Server()
 	//Check later on how to close? 
 }
 
+/**
+ * @brief Initializes the server by setting up listening sockets.
+ * 
+ * Creates and configures a socket for each serve	// Logger::log(DEBUG, "client disconnected");r configuration in _configs.
+ * For each socket, this method:
+ * - Creates an IPv4 TCP socket
+ * - Enables socket address reuse to avoid TIME_WAIT issues
+ * - Sets the socket to non-blocking mode for event-driven I/O
+ * - Binds the socket to the configured port
+ * - Initiates listening for incoming client connections
+ * 
+ * @throws std::runtime_error if socket creation, configuration, binding, or
+ *         listening fails
+ * 
+ * @see Server::_configs for the list of configurations to initialize
+ */
 void Server::init()
 {
 	int yes = 1;
-
 	for (size_t i = 0; i < _configs.size(); i++)
 	{
 		int sock_fd = -1;		
-		// 1. Create socket
 		if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR)
 			throw std::runtime_error("Socket Creation failed"); 
 
-		// 2. Set socket opt to reset address/port
 		if((setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))) == SOCKET_ERROR)
 			throw std::runtime_error("Setsockopt failed");
 	
-		// 3. Set serverFD to non block
 		if((fcntl(sock_fd, F_SETFL, O_NONBLOCK)) == SOCKET_ERROR)
 			throw std::runtime_error("Fcntl failed");
-	
-		// 4. Bind server adress to socket
-		// Mazbe chaneg this to getaddrinfo() -> beej chapter 4
+
 		struct sockaddr_in serverAddr;
-		serverAddr.sin_family = AF_INET; // Set IPv4
-		serverAddr.sin_port = htons(_configs[i].port); // set port
-		serverAddr.sin_addr.s_addr = INADDR_ANY; // allow in from any IP
+		serverAddr.sin_family = AF_INET;
+		serverAddr.sin_port = htons(_configs[i].port);
+		serverAddr.sin_addr.s_addr = INADDR_ANY;
 		bzero(&(serverAddr.sin_zero), 8);
 	
 		if ((bind(sock_fd, (struct sockaddr *)&serverAddr, sizeof(struct sockaddr))) == SOCKET_ERROR)
 			throw std::runtime_error("Bind failed");
 	
-		// 5. Listen 
-		if((listen(sock_fd, BACKLOG)) == SOCKET_ERROR)	// backlog = number of connections allowed on queue
+		if((listen(sock_fd, BACKLOG)) == SOCKET_ERROR)
 			throw std::runtime_error("listen failed");
 	
-		// 6. Set server FD to pull vector 
 		struct pollfd pfd;
 		pfd.fd = sock_fd;
 		pfd.events = POLLIN;
 		_pollSockets.push_back(pfd);
 
-		// 7. Save server fd and config in map
 		_serverConfigsByFd[sock_fd] = _configs[i];
 		
 		// Debug: Log the server config mapping
@@ -85,6 +92,17 @@ void Server::init()
 	}
 }
 
+
+/**
+ * @brief Runs the main event loop for the server.
+ *
+ * Continuously waits for activity on all registered sockets using poll().
+ * When a listening socket becomes readable, it accepts a new client.
+ * When a client socket becomes readable, it reads and handles the request.
+ * When a client socket is writable, it sends the pending response.
+ *
+ * @throws std::runtime_error if poll() fails
+ */
 void Server::run()
 {
 	while(1) 
@@ -96,7 +114,6 @@ void Server::run()
 		
 		for (size_t i = 0; i < _pollSockets.size(); i++)
 		{
-			// Case A: Read(POLLIN)
 			if(_pollSockets[i].revents & POLLIN)
 			{
 				if(_serverConfigsByFd.count(_pollSockets[i].fd))
@@ -104,14 +121,22 @@ void Server::run()
 				else 
 					_handleClientMessage(_pollSockets[i].fd);
 			}
-			// Case B: Write(POLLOUT)
-			// Also check if client still existst
 			else if(_pollSockets[i].revents & POLLOUT)
 				_sendResponseToClient(_pollSockets[i].fd);
 		}
 	}	
 }
 
+
+/**
+ * @brief Checks if the HTTP request in the buffer is complete.
+ *
+ * Determines whether a received HTTP request has been fully received and is
+ * ready for processing. Currently a placeholder that always returns true.
+ *
+ * @param request Reference to the request string buffer to validate
+ * @return true if the request is complete, false otherwise
+ */
 bool Server::_isCompleteRequest(std::string &request)
 {
 	(void)request;
@@ -130,10 +155,23 @@ bool Server::_isCompleteRequest(std::string &request)
 	return true;
 }
 
+
+/**
+* @brief Accepts a new incoming connection on a listening server socket.
+*
+* Performs accept() on the provided server socket file descriptor, looks up
+* the associated ServerConfig, sets the new client socket to non-blocking
+* mode, registers it for polling, constructs a Client object and stores
+* it in the internal client map. Logs debug information about the new
+* connection.
+*
+* @param serverSocketFd File descriptor of the listening server socket to
+*                       accept a new client from.
+* @return void
+*/
 void Server::_acceptNewClient(int serverSocketFd)
 {
 	struct sockaddr_in clientAddr;
-	// 1. Get the ServerConfig for this server socket from the map
 	ServerConfig* config = &_serverConfigsByFd[serverSocketFd];
 	socklen_t addrLen = sizeof(clientAddr);
 	int newClientFd = accept(serverSocketFd,(struct sockaddr *)&clientAddr, &addrLen);
@@ -150,22 +188,43 @@ void Server::_acceptNewClient(int serverSocketFd)
 		<< " | Config Root: " << config->root;
 	LOG_DEBUG(oss.str());
 	
-	// Set to non-blocking
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
 
-	// 2. push into Vector 
 	struct pollfd pfd;
 	pfd.fd = newClientFd;
 	pfd.events = POLLIN;
 	_pollSockets.push_back(pfd);
 	
-	// 3. Create new client object and safe into map 
 	_clients.insert(std::make_pair(newClientFd, Client(newClientFd, config)));
 	
 	// std::cout << "New Client connected: " <<  << std::endl;
 	//LOG_DEBUG( "New client connected");
 }
 
+
+
+/**
+ * @brief Reads incoming data from a client socket and prepares a response.
+ *
+ * This function performs the request-handling step for an active client:
+ * - calls recv() to read data from the socket
+ * - closes and removes the client if the connection was closed or an error
+ *   occurred
+ * - appends the received bytes to the client's request buffer
+ * - logs the received request data for debugging
+ * - checks whether the request is complete before generating a response
+ * - stores the response in the client object and switches the socket to
+ *   writable mode so the response can be sent later
+ *
+ * Good practice:
+ * - always validate socket reads for disconnects and errors
+ * - keep request parsing separate from network I/O when possible
+ * - avoid assuming one recv() call contains a full HTTP request
+ * - update poll events only after the response is ready
+ *
+ * @param clientSocketFd File descriptor of the connected client socket
+ * @return void
+ */
 void Server::_handleClientMessage(int clientSocketFd)
 {
 	char buffer[8192];
@@ -175,14 +234,12 @@ void Server::_handleClientMessage(int clientSocketFd)
 		_cleanupClient(clientSocketFd);
 	else
 	{
-		// put data into clientbuffer
 		_clients.at(clientSocketFd).requestBuffer.append(buffer, bytes);
-		// std::cout << "Received: " << _clients.at(clientSocketFd).requestBuffer << std::endl;
+
 		Logger::getInstance().log(INFO, "Received", _clients.at(clientSocketFd).requestBuffer);
-		// HttpHeader	buffer(_clients.at(fd).requestBuffer);
-		if(_isCompleteRequest(_clients.at(clientSocketFd).requestBuffer))
-		{	
-			// Plceholder fo Request complete (\r\b\r\b) 
+		
+		if (_isCompleteRequest(_clients.at(clientSocketFd).requestBuffer))
+		{	 
 			std::string response = "Hello from Server"; 
         
        		_clients.at(clientSocketFd).responseBuffer = response;
@@ -200,6 +257,25 @@ void Server::_handleClientMessage(int clientSocketFd)
 	}
 }
 
+
+/**
+ * @brief Sends the prepared response to a connected client and resets client state.
+ *
+ * Verifies the client is tracked, obtains a reference to the client's
+ * responseBuffer and returns immediately if it's empty. Attempts a single
+ * send() of the buffer. If send() returns a non-negative value, the function:
+ *  - clears the responseBuffer,
+ *  - clears the requestBuffer to prepare for the next request,
+ *  - switches the client's poll entry back to POLLIN (ready for reading).
+ *
+ * Notes:
+ * - Currently treats any non-negative send() result as success and does not
+ *   handle partial writes or EAGAIN/EWOULDBLOCK retries.
+ * - No error logging is performed on send() failure; callers should ensure
+ *   the client is cleaned up elsewhere if needed.
+ *
+ * @param clientSocketFd File descriptor of the connected client socket.
+ */
 void Server::_sendResponseToClient(int clientSocketFd)
 {
 	// check that clients exists
@@ -216,10 +292,9 @@ void Server::_sendResponseToClient(int clientSocketFd)
 	if(bytesSent >= 0)
 	{
 		msg.clear();
-		_clients.at(clientSocketFd).requestBuffer.clear(); // Empty for new request
+		_clients.at(clientSocketFd).requestBuffer.clear();
 		std::cout << "Response send" << std::endl; 
-		// reset Poll event : To reading
-		for(size_t i = 0; i < _pollSockets.size(); i++)
+		for (size_t i = 0; i < _pollSockets.size(); i++)
 		{
 			if(_pollSockets[i].fd == clientSocketFd)
 			{
@@ -230,12 +305,22 @@ void Server::_sendResponseToClient(int clientSocketFd)
 	}
 }
 
+
+
+/**
+ * @brief Clean up and remove a disconnected client.
+ *
+ * Performs all necessary teardown for a client that has disconnected or
+ * encountered an error: closes the socket, removes the file descriptor
+ * from the poll vector so it is no longer monitored, erases the client
+ * entry from the internal client map, and logs the disconnection.
+ *
+ * @param clientSocketFd File descriptor of the client to clean up
+ */
 void Server::_cleanupClient(int clientSocketFd)
 {
-	// Close socket
 	close(clientSocketFd);
-	
-	// delete from poll vector
+    
 	for (size_t i = 0; i < _pollSockets.size(); i++)
 	{
 		if(_pollSockets[i].fd == clientSocketFd)
@@ -244,10 +329,7 @@ void Server::_cleanupClient(int clientSocketFd)
 			break;
 		}
 	}
-	// delete from client map
 	_clients.erase(clientSocketFd);
-	
-	// std::cout << "Client disconnected" << std::endl;
+    
 	LOG_DEBUG("Client disconnected");
-	// Logger::log(DEBUG, "client disconnected");
 }
