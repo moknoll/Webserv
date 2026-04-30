@@ -16,18 +16,14 @@
 
 // -------- Location --------
 
-Location::Location()
-    : autoindex(false),
-      client_max_body_size(0)
+Location::Location() : autoindex(false), client_max_body_size(0)
 {
-    // Everything else stays empty by default
+	// Everything else empty by default
 }
 
 // -------- ServerConfig --------
 
-ServerConfig::ServerConfig()
-    : port(0),
-      client_max_body_size(0)
+ServerConfig::ServerConfig() : port(0), client_max_body_size(0)
 {
-    // Everything else stays empty by default
+	// Everything else empty by default
 }

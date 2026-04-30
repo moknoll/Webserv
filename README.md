@@ -6,6 +6,6 @@
 
  struct for CGI ? 
 
- 
+ parse config file. tokenize then verify and fill structs(Location, ServerConfig)
 
 
