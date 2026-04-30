@@ -1,15 +1,33 @@
 #include "ServerConfig.hpp"
 
-ServerConfig::ServerConfig()
+// ServerConfig::ServerConfig()
+// {
+// 	port = 0;
+// 	root = "";
+// 	index = "";
+// 	host = "";
+// 	client_max_body_size = 0;
+// }
+
+// int ServerConfig::_getPort()
+// {
+// 	return this->port;
+// }
+
+// -------- Location --------
+
+Location::Location()
+    : autoindex(false),
+      client_max_body_size(0)
 {
-	port = 0;
-	root = "";
-	index = "";
-	host = "";
-	client_max_body_size = 0;
+    // Everything else stays empty by default
 }
 
-int ServerConfig::_getPort()
+// -------- ServerConfig --------
+
+ServerConfig::ServerConfig()
+    : port(0),
+      client_max_body_size(0)
 {
-	return this->port;
+    // Everything else stays empty by default
 }
