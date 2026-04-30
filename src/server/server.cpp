@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/29 15:00:43 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/30 10:10:07 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,37 +40,62 @@ Server::~Server()
 void Server::init()
 {
 	int yes = 1;
+	int status; 
 	for (size_t i = 0; i < _configs.size(); i++)
 	{
-		int sock_fd = -1;		
-		if((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR)
-			throw std::runtime_error("Socket Creation failed"); 
+		struct addrinfo hints;
+		struct addrinfo *servinfo, *p;
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET; 
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_PASSIVE;// check this
+		std::string host = _configs[i].host;
+		std::string port = std::to_string(_configs[i].port); 
 
-		if((setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))) == SOCKET_ERROR)
-			throw std::runtime_error("Setsockopt failed");
-	
-		if((fcntl(sock_fd, F_SETFL, O_NONBLOCK)) == SOCKET_ERROR)
-			throw std::runtime_error("Fcntl failed");
+		std::cout << "Config " << i << ": host='" << host << "' port='" << port << "'" << std::endl;
+		if ((status = getaddrinfo(host.c_str(), port.c_str(), &hints, &servinfo)) != 0)
+			throw std::runtime_error(std::string("getaddrinfo failed: ") + gai_strerror(status));
 
-		struct sockaddr_in serverAddr;
-		serverAddr.sin_family = AF_INET;
-		serverAddr.sin_port = htons(_configs[i].port);
-		serverAddr.sin_addr.s_addr = INADDR_ANY;
-		bzero(&(serverAddr.sin_zero), 8);
-	
-		if ((bind(sock_fd, (struct sockaddr *)&serverAddr, sizeof(struct sockaddr))) == SOCKET_ERROR)
-			throw std::runtime_error("Bind failed");
-	
-		if((listen(sock_fd, BACKLOG)) == SOCKET_ERROR)
-			throw std::runtime_error("listen failed");
-	
+		int sock_fd = -1; 
+
+		for (p = servinfo; p != NULL; p = p->ai_next)
+		{
+			if((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)))
+				if (sock_fd == SOCKET_ERROR)
+					continue;
+			if ((setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))) == SOCKET_ERROR)
+			{
+				close(sock_fd); 
+				continue;
+			}
+			if ((fcntl(sock_fd, F_SETFL, O_NONBLOCK)) == SOCKET_ERROR)
+			{
+				close(sock_fd); 
+				continue;
+			}
+			if ((bind(sock_fd, p->ai_addr, p->ai_addrlen)) == SOCKET_ERROR)
+			{
+				close(sock_fd); 
+				continue;
+			}
+			break; 
+			std::cout << "Setup complete" << std::endl; 
+		}
+		
+		if (p == NULL)
+			throw std::runtime_error("Could not bind to" + host + ":" + port); 
+		
+		freeaddrinfo(servinfo);
+		
+		if (listen(sock_fd, BACKLOG) == SOCKET_ERROR)
+			throw std::runtime_error("listen failed"); 
+		
 		struct pollfd pfd;
 		pfd.fd = sock_fd;
 		pfd.events = POLLIN;
 		_pollSockets.push_back(pfd);
 
 		_serverConfigsByFd[sock_fd] = _configs[i];
-		
 		// Debug: Log the server config mapping
 		std::ostringstream oss;
 		oss << "Server Socket FD: " << sock_fd 
@@ -79,8 +104,7 @@ void Server::init()
 			<< " | Root: " << _configs[i].root 
 			<< " | Index: " << _configs[i].index
 			<< " | Max Body Size: " << _configs[i].client_max_body_size;
-		LOG_DEBUG(oss.str());
-		
+		LOG_DEBUG(oss.str());	
 	}
 }
 

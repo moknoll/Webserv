@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   server.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:12:35 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/27 12:25:12 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/29 18:12:52 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,7 @@
 #include "../ConfigParser/ServerConfig.hpp"
 #include "client.hpp"
 #include "sockets.hpp"
+
 
 class Server
 {
