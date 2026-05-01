@@ -15,10 +15,9 @@ class HttpRequest
 
 	HttpRequest& operator=(const HttpRequest& other);
 
-	void         Get(const std::string& content);
-
 	std::string  get_uri() const;
 	std::string  get_header(const std::string& name);
+	int          hasError() const;
 
   private:
 	int                                  _err_status;

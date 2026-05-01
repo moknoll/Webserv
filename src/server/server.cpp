@@ -130,7 +130,8 @@ void Server::_acceptNewClient(int fd)
 	socklen_t          addrLen = sizeof(clientAddr);
 	int newClientFd = accept(fd, (struct sockaddr*) &clientAddr, &addrLen);
 
-	if (newClientFd == SOCKET_ERROR) return;
+	if (newClientFd == SOCKET_ERROR)
+		return;
 
 	// Set to non-blocking
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
@@ -167,7 +168,7 @@ void Server::_handleClientMessage(int fd)
 
 		HttpHandler  h(_configs[0]);
 		HttpRequest  req(_clients.at(fd).requestBuffer);
-		HttpResponse res = h.getHandle(req);
+		HttpResponse res = h.handleGET(req);
 
 		_clients.at(fd).responseBuffer = res.buildResponse();
 
@@ -193,13 +194,15 @@ void Server::_handleClientMessage(int fd)
 void Server::_sendResponseToClient(int fd)
 {
 	// check that clients exists
-	if (_clients.find(fd) == _clients.end()) return;
+	if (_clients.find(fd) == _clients.end())
+		return;
 
 	std::string& msg = _clients.at(fd).responseBuffer;
 	const char*  buffer = msg.c_str();
 	size_t       buffer_size = msg.size();
 
-	if (msg.empty()) return;
+	if (msg.empty())
+		return;
 
 	LOG_DEBUG(ws::to_string(msg.size()));
 	int bytesSent = 0;
@@ -207,7 +210,8 @@ void Server::_sendResponseToClient(int fd)
 	{
 		bytesSent = send(fd, msg.c_str(), msg.size(), 0);
 
-		if (bytesSent == -1 && errno == EAGAIN) LOG_DEBUG("Buffer is full");
+		if (bytesSent == -1 && errno == EAGAIN)
+			LOG_DEBUG("Buffer is full");
 
 		if (bytesSent == -1)
 		{

@@ -116,6 +116,11 @@ std::string HttpRequest::get_uri() const
 	return this->_uri;
 }
 
+int HttpRequest::hasError() const
+{
+	return this->_err_status;
+}
+
 std::string HttpRequest::get_header(const std::string& name)
 {
 	if (_headers.find(name) != _headers.end()) return _headers.at(name);

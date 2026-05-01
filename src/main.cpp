@@ -21,7 +21,6 @@
 #include <fcntl.h>
 #include <iostream>
 #include <string>
-#include <sys/stat.h>
 
 int checkArguments(int argc, char* argv[])
 {
@@ -41,13 +40,58 @@ int checkArguments(int argc, char* argv[])
 
 std::vector< ServerConfig > setupConfigDefaultToTest()
 {
+	// listen 0.0.0.0:8080
+	ServerConfig server;
+	server.host = "0.0.0.0";
+	server.port = 8080;
+	// server.server_name = "example.com";
+
+	// Error pages
+	server.error_pages[404] = "./www/404.html";
+	server.error_pages[500] = "./www/500.html";
+
+	// Location: /
+	Location root_loc;
+	root_loc.path = "/";
+	root_loc.root = "./www";
+	root_loc.index = "index.html";
+	root_loc.allowed_methods.push_back("GET"); // = {"GET", "POST"};
+	root_loc.allowed_methods.push_back("POST");
+	root_loc.client_max_body_size = 1024 * 1024; // 1MB
+	root_loc.redirect = "";
+
+	// Location: /upload
+	Location upload_loc;
+	upload_loc.path = "/upload";
+	upload_loc.root = "./www/uploads";
+	upload_loc.index = "";
+	upload_loc.allowed_methods.push_back("POST"); // = {"POST"};
+	upload_loc.client_max_body_size = 10 * 1024 * 1024; // 10MB
+	upload_loc.redirect = "";
+
+	// Location: /old (редирект)
+	Location redirect_loc;
+	redirect_loc.path = "/old";
+	redirect_loc.root = "";
+	redirect_loc.index = "";
+	redirect_loc.allowed_methods.push_back("GET"); // = {"GET"};
+	redirect_loc.client_max_body_size = 0;
+	redirect_loc.redirect = "/new"; // 301 -> /new or http://google.com
+
+	//server.locations = {root_loc, upload_loc, redirect_loc};
+	server.locations.push_back(root_loc);
+	server.locations.push_back(upload_loc);
+	server.locations.push_back(redirect_loc);
+	
 	std::vector< ServerConfig > configs;
+/*
 	ServerConfig                config1, config2;
 	config1.port = MYPORT;
 	config1.host = "server1.com";
 	config1.root = "./www";
 	config1.index = "index.html";
 	config1.client_max_body_size = 1024 * 1024; // 1MB
+	config1.locations;
 	configs.push_back(config1);
 
 	config2.port = MYPORT + 1;
@@ -55,34 +99,12 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	config2.root = "./www2";
 	config2.index = "index.html";
 	config2.client_max_body_size = 1024 * 1024; // 1MB
-	configs.push_back(config2);
+	*/
+	
+	configs.push_back(server);
 	return configs;
 }
 
-void file_stat(const char* name)
-{
-	struct stat filestat;
-	if (stat(name, &filestat) == 0)
-	{
-		struct timespec tm = filestat.st_atim;
-		struct timespec tm2 = filestat.st_ctim;
-
-		std::cout << "time in sec: " << tm.tv_sec << std::endl;
-		std::cout << "time in sec: " << tm2.tv_sec << std::endl;
-
-		std::cout << "size: " << filestat.st_size << std::endl;
-		std::cout << "mode: " << filestat.st_mode << std::endl;
-		std::cout << "atime: " << filestat.st_atime << std::endl;
-		std::cout << "ctime: " << filestat.st_ctime << std::endl;
-		std::cout << "is file: " << S_ISREG(filestat.st_mode);
-		std::cout << "is dir: " << S_ISDIR(filestat.st_mode);
-	}
-	else
-	{
-		perror("stat error: ");
-		// std::cout << "error stat\n";
-	}
-}
 
 int main(int argc, char* argv[])
 {
@@ -92,7 +114,6 @@ int main(int argc, char* argv[])
 	(void) argc;
 	(void) argv;
 	Logger::getInstance().setLevel(DEBUG);
-
 
 	try
 	{
