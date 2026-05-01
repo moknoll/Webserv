@@ -1,4 +1,17 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   Logger.cpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/01 13:20:13 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/01 13:20:14 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "Logger.hpp"
+#include <cstddef>
 #include <ctime>
 #include <iostream>
 #include <string>
@@ -22,7 +35,8 @@ void Logger::log(LogLevel           level,
                  const std::string& message,
                  const std::string& context)
 {
-	if (level < this->currentLevel) return;
+	if (level < this->currentLevel)
+		return;
 
 	std::string timestamp = _getTimestamp();
 	std::string strLevel = _levelToString(level);
@@ -58,10 +72,18 @@ const std::string Logger::_levelToString(LogLevel level)
 
 const std::string Logger::_getTimestamp()
 {
-	time_t now = time(0);
-	tm*    timeinfo = localtime(&now);
-	char   timestamp[20];
-	std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", timeinfo);
-	return std::string(timestamp);
+	char        buf[50];
+	const char* fmt = "%Y-%m-%d %H:%M:%S";
+
+	std::time_t now = time(0);
+	if (now == -1)
+		return "";
+
+	tm* timeinfo = localtime(&now);
+
+	if (!timeinfo || std::strftime(buf, sizeof(buf), fmt, timeinfo) == 0)
+		return "";
+
+	return std::string(buf);
 }
 

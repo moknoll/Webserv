@@ -1,17 +1,29 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   HttpResponse.cpp                                   :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/01 13:19:45 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/01 13:19:46 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "HttpResponse.hpp"
 #include "../lib/ws.hpp"
-#include "http.hpp"
+#include "constants.hpp"
+#include <cstddef>
+#include <ctime>
 #include <string>
 
 HttpResponse::HttpResponse() {}
 
-HttpResponse::HttpResponse(const int status) : _status(status) {}
-
-// HttpResponse::HttpResponse(int status) : _status(status) {]
+HttpResponse::HttpResponse(const int status) : status_(status) {}
 
 HttpResponse::HttpResponse(const HttpResponse& other)
-    : _status(other._status), _status_line(other._status_line),
-      _headers(other._headers), _body(other._body)
+    : status_(other.status_), status_line_(other.status_line_),
+      headers_(other.headers_), body_(other.body_)
 {
 }
 
@@ -21,10 +33,10 @@ HttpResponse& HttpResponse::operator=(const HttpResponse& other)
 {
 	if (this != &other)
 	{
-		_status = other._status;
-		_status_line = other._status_line;
-		_headers = other._headers;
-		_body = other._body;
+		status_ = other.status_;
+		status_line_ = other.status_line_;
+		headers_ = other.headers_;
+		body_ = other.body_;
 	}
 	return *this;
 }
@@ -44,41 +56,47 @@ std::string HttpResponse::buildResponse() const
 	std::string res;
 
 	res = "HTTP/1.1 ";
-	res += getStatusStr(_status);
+	res += getStatusMsg(status_);
 	res += CRLF;
 
 	std::map< std::string, std::string >::const_iterator it;
 
-	for (it = _headers.begin(); it != _headers.end(); ++it)
+	for (it = headers_.begin(); it != headers_.end(); ++it)
 		res += it->first + ": " + it->second + CRLF;
 
 	res += CRLF;
-	res += _body;
+	res += body_;
 
 	return res;
 }
 
 void HttpResponse::setStatus(int status)
 {
-	this->_status = status;
+	this->status_ = status;
 }
 
 void HttpResponse::setHeader(const std::string& header_name,
                              const std::string& v)
 {
-	_headers[header_name] = v;
+	headers_[header_name] = v;
 }
 
-void HttpResponse::setBody(const std::string& content,
-                           const std::string& content_type)
+void HttpResponse::setFullResponse(const std::string& content,
+                                   const std::string& content_type)
 {
-	_body = content;
-	setHeader("Content-Length", ws::to_string(content.size()));
 	setHeader("Content-Type", content_type);
-	setHeader("Server", "Webserv");
+	setBody(content);
+	setHeader("Date", getHttpTime());
+	setHeader("Server", SERVER_NAME_STR);
 }
 
-const char* HttpResponse::getStatusStr(int status) const
+void HttpResponse::setBody(const std::string& content)
+{
+	body_ = content;
+	setHeader("Content-Length", ws::to_string(content.size()));
+}
+
+const char* HttpResponse::getStatusMsg(int status) const
 {
 	switch (status)
 	{
@@ -96,38 +114,38 @@ const char* HttpResponse::getStatusStr(int status) const
 	}
 }
 
-std::string getMimeType(const std::string& path)
-{
-	std::string ext = ws::getFileExtension(path);
-
-	if (ext == "htm" || ext == "html") return "text/html";
-	if (ext == "css") return "text/css";
-	if (ext == "js") return "application/javascript";
-	if (ext == "xml") return "application/xml";
-	if (ext == "txt") return "text/plain";
-	if (ext == "jpeg" || ext == "jpg") return "image/jpeg";
-	if (ext == "png") return "image/png";
-	if (ext == "gif") return "image/gif";
-	if (ext == "ico") return "image/x-icon";
-	if (ext == "svg") return "image/svg+xml";
-	if (ext == "webp") return "image/webp";
-	if (ext == "webm") return "video/webm";
-	if (ext == "mp4") return "video/mp4";
-	if (ext == "mp3") return "audio/mpeg";
-	if (ext == "gz") return "application/gzip";
-	if (ext == "zip") return "application/zip";
-
-	return "application/octet-stream";
-}
-
-std::string HttpResponse::get_error_page(int err_status) const
+std::string HttpResponse::getErrorPage(int err_status) const
 {
 	std::string ret = "<html><head><title>";
-	ret += getStatusStr(err_status);
+
+	ret += getStatusMsg(err_status);
 	ret += "</title></head><body><center><h1>";
-	ret += getStatusStr(err_status);
-	ret += +"</h1></center><hr><center>webserv</center></body></html>";
+	ret += getStatusMsg(err_status);
+	ret +=
+	    "</h1></center><hr><center>" SERVER_NAME_STR "</center></body></html>";
 
 	return ret;
 }
 
+const std::string HttpResponse::getHttpTime() const
+{
+	char        buf[100];
+
+	std::time_t now = std::time(NULL);
+	if (now == -1)
+		return "";
+
+	std::tm*    tm_info = std::gmtime(&now); // For getting time in GMT
+
+	// %a day		(Fri)
+	// %d month	day	(1)
+	// %b month		(May)
+	// %Y year		(2026)
+	// %H:%M:%S		(Time)
+	const char* fmt = "%a, %d %b %Y %H:%M:%S GM";
+
+	if (!tm_info || std::strftime(buf, sizeof(buf), fmt, tm_info) == 0)
+		return "";
+
+	return buf;
+}

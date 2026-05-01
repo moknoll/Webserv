@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   HttpRequest.hpp                                    :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/01 13:19:39 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/01 13:19:40 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #pragma once
 
 // #include <cstdint>
@@ -15,23 +27,23 @@ class HttpRequest
 
 	HttpRequest& operator=(const HttpRequest& other);
 
-	std::string  get_uri() const;
-	std::string  get_header(const std::string& name);
-	int          hasError() const;
+	std::string  getURI() const;
+	std::string  getHeader(const std::string& name) const;
+	int          getRequestStatus() const;
 
   private:
-	int                                  _err_status;
-	int                                  _method;
-	size_t                               _ContentLenght;
-	// std::string                          _method;
-	std::string                          _uri;
-	std::string                          _http_version;
-	std::string                          _request_line;
-	std::string                          _host;
-	std::string                          _body;
-	std::string                          _extension;
-	std::string                          _unparsed_uri;
-	std::map< std::string, std::string > _headers;
+	int                                  err_status_;
+	int                                  method_;
+	size_t                               Content_length_;
+	// std::string                          method_;
+	std::string                          uri_;
+	std::string                          http_version_;
+	std::string                          request_line_;
+	std::string                          host_;
+	std::string                          body_;
+	std::string                          extension_;
+	std::string                          unparsed_uri_;
+	std::map< std::string, std::string > headers_;
 
 	int  _parser(const std::string& req_message);
 	int  _parse_request_line(const std::string& line);

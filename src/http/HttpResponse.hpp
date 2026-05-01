@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   HttpResponse.hpp                                   :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/01 13:19:50 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/01 13:19:51 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #pragma once
 
 #include <map>
@@ -15,20 +27,22 @@ class HttpResponse
 
 	std::string   buildResponse() const;
 
-	void setHeader(const std::string& header_name, const std::string& v);
-	void setBody(const std::string& content, const std::string& content_type);
-	void setStatus(int status);
+	void        setHeader(const std::string& header_name, const std::string& v);
+	void        setBody(const std::string& content);
+	void        setFullResponse(const std::string& content,
+	                            const std::string& content_type);
+	void        setStatus(int status);
 
 	std::string getHeader(const std::string& header_name) const;
-	std::string get_error_page(int err_status) const;
-	const char* getStatusStr(int status) const;
+	std::string getErrorPage(int err_status) const;
+	const char* getStatusMsg(int status) const;
 
   private:
-	int                                  _status;
-	std::string                          _status_line;
-	std::map< std::string, std::string > _headers;
-	std::string                          _body;
+	int                                  status_;
+	std::string                          status_line_;
+	std::map< std::string, std::string > headers_;
+	std::string                          body_;
 
-	std::string _getMimeType(const std::string& extension);
+	const std::string                    getHttpTime() const;
 };
 

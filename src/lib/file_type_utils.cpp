@@ -1,12 +1,22 @@
-#include "../http/http.hpp"
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   file_type_utils.cpp                                :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/01 13:18:57 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/01 13:19:02 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "../http/constants.hpp"
 #include "ws.hpp"
 
 #include <cerrno>
 #include <cstddef>
-#include <fcntl.h>
 #include <string>
 #include <sys/stat.h>
-#include <unistd.h>
 
 bool ws::isFile(const std::string& path)
 {
@@ -61,22 +71,5 @@ const std::string ws::getFileExtension(const std::string& path)
 
 	ws::toLowerCase(extension);
 	return extension;
-}
-
-int ws::checkFile(const char* path)
-{
-	int fd = open(path, O_RDONLY);
-	if (fd != -1)
-	{
-		close(fd);
-		return HTTP_OK;
-	}
-
-	switch (errno)
-	{
-		case ENOENT: return HTTP_NOT_FOUND;
-		case EACCES: return HTTP_FORBIDDEN;
-		default:     return HTTP_INTERNAL_SERVER_ERROR;
-	}
 }
 

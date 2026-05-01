@@ -43,7 +43,7 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	// listen 0.0.0.0:8080
 	ServerConfig server;
 	server.host = "0.0.0.0";
-	server.port = 8080;
+	server.port = 16000;
 	// server.server_name = "example.com";
 
 	// Error pages
@@ -55,6 +55,8 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	root_loc.path = "/";
 	root_loc.root = "./www";
 	root_loc.index = "index.html";
+	root_loc.error_pages[404] = "./www/404.html";
+	root_loc.error_pages[500] = "./www/500.html";
 	root_loc.allowed_methods.push_back("GET"); // = {"GET", "POST"};
 	root_loc.allowed_methods.push_back("POST");
 	root_loc.client_max_body_size = 1024 * 1024; // 1MB

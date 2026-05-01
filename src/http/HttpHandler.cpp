@@ -1,15 +1,34 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   HttpHandler.cpp                                    :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/01 13:19:14 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/01 13:19:16 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "HttpHandler.hpp"
 #include "../lib/ws.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
-#include "http.hpp"
+#include "constants.hpp"
+
+#include <cerrno>
 #include <cstddef>
+#include <fcntl.h>
 #include <fstream>
-#include <iostream>
+#include <map>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
-HttpHandler::HttpHandler(const ServerConfig& cfg) : config(cfg), error(0) {}
+HttpHandler::HttpHandler(const ServerConfig& cfg)
+    : config_(cfg), error_(HTTP_OK)
+{
+}
 
 // HttpHandler::HttpHandler(const HttpHandler& other): config(other.config),
 // error(other.error)  {}
@@ -17,106 +36,106 @@ HttpHandler::~HttpHandler() {}
 
 // HttpHandler&	HttpHandlerHt::operator=(const HttpHandler& other) {}
 
-
 HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 {
-	const std::string& uri = req.get_uri();
+	const std::string& uri = req.getURI();
 
-	if (req.hasError())
-		return makeError(req.hasError());
+	const Location*    loc = findMatchUri(uri, config_.locations);
 
-	const Location* loc = findMatchUri(uri, config.locations);
+	if (req.getRequestStatus() != HTTP_OK)
+		return makeError(req.getRequestStatus(), loc);
 
 	if (loc == NULL)
-		return makeError(HTTP_NOT_FOUND);
+		return makeError(HTTP_NOT_FOUND, loc);
 
 	// getMethod if method not allowed
 	// return makeError(HTTP_NOT_ALLOWED);
 
 	// build path
-	//
 	std::string path = buildPath(uri, *loc);
 
 	if (ws::isDirectory(path))
-		path += loc->index;
-
-	// if path is dir add index.html from location.index
-	if (ws::isDirectory(path))
 	{
-		std::string index_path = path + loc->index;
+		std::string index_file_path = path + loc->index;
 
-		// if (loc->autoindex && kk
-		; // return makeDirPage(path);
-		  // p += loc.index;
+		// TODO makeDirectoryPage
+		if (checkFile(index_file_path.c_str()) != HTTP_OK && loc->autoindex)
+			// return	makeDirectoryPage();
+			;
+
+		return buildFileResponse(index_file_path, loc);
 	}
 
-	return buildFileResponse(path);
+	return buildFileResponse(path, loc);
 }
 
-
-
-HttpResponse HttpHandler::makeError(int status)
+HttpResponse HttpHandler::makeError(int status, const Location* loc)
 {
-	HttpResponse res;
+	HttpResponse res(status);
 	std::string  content;
-	res.setStatus(status);
 
-	// if in config exist eror page  page = config.get_eror_page
-	// ws::checkFile(confing.error_page_path
-	// content = readFile(config.error_page.path);
-	if (content == "")
+	if (!loc || loc->error_pages.find(status) == loc->error_pages.end())
 	{
-		res.setBody(res.get_error_page(status), "text/html");
+		res.setFullResponse(res.getErrorPage(status), getMimeType("html"));
+		return res;
+	}
+
+	std::map< int, std::string >::const_iterator error_page_path_it;
+	error_page_path_it = loc->error_pages.find(status);
+
+	content = readFile(error_page_path_it->second.c_str());
+	if (this->error_ == HTTP_OK)
+	{
+		res.setFullResponse(content, getMimeType("html"));
 	}
 	else
 	{
-		res.setHeader("Content-Type", "text/html");
-		res.setHeader("Content-Length", ws::to_string(content.size()));
-		res.setHeader("Server", "webserv");
-		// res.setBody(content, getMimeType(error_page_path);
+		res.setFullResponse(res.getErrorPage(error_), getMimeType("html"));
 	}
+
 	return res;
 }
 
 std::string HttpHandler::readFile(const char* path)
 {
-	error = ws::checkFile(path);
+	this->error_ = checkFile(path);
 
-	if (error != HTTP_OK)
+	if (error_ != HTTP_OK)
 		return "";
 
 	std::ifstream file(path);
 
 	if (!file.is_open())
 	{
-		error = HTTP_INTERNAL_SERVER_ERROR;
+		this->error_ = HTTP_INTERNAL_SERVER_ERROR;
 		return "";
 	}
 
 	std::string content((std::istreambuf_iterator< char >(file)),
 	                    std::istreambuf_iterator< char >());
-	error = HTTP_OK;
+	error_ = HTTP_OK;
 	return content;
 }
 
-HttpResponse HttpHandler::buildFileResponse(const std::string& path)
+HttpResponse HttpHandler::buildFileResponse(const std::string& path,
+                                            const Location*    loc)
 {
 	std::string content = readFile(path.c_str());
 
-	if (error != HTTP_OK)
-		return makeError(error);
+	if (error_ != HTTP_OK)
+		return makeError(error_, loc);
 
-	HttpResponse res;
+	HttpResponse res(HTTP_OK);
 
-	res.setStatus(HTTP_OK);
+	std::string  extention = ws::getFileExtension(path);
+	res.setFullResponse(content, getMimeType(extention));
 
-	res.setBody(content, getMimeType(path));
 	return res;
 }
 
 const Location*
 HttpHandler::findMatchUri(const std::string&             uri,
-                          const std::vector< Location >& locations)
+                          const std::vector< Location >& locations) const
 {
 	const Location* best_loc = NULL;
 	size_t          len_best_loc = 0;
@@ -143,12 +162,27 @@ std::string HttpHandler::buildPath(const std::string& uri, const Location& loc)
 	return loc.root + uri;
 }
 
-// clang-format off
-std::string HttpHandler::getMimeType(const std::string& path)
+int HttpHandler::checkFile(const char* path) const
 {
-	std::string ext = ws::getFileExtension(path);
+	int fd = open(path, O_RDONLY);
+	if (fd != -1)
+	{
+		close(fd);
+		return HTTP_OK;
+	}
 
-	if (ext == "htm" || ext == "html")	return "text/html";
+	switch (errno)
+	{
+		case ENOENT: return HTTP_NOT_FOUND;
+		case EACCES: return HTTP_FORBIDDEN;
+		default:     return HTTP_INTERNAL_SERVER_ERROR;
+	}
+}
+
+// clang-format off
+std::string HttpHandler::getMimeType(const std::string& ext) const
+{
+	if (ext == "htm" || ext == "html")	return "text/html; charset=utf-8";
 	if (ext == "css")					return "text/css";
 	if (ext == "js")					return "application/javascript";
 	if (ext == "xml")					return "application/xml";

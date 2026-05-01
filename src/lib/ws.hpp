@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   ws.hpp                                             :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/01 13:20:06 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/01 13:20:07 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #pragma once
 
 #include <cstddef>
@@ -75,8 +87,6 @@ class ws
 	 * slash is considered as the extension delimiter.
 	 */
 	static const std::string          getFileExtension(const std::string& path);
-
-	static int                        checkFile(const char* path);
 
 	/**
 	 * @brief Converts a value of any type to its string representation.

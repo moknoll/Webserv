@@ -1,5 +1,19 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   http.hpp                                           :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/01 13:20:33 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/01 13:20:35 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef _HTTP_CONSTANTS_
 #define _HTTP_CONSTANTS_
+
+#define SERVER_NAME_STR               "Webserv"
 
 #define OK                            0
 #define ERROR                         -1
@@ -9,18 +23,19 @@
 #define DECLINED                      -5
 #define ABORT                         -6
 
-#define LF                            '\n' // Line Feed  (New line)
-#define CR                            '\r' // Carriage Return
+#define LF                            '\n'   // Line Feed  (New line)
+#define CR                            '\r'   // Carriage Return
 #define CRLF                          "\x0d\x0a"
 
-#define HTTP_UNKNOWN                  0x0001
-#define HTTP_GET                      0x0002
-#define HTTP_POST                     0x0008
-#define HTTP_DELETE                   0x0020
-#define HTTP_HEAD                     0x0004
-#define HTTP_PUT                      0x0010
-#define HTTP_COPY                     0x0080
-#define HTTP_MOVE                     0x0100
+#define HTTP_UNKNOWN                  0x0001 // (1 << 0) 1
+#define HTTP_GET                      0x0002 // (1 << 1) 2
+#define HTTP_POST                     0x0004 // (1 << 2) 4
+#define HTTP_DELETE                   0x0008 // (1 << 3) 8
+#define HTTP_HEAD                     0x0010 // (1 << 4) 16
+#define HTTP_PUT                      0x0020 // (1 << 5) 32
+#define HTTP_COPY                     0x0040 // (1 << 6) 64
+#define HTTP_MOVE                     0x0080 // (1 << 7) 128
+#define HTTP_CONNECT                  0x0100 // (1 << 8) 257
 
 #define HTTP_CONNECTION_CLOSE         1
 #define HTTP_CONNECTION_KEEP_ALIVE    2
@@ -56,19 +71,22 @@
 #define HTTP_GATEWAY_TIME_OUT         504
 #define HTTP_INSUFFICIENT_STORAGE     507
 
-typedef enum
+enum http_state_e
 {
 	HTTP_INITING_REQUEST_STATE = 0,
 	HTTP_READING_REQUEST_STATE,
+	HTTP_WRITING_REQUEST_STATE,
 	HTTP_PROCESS_REQUEST_STATE,
 
-	HTTP_CONNECT_UPSTREAM_STATE,
-	HTTP_WRITING_UPSTREAM_STATE,
-	HTTP_READING_UPSTREAM_STATE,
-
-	HTTP_WRITING_REQUEST_STATE,
-	HTTP_LINGERING_CLOSE_STATE,
 	HTTP_KEEPALIVE_STATE
-} http_state_e;
+};
+
+enum FileError_e
+{
+	ERR_NOT_FOUND = 0,
+	ERR_PERMISSION,
+	ERR_IS_DIR,
+	ERR_UNKNOWN
+};
 
 #endif /*  _HTTP_CONSTANTS_ */

@@ -6,13 +6,13 @@
 
 struct Location
 {
-	std::string                path;  // "/"  "/upload"
-	std::string                root;  // "./www"
-	std::string                index; // "index.html"
-	bool                       autoindex;
-	size_t                     client_max_body_size;
+	std::string                  path;        // "/"  "/upload"
+	std::string                  root;        // "./www"
+	std::string                  index;       // "index.html"
+	bool                         autoindex;
+	size_t                       client_max_body_size;
 	std::map< int, std::string > error_pages; // 404 ->
-	std::vector< std::string > allowed_methods;
+	std::vector< std::string >   allowed_methods;
 	std::string redirect; // return 301 (from subject: HTTP redirection)
 };
 
