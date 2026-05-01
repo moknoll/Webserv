@@ -1,6 +1,8 @@
 *.o
+*.out
 webserv
 client.exe
 .build
 data.json
 *libws.a
+tmp*.cpp
