@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-bool ws::is_file(const std::string& path)
+bool ws::isFile(const std::string& path)
 {
 	struct stat filestat;
 	if (stat(path.c_str(), &filestat) == 0)
@@ -21,7 +21,7 @@ bool ws::is_file(const std::string& path)
 	return false;
 }
 
-bool ws::is_dir(const std::string& path)
+bool ws::isDirectory(const std::string& path)
 {
 	struct stat filestat;
 	if (stat(path.c_str(), &filestat) == 0)
@@ -34,7 +34,7 @@ bool ws::is_dir(const std::string& path)
 	return false;
 }
 
-size_t ws::get_file_size(const std::string& path)
+size_t ws::getFileSize(const std::string& path)
 {
 	size_t      file_size = 0;
 
@@ -74,13 +74,9 @@ int ws::checkFile(const char* path)
 
 	switch (errno)
 	{
-		case ENOENT:
-			return HTTP_NOT_FOUND;
-		case EACCES:
-			return HTTP_FORBIDDEN;
-		default:
-			return HTTP_INTERNAL_SERVER_ERROR;
+		case ENOENT: return HTTP_NOT_FOUND;
+		case EACCES: return HTTP_FORBIDDEN;
+		default:     return HTTP_INTERNAL_SERVER_ERROR;
 	}
 }
-
 

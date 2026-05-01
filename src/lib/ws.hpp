@@ -47,7 +47,7 @@ class ws
 	static void                       toLowerCase(std::string& s);
 
 	// get file size in bytes with stat
-	static size_t                     get_file_size(const std::string& path);
+	static size_t                     getFileSize(const std::string& path);
 	/**
 	 * @brief Checks whether a given path refers to a regular file.
 	 * @param path The file system path to check.
@@ -55,7 +55,7 @@ class ws
 	 * @note Uses stat() and S_ISREG macro. Returns false for directories,
 	 *       symlinks, special files, or non-existent paths.
 	 */
-	static bool                       is_file(const std::string& path);
+	static bool                       isFile(const std::string& path);
 
 	/**
 	 * @brief Checks whether a given path refers to a directorie.
@@ -64,7 +64,7 @@ class ws
 	 * @note Uses stat() and S_ISREG macro. Returns false for directories,
 	 *       symlinks, special files, or non-existent paths.
 	 */
-	static bool                       is_dir(const std::string& path);
+	static bool                       isDirectory(const std::string& path);
 
 	/**
 	 * @brief Extracts and normalizes the file extension from a given file path.
