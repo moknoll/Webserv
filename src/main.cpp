@@ -79,11 +79,21 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	redirect_loc.allowed_methods.push_back("GET"); // = {"GET"};
 	redirect_loc.client_max_body_size = 0;
 	redirect_loc.redirect = "/new"; // 301 -> /new or http://google.com
+	
+	// Location: /autoindex
+	Location autoindex_loc;
+	autoindex_loc.path = "/autoin";
+	autoindex_loc.root = "../src";
+	autoindex_loc.autoindex = true;
+	autoindex_loc.index = "";
+	autoindex_loc.allowed_methods.push_back("GET"); // = {"GET"};
+
 
 	//server.locations = {root_loc, upload_loc, redirect_loc};
 	server.locations.push_back(root_loc);
 	server.locations.push_back(upload_loc);
 	server.locations.push_back(redirect_loc);
+	server.locations.push_back(autoindex_loc);
 	
 	std::vector< ServerConfig > configs;
 /*

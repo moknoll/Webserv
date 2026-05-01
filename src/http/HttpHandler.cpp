@@ -18,8 +18,11 @@
 
 #include <cerrno>
 #include <cstddef>
+#include <cstring>
+#include <dirent.h>
 #include <fcntl.h>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <string>
 #include <unistd.h>
@@ -54,14 +57,15 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 	// build path
 	std::string path = buildPath(uri, *loc);
 
+	std::cout << "HIIIIIIII";
 	if (ws::isDirectory(path))
 	{
 		std::string index_file_path = path + loc->index;
 
 		// TODO makeDirectoryPage
 		if (checkFile(index_file_path.c_str()) != HTTP_OK && loc->autoindex)
-			// return	makeDirectoryPage();
-			;
+			return makeDirectoryPage(path);
+		// ;
 
 		return buildFileResponse(index_file_path, loc);
 	}
@@ -160,6 +164,79 @@ HttpHandler::findMatchUri(const std::string&             uri,
 std::string HttpHandler::buildPath(const std::string& uri, const Location& loc)
 {
 	return loc.root + uri;
+}
+
+std::string buildDirectoryPage(const std::vector< std::string >& list_of_files,
+                               const std::string&                path)
+{
+	std::string content;
+
+	content += "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>";
+	content += "<title>Index of " + path + "</title></head><body>";
+	content += "<h1>Index of " + path + "</h1> 	<hr>	<pre>";
+
+	for (size_t i = 0; i < list_of_files.size(); ++i)
+		content +=
+		    "<a href=" + list_of_files[i] + ">" + list_of_files[i] + "</a>";
+
+	content += "</pre><hr></body></html>";
+
+	return content;
+
+	/*
+
+
+<a href="../">../</a>
+<a href="document.txt">document.txt</a>
+<a href="photo.jpg">photo.jpg</a>
+<a href="video.mp4">video.mp4</a>
+<a href="archive.zip">archive.zip</a>
+<a href="script.js">script.js</a>
+<a href="folder/">folder/</a>
+<a href="backup.tar.gz">backup.tar.gz</a>
+	</pre>
+	<hr>
+</body>
+</html>
+	    */
+}
+
+HttpResponse HttpHandler::makeDirectoryPage(const std::string& path)
+{
+	HttpResponse               res(HTTP_OK);
+
+	std::vector< std::string > list_of_files = getListOfFiles(path);
+
+	if (this->error_ != HTTP_OK)
+		return makeError(error_, NULL);
+	std::string content = buildDirectoryPage(list_of_files, path);
+
+	res.setFullResponse(content, "html");
+
+	return res;
+}
+
+std::vector< std::string > HttpHandler::getListOfFiles(const std::string& path)
+{
+	std::vector< std::string > list_of_files;
+
+	DIR*                       dir = opendir(path.c_str());
+	if (dir == NULL)
+	{
+		this->error_ = HTTP_INTERNAL_SERVER_ERROR;
+		return list_of_files;
+	}
+
+	struct dirent* entry;
+
+	while ((entry = readdir(dir)) != NULL)
+	{
+		if (std::strcmp(entry->d_name, ".") == 0)
+			continue;
+		list_of_files.push_back(entry->d_name);
+	}
+
+	return list_of_files;
 }
 
 int HttpHandler::checkFile(const char* path) const

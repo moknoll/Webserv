@@ -1,3 +1,11 @@
+# Todo List
+
+- [ ] Write a function that generates a page from the content of a folder (directory)
+- [ ] Implement POST request handling
+- [ ] Implement DELETE request handling
+
+---
+
 
 # Configuration Structure for Parsing
 

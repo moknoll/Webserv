@@ -30,19 +30,20 @@ class HttpHandler
 	HttpResponse handleGET(const HttpRequest& req);
 
   private:
-	const ServerConfig& config_;
-	int                 error_;
+	const ServerConfig&        config_;
+	int                        error_;
 
-	HttpResponse        makeError(int status, const Location* loc);
+	HttpResponse               makeError(int status, const Location* loc);
 
 	// TODO
-	HttpResponse        makeDirectoryPage(const std::string& path);
+	HttpResponse               makeDirectoryPage(const std::string& path);
 
-	int                 checkFile(const char* path) const;
-	std::string         readFile(const char* path);
-	HttpResponse        buildFileResponse(const std::string& path,
-	                                      const Location*    loc);
-	std::string         getMimeType(const std::string& path) const;
+	int                        checkFile(const char* path) const;
+	std::string                readFile(const char* path);
+	std::string                getMimeType(const std::string& path) const;
+	std::vector< std::string > getListOfFiles(const std::string& path);
+	HttpResponse               buildFileResponse(const std::string& path,
+	                                             const Location*    loc);
 
 	const Location*
 	            findMatchUri(const std::string&             uri,
