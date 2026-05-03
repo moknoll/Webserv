@@ -83,7 +83,8 @@ enum http_state_e
 
 enum FileError_e
 {
-	ERR_NOT_FOUND = 0,
+	FILE_OK = 0,
+	ERR_NOT_FOUND,
 	ERR_PERMISSION,
 	ERR_IS_DIR,
 	ERR_UNKNOWN

@@ -35,8 +35,9 @@ class HttpHandler
 
 	HttpResponse               makeError(int status, const Location* loc);
 
-	// TODO
-	HttpResponse               makeDirectoryPage(const std::string& path);
+	// WIP
+	HttpResponse               makeDirectoryPage(const std::string& path,
+	                                             const std::string& uri);
 
 	int                        checkFile(const char* path) const;
 	std::string                readFile(const char* path);
@@ -44,11 +45,19 @@ class HttpHandler
 	std::vector< std::string > getListOfFiles(const std::string& path);
 	HttpResponse               buildFileResponse(const std::string& path,
 	                                             const Location*    loc);
+	// WIP
+	HttpResponse               redirect(const std::string& location) const;
 
-	const Location*
-	            findMatchUri(const std::string&             uri,
-	                         const std::vector< Location >& locations) const;
+	// WIP
+	std::string
+	buildDirectoryPage(const std::vector< std::string >& list_of_files,
+	                   const std::string&                path);
 
+	    const Location* findMatchUri(
+	        const std::string&             uri,
+	        const std::vector< Location >& locations) const;
+
+	// WIP
 	std::string buildPath(const std::string& uri, const Location& loc);
 };
 
