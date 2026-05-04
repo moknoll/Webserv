@@ -37,25 +37,24 @@ class HttpHandler
 
 	// WIP
 	HttpResponse               makeDirectoryPage(const std::string& path,
-	                                             const std::string& uri);
+	                                             const std::string& uri,
+	                                             const Location*    loc);
 
-	int                        checkFile(const char* path) const;
-	std::string                readFile(const char* path);
-	std::string                getMimeType(const std::string& path) const;
 	std::vector< std::string > getListOfFiles(const std::string& path);
 	HttpResponse               buildFileResponse(const std::string& path,
 	                                             const Location*    loc);
 	// WIP
 	HttpResponse               redirect(const std::string& location) const;
 
-	// WIP
-	std::string
-	buildDirectoryPage(const std::vector< std::string >& list_of_files,
-	                   const std::string&                path);
-
-	    const Location* findMatchUri(
-	        const std::string&             uri,
-	        const std::vector< Location >& locations) const;
+	// // WIP
+	// std::string
+	// buildDirectoryPage(const std::vector< std::string >& list_of_files,
+	//                    const std::string&                path,
+	//                    const std::string&                uri);
+	//
+	const Location*
+	            findMatchUri(const std::string&             uri,
+	                         const std::vector< Location >& locations) const;
 
 	// WIP
 	std::string buildPath(const std::string& uri, const Location& loc);

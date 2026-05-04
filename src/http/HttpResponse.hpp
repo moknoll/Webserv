@@ -14,6 +14,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 class HttpResponse
 {
@@ -30,11 +31,15 @@ class HttpResponse
 	void        setHeader(const std::string& header_name, const std::string& v);
 	void        setBody(const std::string& content);
 	void        setFullResponse(const std::string& content,
-	                            const std::string& content_type);
+	                            const std::string& extention);
 	void        setStatus(int status);
 
 	std::string getHeader(const std::string& header_name) const;
-	std::string getErrorPage(int err_status) const;
+	std::string buildErrorPage(int err_status) const;
+
+	std::string buildDirectoryPage(const std::vector< std::string >& files,
+	                               const std::string&                path,
+	                               const std::string&                uri);
 	const char* getStatusMsg(int status) const;
 
   private:
@@ -44,5 +49,6 @@ class HttpResponse
 	std::string                          body_;
 
 	const std::string                    getHttpTime() const;
+	const std::string getMimeType(const std::string& ext) const;
 };
 

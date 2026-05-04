@@ -58,7 +58,14 @@ class ws
 	// convert string to tolower case string
 	static void                       toLowerCase(std::string& s);
 
-	// get file size in bytes with stat
+	/**
+	 * @brief Retrieves the size of a file in bytes.
+	 * @param path Path to the file.
+	 * @return File size in bytes if successful, 0 otherwise.
+	 * @note Returns 0 for directories, non-existent files, or files without
+	 * read permissions. Use checkFile() first to distinguish actual zero-byte
+	 *       files from error conditions.
+	 */
 	static size_t                     getFileSize(const std::string& path);
 	/**
 	 * @brief Checks whether a given path refers to a regular file.
@@ -87,6 +94,41 @@ class ws
 	 * slash is considered as the extension delimiter.
 	 */
 	static const std::string          getFileExtension(const std::string& path);
+
+	/**
+	 * @brief Reads the entire contents of a file into a string.
+	 * @param path: Path to the file to read.
+	 * @param file_content: Reference to a string where the file content will be
+	 * stored.
+	 * @return true if the file was successfully opened and read, false
+	 * otherwise.
+	 * @note Clears any existing content in 'out' and replaces it with file
+	 * data. Uses stream iterators, so it reads until EOF. Large files may cause
+	 *       memory allocation issues.
+	 */
+	static bool readFile(const char* path, std::string& file_content);
+
+	/**
+	 * @brief Checks a file's existence and accessibility without reading it.
+	 * @param path Path to the file to check.
+	 * @return Status code: FILE_OK if accessible, or
+	 *                an error code (NOT_FOUND, PERMISSION, IS_DIR, UNKNOWN)
+	 *                indicating the failure reason.
+	 * @note Uses open() in read-only mode. The file is closed immediately
+	 *       if successfully opened, so no resources are leaked.
+	 */
+	static int  checkFile(const char* path);
+
+	/**
+	 * @brief Gets the last modification time of a file as a formatted string.
+	 * @param path Path to the file.
+	 * @return Formatted time string (e.g., "01-Jan-2024 15:30") or empty string
+	 * on error.
+	 * @note Format used: day-month-year hour:minute (e.g., "05-May-2026
+	 * 14:23"). Returns empty string if the file doesn't exist, stat() fails, or
+	 *       formatting fails. Uses local time (not UTC).
+	 */
+	static const std::string getFileModificationTime(const std::string& path);
 
 	/**
 	 * @brief Converts a value of any type to its string representation.

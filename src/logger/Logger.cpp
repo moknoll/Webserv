@@ -75,11 +75,11 @@ const std::string Logger::_getTimestamp()
 	char        buf[50];
 	const char* fmt = "%Y-%m-%d %H:%M:%S";
 
-	std::time_t now = time(0);
+	std::time_t now = std::time(0);
 	if (now == -1)
 		return "";
 
-	tm* timeinfo = localtime(&now);
+	tm* timeinfo = std::localtime(&now);
 
 	if (!timeinfo || std::strftime(buf, sizeof(buf), fmt, timeinfo) == 0)
 		return "";

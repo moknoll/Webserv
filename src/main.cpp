@@ -54,7 +54,7 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	Location root_loc;
 	root_loc.path = "/";
 	root_loc.root = "./www";
-	root_loc.index = "index.htm";
+	root_loc.index = "index.html";
 	root_loc.error_pages[404] = "./www/404.html";
 	root_loc.error_pages[500] = "./www/500.html";
 	root_loc.allowed_methods.push_back("GET"); // = {"GET", "POST"};

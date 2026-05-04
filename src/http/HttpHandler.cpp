@@ -20,12 +20,16 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstring>
+#include <ctime>
 #include <dirent.h>
 #include <fcntl.h>
-#include <fstream>
+#include <iomanip>
+#include <ios>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
 
@@ -39,6 +43,21 @@ HttpHandler::HttpHandler(const ServerConfig& cfg)
 HttpHandler::~HttpHandler() {}
 
 // HttpHandler&	HttpHandlerHt::operator=(const HttpHandler& other) {}
+
+HttpResponse HttpHandler::handle(const HttpRequest& req)
+{
+	const std::string& uri = req.getURI();
+
+	const Location*    loc = findMatchUri(uri, config_.locations);
+	(void) loc;
+
+	// if loc->path == CGI
+	//  handleCGI();
+	//
+
+	return HttpResponse(200);
+}
+
 // WIP
 HttpResponse HttpHandler::redirect(const std::string& location) const
 {
@@ -46,7 +65,7 @@ HttpResponse HttpHandler::redirect(const std::string& location) const
 
 	res.setHeader("Location", location);
 
-	res.setFullResponse(res.getErrorPage(HTTP_MOVED_PERMANENTLY), "html");
+	res.setFullResponse(res.buildErrorPage(HTTP_MOVED_PERMANENTLY), "html");
 
 	return res;
 }
@@ -87,17 +106,17 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 
 		std::cout << "index_file_path: " << index_file_path << '\n';
 		// TODO makeDirectoryPage
-		if (checkFile(index_file_path.c_str()) == FILE_OK)
+		if (ws::checkFile(index_file_path.c_str()) == FILE_OK)
 			return buildFileResponse(index_file_path, loc);
 
 		std::cout << "autoindex: " << loc->autoindex << '\n';
-		std::cout << "checkFile: " << checkFile(index_file_path.c_str())
+		std::cout << "checkFile: " << ws::checkFile(index_file_path.c_str())
 		          << '\n';
 		if (loc->autoindex)
 		{
 			if (uri[uri.length() - 1] != '/')
 				return redirect("http://" + req.getHeader("Host") + uri + "/");
-			return makeDirectoryPage(path, uri);
+			return makeDirectoryPage(path, uri, loc);
 		}
 
 		return makeError(HTTP_FORBIDDEN, loc);
@@ -111,48 +130,29 @@ HttpResponse HttpHandler::makeError(int status, const Location* loc)
 	HttpResponse res(status);
 	std::string  content;
 
-	if (!loc || loc->error_pages.find(status) == loc->error_pages.end())
+	if (!loc)
 	{
-		res.setFullResponse(res.getErrorPage(status), getMimeType("html"));
+		std::map< int, std::string >::const_iterator it =
+		    loc->error_pages.find(status);
+		if (it != loc->error_pages.end())
+		{
+			if (ws::readFile(it->second.c_str(), content))
+			{
+				res.setFullResponse(content, "html");
+				return res;
+			}
+		}
 		return res;
 	}
 
-	std::map< int, std::string >::const_iterator error_page_path_it;
-	error_page_path_it = loc->error_pages.find(status);
-
-	content = readFile(error_page_path_it->second.c_str());
-	if (this->error_ == HTTP_OK)
-	{
-		res.setFullResponse(content, getMimeType("html"));
-	}
-	else
-	{
-		res.setFullResponse(res.getErrorPage(error_), getMimeType("html"));
-	}
-
+	res.setFullResponse(res.buildErrorPage(status), "html");
 	return res;
-}
-
-std::string HttpHandler::readFile(const char* path)
-{
-	std::ifstream file(path);
-
-	if (!file.is_open())
-	{
-		this->error_ = HTTP_INTERNAL_SERVER_ERROR;
-		return "";
-	}
-
-	std::string content((std::istreambuf_iterator< char >(file)),
-	                    std::istreambuf_iterator< char >());
-	error_ = HTTP_OK;
-	return content;
 }
 
 HttpResponse HttpHandler::buildFileResponse(const std::string& path,
                                             const Location*    loc)
 {
-	switch (checkFile(path.c_str()))
+	switch (ws::checkFile(path.c_str()))
 	{
 		case FILE_OK:        break;
 		case ERR_NOT_FOUND:  return makeError(HTTP_NOT_FOUND, loc);
@@ -161,16 +161,13 @@ HttpResponse HttpHandler::buildFileResponse(const std::string& path,
 		default:             return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
 	}
 
-	std::string content = readFile(path.c_str());
-
-	if (error_ != HTTP_OK)
-		return makeError(error_, loc);
+	std::string content;
+	if (!ws::readFile(path.c_str(), content))
+		return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
 
 	HttpResponse res(HTTP_OK);
 
-	std::string  extention = ws::getFileExtension(path);
-	res.setFullResponse(content, getMimeType(extention));
-
+	res.setFullResponse(content, ws::getFileExtension(path));
 	return res;
 }
 
@@ -204,7 +201,7 @@ std::string HttpHandler::buildPath(const std::string& uri, const Location& loc)
 	std::string path = loc.root;
 
 	if (!path.empty() && path[path.length() - 1] != '/')
-		path += "/";
+		path += '/';
 
 	if (!sub_uri.empty() && sub_uri[0] == '/')
 		path += sub_uri.substr(1);
@@ -228,39 +225,88 @@ href="file2">file2</a>                                              03-May-2026
 </html>
 */
 
-// WIP
 std::string
-HttpHandler::buildDirectoryPage(const std::vector< std::string >& list_of_files,
-                                const std::string&                path)
+modif(const std::string& name, const std::string& time, const std::string& size)
 {
-	std::string content;
+	std::stringstream ss;
+	std::string       n = name;
 
-	content += "<html>\n";
-	content += "<head><title>Index of " + path + "</title></head>\n";
-	content += "<body>\n<h1>Index of " + path
-	         + "</h1><hr><pre>"; //<a href=\"../\">../</a>\n";
+	if (name.length() > 51)
+	{
+		n = name.substr(0, 47);
+		n += "..>";
+	}
+	ss << std::left << std::setw(55) << n + "</a>";
+	ss << std::right << time << std::setw(11);
+	ss << std::right << size << std::setw(20);
 
-	for (size_t i = 0; i < list_of_files.size(); ++i)
-		content +=
-		    "<a href=" + list_of_files[i] + ">" + list_of_files[i] + "</a>\n";
-
-	content += "</pre><hr></body></html>";
-
-	return content;
+	return ss.str();
 }
 
+// WIP
+// std::string
+// HttpHandler::buildDirectoryPage(const std::vector< std::string >& list_of_files,
+//                                 const std::string&                path,
+//                                 const std::string&                uri)
+// {
+// 	std::string content;
+//
+// 	content += "<html>\n";
+// 	content += "<head><title>Index of " + uri + "</title></head>\n";
+// 	content += "<body>\n<h1>Index of " + uri
+// 	         + "</h1><hr><pre><a href=\"../\">../</a>\n";
+//
+// 	for (size_t i = 0; i < list_of_files.size(); ++i)
+// 	{
+// 		std::string time = ws::getFileModificationTime(path + list_of_files[i]);
+// 		std::string size;
+// 		if (ws::isDirectory(path + list_of_files[i]))
+// 			size = "-";
+// 		else
+// 			size = ws::to_string(ws::getFileSize(path + list_of_files[i]));
+// 		std::cout << modif(list_of_files[i], time, size) << std::endl;
+// 		content += "<a href=" + list_of_files[i] + ">"
+// 		         + modif(list_of_files[i], time, size) + "\n";
+// 	}
+// 	// content += +list_of_files[i] + ">" + list_of_files[i] + "</a>\n";
+//
+// 	content += "</pre><hr></body></html>";
+//
+// 	return content;
+// }
+
 HttpResponse HttpHandler::makeDirectoryPage(const std::string& path,
-                                            const std::string& uri)
+                                            const std::string& uri,
+                                            const Location*    loc)
 {
 	HttpResponse               res(HTTP_OK);
 
-	std::vector< std::string > list_of_files = getListOfFiles(path);
+	std::vector< std::string > list_of_files;
 
-	if (this->error_ != HTTP_OK)
-		return makeError(error_, NULL);
-	std::string content = buildDirectoryPage(list_of_files, uri);
+	DIR*                       dir = opendir(path.c_str());
+	if (dir == NULL)
+		return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
 
-	res.setFullResponse(content, getMimeType("html"));
+	struct dirent* entry;
+
+	while ((entry = readdir(dir)) != NULL)
+	{
+		std::string name = entry->d_name;
+		if (name == "." || name == "..")
+			continue;
+		list_of_files.push_back(name);
+	}
+
+	for (size_t i = 0; i < list_of_files.size(); ++i)
+	{
+		if (ws::isDirectory(path + list_of_files[i])
+		    && list_of_files[i][list_of_files[i].size() - 1] != '/')
+			list_of_files[i] += "/";
+	}
+
+	std::string content = res.buildDirectoryPage(list_of_files, path, uri);
+
+	res.setFullResponse(content, "html");
 
 	return res;
 }
@@ -280,59 +326,19 @@ std::vector< std::string > HttpHandler::getListOfFiles(const std::string& path)
 
 	while ((entry = readdir(dir)) != NULL)
 	{
-		if (std::strcmp(entry->d_name, ".") == 0)
+		std::string name = entry->d_name;
+		if (name == "." || name == "..")
 			continue;
-		list_of_files.push_back(entry->d_name);
+		list_of_files.push_back(name);
 	}
 
 	for (size_t i = 0; i < list_of_files.size(); ++i)
 	{
-		if (ws::isDirectory(path + list_of_files[i]))
+		if (ws::isDirectory(path + list_of_files[i])
+		    && list_of_files[i][list_of_files[i].size() - 1] != '/')
 			list_of_files[i] += "/";
 	}
 
 	return list_of_files;
 }
-
-int HttpHandler::checkFile(const char* path) const
-{
-	int fd = open(path, O_RDONLY);
-	if (fd != -1)
-	{
-		close(fd);
-		return FILE_OK;
-	}
-
-	switch (errno)
-	{
-		case ENOENT: return ERR_NOT_FOUND;
-		case EACCES: return ERR_PERMISSION;
-		case EISDIR: return ERR_IS_DIR;
-		default:     return ERR_UNKNOWN;
-	}
-}
-
-// clang-format off
-std::string HttpHandler::getMimeType(const std::string& ext) const
-{
-	if (ext == "htm" || ext == "html")	return "text/html; charset=utf-8";
-	if (ext == "css")					return "text/css";
-	if (ext == "js")					return "application/javascript";
-	if (ext == "xml")					return "application/xml";
-	if (ext == "txt")					return "text/plain";
-	if (ext == "jpeg" || ext == "jpg")	return "image/jpeg";
-	if (ext == "png")					return "image/png";
-	if (ext == "gif")					return "image/gif";
-	if (ext == "ico")					return "image/x-icon";
-	if (ext == "svg")					return "image/svg+xml";
-	if (ext == "webp")					return "image/webp";
-	if (ext == "webm")					return "video/webm";
-	if (ext == "mp4")					return "video/mp4";
-	if (ext == "mp3")					return "audio/mpeg";
-	if (ext == "gz")					return "application/gzip";
-	if (ext == "zip")					return "application/zip";
-
-	return "application/octet-stream";
-}
-// clang-format on
 
