@@ -23,11 +23,8 @@
 #include <ctime>
 #include <dirent.h>
 #include <fcntl.h>
-#include <iomanip>
-#include <ios>
 #include <iostream>
 #include <map>
-#include <sstream>
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -47,34 +44,9 @@ HttpHandler::~HttpHandler() {}
 HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
 	const std::string& uri = req.getURI();
-
+	const std::string& host = req.getHeader("Host");
 	const Location*    loc = findMatchUri(uri, config_.locations);
-	(void) loc;
-
-	// if loc->path == CGI
-	//  handleCGI();
-	//
-
-	return HttpResponse(200);
-}
-
-// WIP
-HttpResponse HttpHandler::redirect(const std::string& location) const
-{
-	HttpResponse res(HTTP_MOVED_PERMANENTLY);
-
-	res.setHeader("Location", location);
-
-	res.setFullResponse(res.buildErrorPage(HTTP_MOVED_PERMANENTLY), "html");
-
-	return res;
-}
-
-HttpResponse HttpHandler::handleGET(const HttpRequest& req)
-{
-	const std::string& uri = req.getURI();
-
-	const Location*    loc = findMatchUri(uri, config_.locations);
+	// const std::string  method = req.getMethod();
 
 	if (req.getRequestStatus() != HTTP_OK)
 		return makeError(req.getRequestStatus(), loc);
@@ -82,47 +54,63 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 	if (loc == NULL)
 		return makeError(HTTP_NOT_FOUND, loc);
 
-	// TODO
-	// getMethod if method not allowed
-	// return makeError(HTTP_NOT_ALLOWED);
+	this->loc_ = *loc;
 
-	// build path WIP
-	std::cout << "URI: " << uri << std::endl;
-	std::string path = buildPath(uri, *loc);
+	std::cout << "redirect first: " << loc->redirect.first << "\n";
+	std::cout << "redirect second: " << loc->redirect.second << "\n";
+	std::cout << "loc path: " << loc->path << "\n";
+	// if redirect -> redirect(status, location)
+	if (loc->redirect.first > -1)
+		return redirect(loc->redirect.first, loc->redirect.second, host);
 
-	std::cout << "path: " << path << std::endl;
+	// if loc->path == CGI
+	//  handleCGI();
+
+	if (!isAllowedMethod("GET", *loc))
+		return makeError(HTTP_NOT_ALLOWED, loc);
+
+	// if (method == "GET")
+	return handleGET(req, *loc);
+	// else if (method == "POST")
+	// return handlePOST(req, *loc);
+	// else if (method == "DELETE")
+	// return handleDELETE(req, loc);
+
+	return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
+}
+
+HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
+{
+	const std::string& uri = req.getURI();
+	const std::string& host = req.getHeader("Host");
+	std::string        path = buildPath(uri, loc);
 
 	if (ws::isDirectory(path))
 	{
-		if (path[path.length() - 1] != '/')
-			std::cout << req.getHeader("Host") + "/" + uri + "/";
-		// return redirect(req.getHeader("Host") + "/" + uri + "/");
-		std::string index_file_path = path;
+		if (path[path.length() - 1] != '/' && uri != "/")
+			return redirect(HTTP_MOVED_PERMANENTLY, uri + "/", host);
 
-		if (!loc->index.empty())
-			index_file_path += loc->index;
-		else
-			index_file_path += "index.html";
+		std::string index_file =
+		    loc.index.empty() ? path + "index.html" : path + loc.index;
 
-		std::cout << "index_file_path: " << index_file_path << '\n';
-		// TODO makeDirectoryPage
-		if (ws::checkFile(index_file_path.c_str()) == FILE_OK)
-			return buildFileResponse(index_file_path, loc);
+		if (ws::checkFile(index_file.c_str()) == FILE_OK)
+			return makeFileResponse(index_file, &loc);
 
-		std::cout << "autoindex: " << loc->autoindex << '\n';
-		std::cout << "checkFile: " << ws::checkFile(index_file_path.c_str())
-		          << '\n';
-		if (loc->autoindex)
-		{
-			if (uri[uri.length() - 1] != '/')
-				return redirect("http://" + req.getHeader("Host") + uri + "/");
-			return makeDirectoryPage(path, uri, loc);
-		}
+		if (loc.autoindex)
+			return makeDirectoryPage(path, uri, &loc);
 
-		return makeError(HTTP_FORBIDDEN, loc);
+		return makeError(HTTP_FORBIDDEN, &loc);
 	}
 
-	return buildFileResponse(path, loc);
+	return makeFileResponse(path, &loc);
+}
+
+HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
+                                     const Location&    loc)
+{
+	(void) req;
+	(void) loc;
+	return HttpResponse(200);
 }
 
 HttpResponse HttpHandler::makeError(int status, const Location* loc)
@@ -149,8 +137,25 @@ HttpResponse HttpHandler::makeError(int status, const Location* loc)
 	return res;
 }
 
-HttpResponse HttpHandler::buildFileResponse(const std::string& path,
-                                            const Location*    loc)
+HttpResponse HttpHandler::redirect(int                status,
+                                   const std::string& location,
+                                   const std::string& host)
+{
+	HttpResponse res(status);
+	std::string  l = location;
+
+	if (location[0] == '/')
+		l = "http://" + host + location;
+
+	res.setHeader("Location", l);
+
+	res.setFullResponse(res.buildErrorPage(status), "html");
+
+	return res;
+}
+
+HttpResponse HttpHandler::makeFileResponse(const std::string& path,
+                                           const Location*    loc)
 {
 	switch (ws::checkFile(path.c_str()))
 	{
@@ -211,134 +216,40 @@ std::string HttpHandler::buildPath(const std::string& uri, const Location& loc)
 	return path;
 }
 
-/*
-<html>
-<head><title>Index of /</title></head>
-<body>
-<h1>Index of /</h1><hr><pre><a href="../">../</a>
-<a href="dir1/">dir1/</a> 03-May-2026 10:24                   - <a
-href="dir2/">dir2/</a>                                              03-May-2026
-10:24                   - <a href="file1">file1</a> 03-May-2026 10:25 0 <a
-href="file2">file2</a>                                              03-May-2026
-10:25                   0 <a href="file3">file3</a> 03-May-2026 10:25 0
-</pre><hr></body>
-</html>
-*/
-
-std::string
-modif(const std::string& name, const std::string& time, const std::string& size)
-{
-	std::stringstream ss;
-	std::string       n = name;
-
-	if (name.length() > 51)
-	{
-		n = name.substr(0, 47);
-		n += "..>";
-	}
-	ss << std::left << std::setw(55) << n + "</a>";
-	ss << std::right << time << std::setw(11);
-	ss << std::right << size << std::setw(20);
-
-	return ss.str();
-}
-
-// WIP
-// std::string
-// HttpHandler::buildDirectoryPage(const std::vector< std::string >& list_of_files,
-//                                 const std::string&                path,
-//                                 const std::string&                uri)
-// {
-// 	std::string content;
-//
-// 	content += "<html>\n";
-// 	content += "<head><title>Index of " + uri + "</title></head>\n";
-// 	content += "<body>\n<h1>Index of " + uri
-// 	         + "</h1><hr><pre><a href=\"../\">../</a>\n";
-//
-// 	for (size_t i = 0; i < list_of_files.size(); ++i)
-// 	{
-// 		std::string time = ws::getFileModificationTime(path + list_of_files[i]);
-// 		std::string size;
-// 		if (ws::isDirectory(path + list_of_files[i]))
-// 			size = "-";
-// 		else
-// 			size = ws::to_string(ws::getFileSize(path + list_of_files[i]));
-// 		std::cout << modif(list_of_files[i], time, size) << std::endl;
-// 		content += "<a href=" + list_of_files[i] + ">"
-// 		         + modif(list_of_files[i], time, size) + "\n";
-// 	}
-// 	// content += +list_of_files[i] + ">" + list_of_files[i] + "</a>\n";
-//
-// 	content += "</pre><hr></body></html>";
-//
-// 	return content;
-// }
-
 HttpResponse HttpHandler::makeDirectoryPage(const std::string& path,
                                             const std::string& uri,
                                             const Location*    loc)
 {
-	HttpResponse               res(HTTP_OK);
-
-	std::vector< std::string > list_of_files;
-
-	DIR*                       dir = opendir(path.c_str());
+	DIR* dir = opendir(path.c_str());
 	if (dir == NULL)
 		return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
 
-	struct dirent* entry;
+	std::vector< std::string > files;
+	struct dirent*             entry;
 
 	while ((entry = readdir(dir)) != NULL)
 	{
 		std::string name = entry->d_name;
 		if (name == "." || name == "..")
 			continue;
-		list_of_files.push_back(name);
+		if (ws::isDirectory(path + name) && name[name.size() - 1] != '/')
+			name += '/';
+		files.push_back(name);
 	}
 
-	for (size_t i = 0; i < list_of_files.size(); ++i)
-	{
-		if (ws::isDirectory(path + list_of_files[i])
-		    && list_of_files[i][list_of_files[i].size() - 1] != '/')
-			list_of_files[i] += "/";
-	}
-
-	std::string content = res.buildDirectoryPage(list_of_files, path, uri);
-
+	HttpResponse res(HTTP_OK);
+	std::string  content = res.buildDirectoryPage(files, path, uri);
 	res.setFullResponse(content, "html");
-
 	return res;
 }
 
-std::vector< std::string > HttpHandler::getListOfFiles(const std::string& path)
+bool HttpHandler::isAllowedMethod(const std::string& method,
+                                  const Location&    loc) const
 {
-	std::vector< std::string > list_of_files;
-
-	DIR*                       dir = opendir(path.c_str());
-	if (dir == NULL)
+	for (size_t i = 0; i < loc.allowed_methods.size(); i++)
 	{
-		this->error_ = HTTP_INTERNAL_SERVER_ERROR;
-		return list_of_files;
+		if (method == loc.allowed_methods[i])
+			return true;
 	}
-
-	struct dirent* entry;
-
-	while ((entry = readdir(dir)) != NULL)
-	{
-		std::string name = entry->d_name;
-		if (name == "." || name == "..")
-			continue;
-		list_of_files.push_back(name);
-	}
-
-	for (size_t i = 0; i < list_of_files.size(); ++i)
-	{
-		if (ws::isDirectory(path + list_of_files[i])
-		    && list_of_files[i][list_of_files[i].size() - 1] != '/')
-			list_of_files[i] += "/";
-	}
-
-	return list_of_files;
+	return false;
 }
-

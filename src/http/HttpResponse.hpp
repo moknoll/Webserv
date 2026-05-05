@@ -50,5 +50,10 @@ class HttpResponse
 
 	const std::string                    getHttpTime() const;
 	const std::string getMimeType(const std::string& ext) const;
+	std::string       trucateName(const std::string& name);
+	std::string buildEntry(const std::string& path, const std::string& name);
+	std::string formatEntry(const std::string& name,
+	                        const std::string& time,
+	                        const std::string& size);
 };
 

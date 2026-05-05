@@ -14,6 +14,7 @@
 #define _HTTP_CONSTANTS_
 
 #define SERVER_NAME_STR               "Webserv"
+#define HTTP_VERSION                  "HTTP/1.1"
 
 #define OK                            0
 #define ERROR                         -1

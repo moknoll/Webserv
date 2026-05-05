@@ -15,6 +15,7 @@
 #include "../ConfigParser/ServerConfig.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
+
 #include <string>
 
 class HttpHandler
@@ -27,36 +28,35 @@ class HttpHandler
 	// HttpHandler& operator=(const HttpHandler& other);
 
 	HttpResponse handle(const HttpRequest& req);
-	HttpResponse handleGET(const HttpRequest& req);
 
   private:
-	const ServerConfig&        config_;
-	int                        error_;
+	const ServerConfig& config_;
+	Location            loc_;
+	int                 error_;
 
-	HttpResponse               makeError(int status, const Location* loc);
+	HttpResponse        handleGET(const HttpRequest& req, const Location& loc);
+	HttpResponse        handlePOST(const HttpRequest& req, const Location& loc);
+	HttpResponse        makeError(int status, const Location* loc);
 
 	// WIP
-	HttpResponse               makeDirectoryPage(const std::string& path,
-	                                             const std::string& uri,
-	                                             const Location*    loc);
+	HttpResponse        makeDirectoryPage(const std::string& path,
+	                                      const std::string& uri,
+	                                      const Location*    loc);
 
 	std::vector< std::string > getListOfFiles(const std::string& path);
-	HttpResponse               buildFileResponse(const std::string& path,
-	                                             const Location*    loc);
-	// WIP
-	HttpResponse               redirect(const std::string& location) const;
+	HttpResponse makeFileResponse(const std::string& path, const Location* loc);
 
-	// // WIP
-	// std::string
-	// buildDirectoryPage(const std::vector< std::string >& list_of_files,
-	//                    const std::string&                path,
-	//                    const std::string&                uri);
-	//
+	// WIP
+	HttpResponse
+	redirect(int status, const std::string& location, const std::string& host);
+
 	const Location*
 	            findMatchUri(const std::string&             uri,
 	                         const std::vector< Location >& locations) const;
 
 	// WIP
 	std::string buildPath(const std::string& uri, const Location& loc);
+
+	bool isAllowedMethod(const std::string& method, const Location& loc) const;
 };
 

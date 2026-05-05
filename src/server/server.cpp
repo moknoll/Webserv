@@ -168,7 +168,7 @@ void Server::_handleClientMessage(int fd)
 
 		HttpHandler  h(_configs[0]);
 		HttpRequest  req(_clients.at(fd).requestBuffer);
-		HttpResponse res = h.handleGET(req);
+		HttpResponse res = h.handle(req);
 
 		_clients.at(fd).responseBuffer = res.buildResponse();
 

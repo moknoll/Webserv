@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <ctime>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -111,16 +112,16 @@ std::string HttpResponse::buildErrorPage(int err_status) const
 	return html_page.str();
 }
 
-std::string trucateName(const std::string& name)
+std::string HttpResponse::trucateName(const std::string& name)
 {
 	if (name.size() > 51)
 		return name.substr(0, 47) + "..&gt;";
 	return name;
 }
 
-std::string formatEntry(const std::string& name,
-                        const std::string& time,
-                        const std::string& size)
+std::string HttpResponse::formatEntry(const std::string& name,
+                                      const std::string& time,
+                                      const std::string& size)
 {
 	std::ostringstream ss;
 	std::string        dispay_name = trucateName(name) + "</a>";
@@ -131,14 +132,17 @@ std::string formatEntry(const std::string& name,
 	return ss.str();
 }
 
-std::string buildEntry(const std::string& fullPath, const std::string& name)
+std::string HttpResponse::buildEntry(const std::string& path,
+                                     const std::string& name)
 {
-	std::string time = ws::getFileExtension(fullPath);
+	std::string time = ws::getFileModificationTime(path + name);
 	std::string size;
-	if (ws::isDirectory(fullPath))
+
+	if (ws::isDirectory(path + name))
 		size = "-";
 	else
-		size = ws::getFileSize(fullPath);
+		size = ws::to_string(ws::getFileSize(path + name));
+	std::cout << "SIZE: " << size << std::endl;
 	return "<a href=" + name + ">" + formatEntry(name, time, size) + "\n";
 }
 

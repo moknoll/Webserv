@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct Location
@@ -13,7 +14,7 @@ struct Location
 	size_t                       client_max_body_size; // default 1M
 	std::map< int, std::string > error_pages;          // 404 ->
 	std::vector< std::string >   allowed_methods;      // default GET, POST
-	std::string redirect; // return 301 (from subject: HTTP redirection)
+	std::pair<int, std::string> redirect; // return 301 (from subject: HTTP redirection);
 };
 
 class ServerConfig
@@ -27,6 +28,7 @@ class ServerConfig
 	bool                         autoindex;            // default false
 	size_t                       client_max_body_size; // default 1M
 	std::map< int, std::string > error_pages;          // 404 ->
+	std::pair<int, std::string>  redirect; // return 301 (from subject: HTTP redirection);
 	std::vector< Location >      locations;
 
 	ServerConfig();

@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <iostream>
 #include <string>
+#include <utility>
 
 int checkArguments(int argc, char* argv[])
 {
@@ -38,12 +39,12 @@ int checkArguments(int argc, char* argv[])
 	return 1;
 }
 
-std::vector< ServerConfig > setupConfigDefaultToTest()
+ServerConfig getConfig(const std::string& host, int port)
 {
 	// listen 0.0.0.0:8080
 	ServerConfig server;
-	server.host = "0.0.0.0";
-	server.port = 16000;
+	server.host = host;
+	server.port = port;
 	// server.server_name = "example.com";
 
 	// Error pages
@@ -57,20 +58,22 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	root_loc.index = "index.html";
 	root_loc.error_pages[404] = "./www/404.html";
 	root_loc.error_pages[500] = "./www/500.html";
-	root_loc.allowed_methods.push_back("GET"); // = {"GET", "POST"};
+	root_loc.allowed_methods.push_back("GET");   // = {"GET", "POST"};
 	root_loc.allowed_methods.push_back("POST");
 	root_loc.client_max_body_size = 1024 * 1024; // 1MB
 	root_loc.autoindex = false;
-	root_loc.redirect = "";
+	root_loc.redirect =
+	    std::make_pair(-1, ""); // 301 -> /new or http://google.com
 
 	// Location: /upload
 	Location upload_loc;
 	upload_loc.path = "/upload";
 	upload_loc.root = "./www/uploads";
 	upload_loc.index = "";
-	upload_loc.allowed_methods.push_back("POST"); // = {"POST"};
+	upload_loc.allowed_methods.push_back("POST");       // = {"POST"};
 	upload_loc.client_max_body_size = 10 * 1024 * 1024; // 10MB
-	upload_loc.redirect = "";
+	upload_loc.redirect =
+	    std::make_pair(-1, ""); // 301 -> /new or http://google.com
 
 	// Location: /old (редирект)
 	Location redirect_loc;
@@ -79,8 +82,8 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	redirect_loc.index = "";
 	redirect_loc.allowed_methods.push_back("GET"); // = {"GET"};
 	redirect_loc.client_max_body_size = 0;
-	redirect_loc.redirect = "/new"; // 301 -> /new or http://google.com
-	
+	redirect_loc.redirect = std::make_pair(301, "/new"); // 301 -> /new or http://google.com
+
 	// Location: /autoindex
 	Location autoindex_loc;
 	autoindex_loc.path = "/autoin";
@@ -88,36 +91,28 @@ std::vector< ServerConfig > setupConfigDefaultToTest()
 	autoindex_loc.autoindex = true;
 	autoindex_loc.index = "";
 	autoindex_loc.allowed_methods.push_back("GET"); // = {"GET"};
+	redirect_loc.redirect =
+	    std::make_pair(-1, ""); // 301 -> /new or http://google.com
 
-
-	//server.locations = {root_loc, upload_loc, redirect_loc};
+	// server.locations = {root_loc, upload_loc, redirect_loc};
 	server.locations.push_back(root_loc);
 	server.locations.push_back(upload_loc);
 	server.locations.push_back(redirect_loc);
 	server.locations.push_back(autoindex_loc);
-	
-	std::vector< ServerConfig > configs;
-/*
-	ServerConfig                config1, config2;
-	config1.port = MYPORT;
-	config1.host = "server1.com";
-	config1.root = "./www";
-	config1.index = "index.html";
-	config1.client_max_body_size = 1024 * 1024; // 1MB
-	config1.locations;
-	configs.push_back(config1);
 
-	config2.port = MYPORT + 1;
-	config2.host = "server2.org";
-	config2.root = "./www2";
-	config2.index = "index.html";
-	config2.client_max_body_size = 1024 * 1024; // 1MB
-	*/
-	
-	configs.push_back(server);
-	return configs;
+	return server;
 }
 
+std::vector< ServerConfig > setupConfigDefaultToTest()
+{
+	ServerConfig                s1 = getConfig("0.0.0.0", MYPORT);
+	ServerConfig                s2 = getConfig("127.0.0.1", MYPORT + 1);
+	std::vector< ServerConfig > configs;
+
+	configs.push_back(s1);
+	configs.push_back(s2);
+	return configs;
+}
 
 int main(int argc, char* argv[])
 {
