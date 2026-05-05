@@ -6,7 +6,7 @@
 /*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/05/05 15:35:28 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/05/05 16:06:01 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,7 +71,7 @@ void Core::init()
 
 		for (p = servinfo; p != NULL; p = p->ai_next)
 		{
-			if(( = socket(p->ai_family, p->ai_socktype, p->ai_protocol)))
+			if((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)))
 				if (sock_fd == SOCKET_ERROR)
 					continue;
 			if ((setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))) == SOCKET_ERROR)
@@ -108,7 +108,7 @@ void Core::init()
 
 		_servers[i].getSocket().setFD(sock_fd);
 
-		// _serverConfigsByFd[sock_fd] = _configs[i];
+		_serverByFd[sock_fd] = _servers[i];
 		// // Debug: Log the server config mapping
 		// std::ostringstream oss;
 		// oss << "Server Socket FD: " << sock_fd 
@@ -140,7 +140,7 @@ void Core::run()
 		{
 			if(_pollSockets[i].revents & POLLIN)
 			{
-				if(_serverConfigsByFd.count(_pollSockets[i].fd))
+				if(_serverByFd.count(_pollSockets[i].fd))
 					_acceptNewClient(_pollSockets[i].fd);
 				else 
 					_handleClientMessage(_pollSockets[i].fd);
@@ -187,20 +187,19 @@ bool Core::_isCompleteRequest(std::string &request)
 void Core::_acceptNewClient(int serverSocketFd)
 {
 	struct sockaddr_in clientAddr;
-	ServerConfig* config = &_serverConfigsByFd[serverSocketFd];
 	socklen_t addrLen = sizeof(clientAddr);
 	int newClientFd = accept(serverSocketFd,(struct sockaddr *)&clientAddr, &addrLen);
 	
 	if(newClientFd == SOCKET_ERROR)
 		return;
 	
-	// Debug: Show which config was assigned to the new client
-	std::ostringstream oss;
-	oss << "New Client FD: " << newClientFd 
-		<< " | Accepted from Server Socket FD: " << serverSocketFd 
-		<< " | Assigned Config Port: " << config->port 
-		<< " | Config Host: " << config->host 
-		<< " | Config Root: " << config->root;
+	// // Debug: Show which config was assigned to the new client
+	// std::ostringstream oss;
+	// oss << "New Client FD: " << newClientFd 
+	// 	<< " | Accepted from Server Socket FD: " << serverSocketFd 
+	// 	<< " | Assigned Config Port: " << config->port 
+	// 	<< " | Config Host: " << config->host 
+	// 	<< " | Config Root: " << config->root;
 	LOG_DEBUG(oss.str());
 	
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
@@ -210,7 +209,7 @@ void Core::_acceptNewClient(int serverSocketFd)
 	pfd.events = POLLIN;
 	_pollSockets.push_back(pfd);
 	
-	_clients.insert(std::make_pair(newClientFd, Client(newClientFd, config)));
+	_clients.insert(std::make_pair(newClientFd, Client(newClientFd)));
 	
 	// std::cout << "New Client connected: " <<  << std::endl;
 	//LOG_DEBUG( "New client connected");
@@ -237,7 +236,7 @@ void Core::_handleClientMessage(int clientSocketFd)
 
 		Logger::getInstance().log(INFO, "Received", _clients.at(clientSocketFd).requestBuffer);
 		
-		if (_isCompleteRequest(_clients.at(clientSocketFd).requestBuffer))
+		if (_clients.at(clientSocketFd))
 		{	 
 			std::string response = "Hello from Server"; 
         
