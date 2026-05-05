@@ -3,16 +3,16 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
+/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:52 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/30 10:13:05 by moritzknoll      ###   ########.fr       */
+/*   Updated: 2026/05/05 13:50:08 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ConfigParser/ConfigParser.hpp"
 #include "ConfigParser/ServerConfig.hpp"
-#include "server/server.hpp"
+#include "server/core.hpp"
 #include "logger/Logger.hpp"
 
 #include <iostream>
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
 		}
 		// TODO: Use the parsed config to initialize and run the server
 
-		Server webserver(
+		Core webserver(
 		    configs); // <--------- This needs to be config (ans not my port),
 		              // but for testing we will use the defined MYPORT
 		webserver.init();

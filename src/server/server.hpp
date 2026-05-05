@@ -5,12 +5,13 @@
 class Server{
 	private: 
 		Socket socket;
-		HTTPhandler h;
+		//HTTPhandler h;
 
 	public:  
 		Server(const ServerConfig &config);
 		Server();
-		Server operator=();
+		//Server operator=();
 		
 		//setSocket()?
+		Socket getSocket()const;
 };

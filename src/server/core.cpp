@@ -6,20 +6,28 @@
 /*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/05/05 14:01:50 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/05/05 15:35:28 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "core.hpp"
+#include "server.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
 #include "../logger/Logger.hpp"
+#include "sockets.hpp"
 #include "client.hpp"
 #include <sstream>
+#include "socket.hpp"
 // #include "../http/request/HttpHeader.hpp"
 
 Core::Core(std::vector<ServerConfig> &configs)
 {
 	// Iterat over configs and set each server with host and port
+	for(size_t i = 0; i < configs.size(); i++)
+	{
+		Server server(configs[i]);
+		_servers.push_back(server);
+	}
 }
 
 Core::~Core()
@@ -44,7 +52,7 @@ void Core::init()
 {
 	int yes = 1;
 	int status; 
-	for (size_t i = 0; i < _configs.size(); i++)
+	for (size_t i = 0; i < _servers.size(); i++)
 	{
 		struct addrinfo hints;
 		struct addrinfo *servinfo, *p;
@@ -52,8 +60,8 @@ void Core::init()
 		hints.ai_family = AF_INET; 
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_flags = AI_PASSIVE;// check this
-		std::string host = _configs[i].host;
-		std::string port = std::to_string(_configs[i].port); 
+		std::string host = _servers[i].getSocket().getHost();
+		std::string port = std::to_string(_servers[i].getSocket().getPort());
 
 		std::cout << "Config " << i << ": host='" << host << "' port='" << port << "'" << std::endl;
 		if ((status = getaddrinfo(host.c_str(), port.c_str(), &hints, &servinfo)) != 0)
@@ -63,7 +71,7 @@ void Core::init()
 
 		for (p = servinfo; p != NULL; p = p->ai_next)
 		{
-			if((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)))
+			if(( = socket(p->ai_family, p->ai_socktype, p->ai_protocol)))
 				if (sock_fd == SOCKET_ERROR)
 					continue;
 			if ((setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))) == SOCKET_ERROR)
@@ -98,16 +106,18 @@ void Core::init()
 		pfd.events = POLLIN;
 		_pollSockets.push_back(pfd);
 
-		_serverConfigsByFd[sock_fd] = _configs[i];
-		// Debug: Log the server config mapping
-		std::ostringstream oss;
-		oss << "Server Socket FD: " << sock_fd 
-			<< " | Port: " << _configs[i].port 
-			<< " | Host: " << _configs[i].host 
-			<< " | Root: " << _configs[i].root 
-			<< " | Index: " << _configs[i].index
-			<< " | Max Body Size: " << _configs[i].client_max_body_size;
-		LOG_DEBUG(oss.str());	
+		_servers[i].getSocket().setFD(sock_fd);
+
+		// _serverConfigsByFd[sock_fd] = _configs[i];
+		// // Debug: Log the server config mapping
+		// std::ostringstream oss;
+		// oss << "Server Socket FD: " << sock_fd 
+		// 	<< " | Port: " << _configs[i].port 
+		// 	<< " | Host: " << _configs[i].host 
+		// 	<< " | Root: " << _configs[i].root 
+		// 	<< " | Index: " << _configs[i].index
+		// 	<< " | Max Body Size: " << _configs[i].client_max_body_size;
+		// LOG_DEBUG(oss.str());	
 	}
 }
 
