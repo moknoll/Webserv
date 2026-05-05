@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
+/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/30 10:10:07 by moritzknoll      ###   ########.fr       */
+/*   Updated: 2026/04/30 11:14:53 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -284,6 +284,12 @@ void Server::_sendResponseToClient(int clientSocketFd)
 				break;
 			}
 		}
+	}
+	else 
+	{
+		// Handle send error (e.g., EAGAIN, EWOULDBLOCK, or other errors)
+		// For simplicity, we will just clean up the client on any send error
+		_cleanupClient(clientSocketFd);
 	}
 }
 
