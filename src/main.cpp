@@ -62,27 +62,26 @@ ServerConfig getConfig(const std::string& host, int port)
 	root_loc.allowed_methods.push_back("POST");
 	root_loc.client_max_body_size = 1024 * 1024; // 1MB
 	root_loc.autoindex = false;
-	root_loc.redirect =
-	    std::make_pair(-1, ""); // 301 -> /new or http://google.com
+	root_loc.redirect = std::make_pair(-1, "");
 
 	// Location: /upload
 	Location upload_loc;
 	upload_loc.path = "/upload";
 	upload_loc.root = "./www/uploads";
 	upload_loc.index = "";
+	upload_loc.allowed_methods.push_back("GET");        // = {"GET"};
 	upload_loc.allowed_methods.push_back("POST");       // = {"POST"};
 	upload_loc.client_max_body_size = 10 * 1024 * 1024; // 10MB
-	upload_loc.redirect =
-	    std::make_pair(-1, ""); // 301 -> /new or http://google.com
+	upload_loc.redirect = std::make_pair(-1, "");
 
-	// Location: /old (редирект)
+	// Location: /old (redirect)
 	Location redirect_loc;
 	redirect_loc.path = "/old";
 	redirect_loc.root = "";
 	redirect_loc.index = "";
-	redirect_loc.allowed_methods.push_back("GET"); // = {"GET"};
+	redirect_loc.allowed_methods.push_back("GET");       // = {"GET"};
 	redirect_loc.client_max_body_size = 0;
-	redirect_loc.redirect = std::make_pair(301, "/new"); // 301 -> /new or http://google.com
+	redirect_loc.redirect = std::make_pair(301, "/new"); // 301 -> /new
 
 	// Location: /autoindex
 	Location autoindex_loc;
@@ -90,9 +89,8 @@ ServerConfig getConfig(const std::string& host, int port)
 	autoindex_loc.root = "./src";
 	autoindex_loc.autoindex = true;
 	autoindex_loc.index = "";
-	autoindex_loc.allowed_methods.push_back("GET"); // = {"GET"};
-	redirect_loc.redirect =
-	    std::make_pair(-1, ""); // 301 -> /new or http://google.com
+	autoindex_loc.allowed_methods.push_back("GET");  // = {"GET"};
+	autoindex_loc.redirect = std::make_pair(-1, ""); // 301 ->
 
 	// server.locations = {root_loc, upload_loc, redirect_loc};
 	server.locations.push_back(root_loc);

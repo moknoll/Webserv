@@ -56,18 +56,14 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 
 	this->loc_ = *loc;
 
-	std::cout << "redirect first: " << loc->redirect.first << "\n";
-	std::cout << "redirect second: " << loc->redirect.second << "\n";
-	std::cout << "loc path: " << loc->path << "\n";
 	// if redirect -> redirect(status, location)
-	if (loc->redirect.first > -1)
+	if (loc->redirect.first != -1)
 		return redirect(loc->redirect.first, loc->redirect.second, host);
-
-	// if loc->path == CGI
-	//  handleCGI();
 
 	if (!isAllowedMethod("GET", *loc))
 		return makeError(HTTP_NOT_ALLOWED, loc);
+	// if (!loc->cgi_extension.empty())
+	// 		handleCGI();
 
 	// if (method == "GET")
 	return handleGET(req, *loc);
@@ -87,7 +83,9 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
 
 	if (ws::isDirectory(path))
 	{
-		if (path[path.length() - 1] != '/' && uri != "/")
+		std::cout << "PATH: " << path << '\n';
+		if (uri[uri.length() - 1] != '/' && uri != "/"
+		    && uri[uri.size() - 1] != '/')
 			return redirect(HTTP_MOVED_PERMANENTLY, uri + "/", host);
 
 		std::string index_file =

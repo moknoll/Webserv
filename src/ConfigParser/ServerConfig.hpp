@@ -7,29 +7,32 @@
 
 struct Location
 {
-	std::string                  path;                 // "/"  "/upload"
-	std::string                  root;                 // "./www" or /tmp/www
-	std::string                  index;                // "index.html"
-	bool                         autoindex;            // default false
-	size_t                       client_max_body_size; // default 1M
-	std::map< int, std::string > error_pages;          // 404 ->
-	std::vector< std::string >   allowed_methods;      // default GET, POST
-	std::pair<int, std::string> redirect; // return 301 (from subject: HTTP redirection);
+	std::string                   path;                 // "/"  "/upload"
+	std::string                   root;                 // "./www" or /tmp/www
+	std::string                   index;                // "index.html"
+	bool                          autoindex;            // default false
+	size_t                        client_max_body_size; // default 1M
+	std::string                   upload_path;          // "./uploads"
+	std::string                   cgi_extension;        // ".py", ".php"
+	std::string                   cgi_path;             // "/usr/bin/python3"
+	std::map< int, std::string >  error_pages;          // 404 ->
+	std::vector< std::string >    allowed_methods;      // default GET, POST
+	std::pair< int, std::string > redirect;             // return 301
 };
 
 class ServerConfig
 {
   public:
-	int                          port;
-	std::string                  host;
-	std::string                  server_name;
-	std::string                  root;
-	std::string                  index;
-	bool                         autoindex;            // default false
-	size_t                       client_max_body_size; // default 1M
-	std::map< int, std::string > error_pages;          // 404 ->
-	std::pair<int, std::string>  redirect; // return 301 (from subject: HTTP redirection);
-	std::vector< Location >      locations;
+	int                           port;
+	std::string                   host;
+	std::string                   server_name;
+	std::string                   root;
+	std::string                   index;
+	bool                          autoindex;            // default false
+	size_t                        client_max_body_size; // default 1M
+	std::map< int, std::string >  error_pages;          // 404 ->
+	std::pair< int, std::string > redirect;             // return 301
+	std::vector< Location >       locations;
 
 	ServerConfig();
 	int _getPort();

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   sockets.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/25 09:16:08 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/14 13:06:59 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/04/29 18:13:13 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,7 @@
 #include <sys/socket.h>	// socket()
 #include <netinet/in.h>	// 
 #include <arpa/inet.h> 
+#include <netdb.h>
 #include <iostream> 
 #include <sys/types.h>
 #include <cstring> // memset

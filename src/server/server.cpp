@@ -6,7 +6,7 @@
 /*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/17 16:29:34 by moritzknoll      ###   ########.fr       */
+/*   Updated: 2026/04/30 10:10:07 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,21 +14,13 @@
 #include "../ConfigParser/ServerConfig.hpp"
 #include "../http/HttpHandler.hpp"
 #include "../http/HttpRequest.hpp"
-// #include "../http/HttpResponse.hpp"
+#include "../http/HttpResponse.hpp"
 #include "../lib/ws.hpp"
 #include "../logger/Logger.hpp"
 #include "client.hpp"
 
-#include <cerrno>
-#include <cstddef>
-#include <cstdio>
-#include <cstring>
-#include <errno.h>
-#include <iostream>
-#include <map>
-#include <string>
-#include <unistd.h>
-#include <vector>
+#include <sstream>
+#include <sys/poll.h>
 // #include "../http/request/HttpHeader.hpp"
 
 Server::Server(std::vector< ServerConfig > configs) : _configs(configs) {}
@@ -43,222 +35,290 @@ Server::~Server()
 	// Check later on how to close?
 }
 
+/**
+ * @brief Initializes the server by setting up listening sockets.
+ *
+ * @throws std::runtime_error if socket creation, configuration, binding, or
+ *         listening fails
+ *
+ * @see Server::_configs for the list of configurations to initialize
+ */
 void Server::init()
 {
 	int yes = 1;
-
+	int status;
 	for (size_t i = 0; i < _configs.size(); i++)
 	{
+		struct addrinfo  hints;
+		struct addrinfo *servinfo, *p;
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_PASSIVE; // check this
+		std::string host = _configs[i].host;
+		std::string port = ws::to_string(_configs[i].port);
+
+		std::cout << "Config " << i << ": host='" << host << "' port='" << port
+		          << "'" << std::endl;
+		if ((status =
+		         getaddrinfo(host.c_str(), port.c_str(), &hints, &servinfo))
+		    != 0)
+			throw std::runtime_error(std::string("getaddrinfo failed: ")
+			                         + gai_strerror(status));
+
 		int sock_fd = -1;
-		// 1. Create socket
-		if ((sock_fd = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR)
-			throw std::runtime_error("Socket Creation failed");
 
-		// 2. Set socket opt to reset address/port
-		if ((setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)))
-		    == SOCKET_ERROR)
-			throw std::runtime_error("Setsockopt failed");
+		for (p = servinfo; p != NULL; p = p->ai_next)
+		{
+			if ((sock_fd =
+			         socket(p->ai_family, p->ai_socktype, p->ai_protocol)))
+				if (sock_fd == SOCKET_ERROR)
+					continue;
+			if ((setsockopt(
+			        sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)))
+			    == SOCKET_ERROR)
+			{
+				close(sock_fd);
+				continue;
+			}
+			if ((fcntl(sock_fd, F_SETFL, O_NONBLOCK)) == SOCKET_ERROR)
+			{
+				close(sock_fd);
+				continue;
+			}
+			if ((bind(sock_fd, p->ai_addr, p->ai_addrlen)) == SOCKET_ERROR)
+			{
+				close(sock_fd);
+				continue;
+			}
+			break;
+			std::cout << "Setup complete" << std::endl;
+		}
 
-		// 3. Set serverFD to non block
-		if ((fcntl(sock_fd, F_SETFL, O_NONBLOCK)) == SOCKET_ERROR)
-			throw std::runtime_error("Fcntl failed");
+		if (p == NULL)
+			throw std::runtime_error("Could not bind to" + host + ":" + port);
 
-		// 4. Bind server adress to socket
-		struct sockaddr_in serverAddr;
-		serverAddr.sin_family = AF_INET;               // Set IPv4
-		serverAddr.sin_port = htons(_configs[i].port); // set port
-		serverAddr.sin_addr.s_addr = INADDR_ANY;       // allow in from any IP
-		bzero(&(serverAddr.sin_zero), 8);
+		freeaddrinfo(servinfo);
 
-		if ((bind(sock_fd,
-		          (struct sockaddr*) &serverAddr,
-		          sizeof(struct sockaddr)))
-		    == SOCKET_ERROR)
-			throw std::runtime_error("Bind failed");
-
-		// 5. Listen
-		if ((listen(sock_fd, BACKLOG))
-		    == SOCKET_ERROR) // backlog = number of connections allowed on queue
+		if (listen(sock_fd, BACKLOG) == SOCKET_ERROR)
 			throw std::runtime_error("listen failed");
 
-		// 6. Set server FD to pull vector
 		struct pollfd pfd;
 		pfd.fd = sock_fd;
 		pfd.events = POLLIN;
-		_pollfds.push_back(pfd);
+		_pollSockets.push_back(pfd);
 
-		// 7. Save server fd and config in map
-		_serverfds[sock_fd] = _configs[i];
-		std::cout << "Server listening on port " << _configs[i].port
-		          << std::endl;
-		std::cout << "On fd: " << sock_fd << std::endl;
+		_serverConfigsByFd[sock_fd] = _configs[i];
+		// Debug: Log the server config mapping
+		std::ostringstream oss;
+		oss << "Server Socket FD: " << sock_fd
+		    << " | Port: " << _configs[i].port
+		    << " | Host: " << _configs[i].host
+		    << " | Root: " << _configs[i].root
+		    << " | Index: " << _configs[i].index
+		    << " | Max Body Size: " << _configs[i].client_max_body_size;
+		LOG_DEBUG(oss.str());
 	}
 }
 
+/**
+ * @brief Runs the main event loop for the server.
+ *
+ * @throws std::runtime_error if poll() fails
+ */
 void Server::run()
 {
 	while (1)
 	{
-		int ret = poll(_pollfds.data(), _pollfds.size(), -1);
+		int ret = poll(_pollSockets.data(), _pollSockets.size(), -1);
 
 		if (ret == -1)
-		{
 			throw std::runtime_error("Poll failed");
-		}
 
-		for (size_t i = 0; i < _pollfds.size(); i++)
+		for (size_t i = 0; i < _pollSockets.size(); i++)
 		{
-			// Case A: Read(POLLIN)
-			if (_pollfds[i].revents & POLLIN)
+			if (_pollSockets[i].revents & POLLIN)
 			{
-				if (_serverfds.count(_pollfds[i].fd))
-					_acceptNewClient(_pollfds[i].fd);
+				if (_serverConfigsByFd.count(_pollSockets[i].fd))
+					_acceptNewClient(_pollSockets[i].fd);
 				else
-					_handleClientMessage(_pollfds[i].fd);
+					_handleClientMessage(_pollSockets[i].fd);
 			}
-			// Case B: Write(POLLOUT)
-			// Also check if client still existst
-			else if (_pollfds[i].revents & POLLOUT)
-				_sendResponseToClient(_pollfds[i].fd);
+			else if (_pollSockets[i].revents & POLLOUT)
+				_sendResponseToClient(_pollSockets[i].fd);
 		}
 	}
 }
 
-void Server::_acceptNewClient(int fd)
+/**
+ * @brief Checks if the HTTP request in the buffer is complete.
+ *
+ * Determines whether a received HTTP request has been fully received and is
+ * ready for processing. Currently a placeholder that always returns true.
+ *
+ * @param request Reference to the request string buffer to validate
+ * @return true if the request is complete, false otherwise
+ */
+bool Server::_isCompleteRequest(std::string& request)
+{
+	(void) request;
+	// size_t headerEnd = request.find("\r\n\r\n");
+	// if(headerEnd == std::string::npos)
+	// 	return false;
+
+	// // For GET check content length
+	// size_t contentLength = request.find("Content-Length:");
+	// if(contentLength == std::string::npos)
+	// 	return true;
+
+	// // For POST
+
+	// // For Delete
+	return true;
+}
+
+/**
+ * @brief Accepts a new incoming connection on a listening server socket.
+ *
+ * @param serverSocketFd File descriptor of the listening server socket to
+ *                       accept a new client from.
+ * @return void
+ */
+void Server::_acceptNewClient(int serverSocketFd)
 {
 	struct sockaddr_in clientAddr;
+	ServerConfig*      config = &_serverConfigsByFd[serverSocketFd];
 	socklen_t          addrLen = sizeof(clientAddr);
-	int newClientFd = accept(fd, (struct sockaddr*) &clientAddr, &addrLen);
+	int                newClientFd =
+	    accept(serverSocketFd, (struct sockaddr*) &clientAddr, &addrLen);
 
 	if (newClientFd == SOCKET_ERROR)
 		return;
 
-	// Set to non-blocking
+	// Debug: Show which config was assigned to the new client
+	std::ostringstream oss;
+	oss << "New Client FD: " << newClientFd
+	    << " | Accepted from Server Socket FD: " << serverSocketFd
+	    << " | Assigned Config Port: " << config->port
+	    << " | Config Host: " << config->host
+	    << " | Config Root: " << config->root;
+	// LOG_DEBUG(oss.str());
+
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
 
-	// 1. push into Vector
 	struct pollfd pfd;
 	pfd.fd = newClientFd;
 	pfd.events = POLLIN;
-	_pollfds.push_back(pfd);
+	_pollSockets.push_back(pfd);
 
-	// 2. Create new client object and safe into map
-	_clients.insert(std::make_pair(newClientFd, Client(newClientFd)));
+	_clients.insert(std::make_pair(newClientFd, Client(newClientFd, config)));
 
-	// std::cout << "New Client connected: " << inet_ntoa(clientAddr.sin_addr)
-	// << std::endl;
-	LOG_DEBUG("New client connected");
+	// std::cout << "New Client connected: " <<  << std::endl;
+	// LOG_DEBUG( "New client connected");
 }
 
-void Server::_handleClientMessage(int fd)
+void Server::set_event(int fd, int state)
 {
-	char buffer[1024];
-	int  bytes = recv(fd, buffer, sizeof(buffer), 0);
-
-	if (bytes <= 0)
-		_cleanupClient(fd);
-	else
+	for (size_t i = 0; i < _pollSockets.size(); i++)
 	{
-		// put data into clientbuffer
-		_clients.at(fd).requestBuffer.append(buffer, bytes);
-		// std::cout << "Received: " << _clients.at(fd).requestBuffer <<
-		// std::endl;
-		Logger::getInstance().log(
-		    INFO, "Received", _clients.at(fd).requestBuffer);
-
-		HttpHandler  h(_configs[0]);
-		HttpRequest  req(_clients.at(fd).requestBuffer);
-		HttpResponse res = h.handle(req);
-
-		_clients.at(fd).responseBuffer = res.buildResponse();
-
-		// Plceholder fo Request complete (\r\b\r\b)
-		// this is up to parsingLH ,
-
-		// Here we would parse the request and generate a response, for now
-		// we just send a static message back
-		// _clients.at(fd).responseBuffer = "Hello from Class-Server!\n";
-
-		// Change Poll event to writing
-		for (size_t i = 0; i < _pollfds.size(); i++)
+		if (_pollSockets[i].fd == fd)
 		{
-			if (_pollfds[i].fd == fd)
-			{
-				_pollfds[i].events = POLLIN | POLLOUT;
-				break;
-			}
+			_pollSockets[i].events = state;
+			break;
 		}
 	}
 }
 
-void Server::_sendResponseToClient(int fd)
+/**
+ * @brief Reads incoming data from a client socket and prepares a response.
+ *
+ * @param clientSocketFd File descriptor of the connected client socket
+ * @return void
+ */
+void Server::_handleClientMessage(int clientSocketFd)
+{
+	char buffer[8192];
+	int  bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
+
+	if (bytes <= 0)
+		_cleanupClient(clientSocketFd);
+	else
+	{
+		_clients.at(clientSocketFd).requestBuffer.append(buffer, bytes);
+
+		// Logger::getInstance().log(
+		// INFO, "Received", _clients.at(clientSocketFd).requestBuffer);
+
+		if (_isCompleteRequest(_clients.at(clientSocketFd).requestBuffer))
+		{
+			// std::string response = "Hello from Server";
+			std::string  response = _clients.at(clientSocketFd).requestBuffer;
+			HttpRequest  req(response);
+			HttpHandler  handle(_configs[0]);
+			HttpResponse resp = handle.handle(req);
+			LOG_DEBUG(response);
+
+			_clients.at(clientSocketFd).responseBuffer = resp.buildResponse();
+
+			// Change Poll event to writing
+			set_event(clientSocketFd, POLLIN | POLLOUT);
+		}
+	}
+}
+
+/**
+ * @brief Sends the prepared response to a connected client and resets client
+ * state.
+ *
+ * Notes:
+ * - Currently treats any non-negative send() result as success and does not
+ *   handle partial writes or EAGAIN/EWOULDBLOCK retries.
+ * - No error logging is performed on send() failure; callers should ensure
+ *   the client is cleaned up elsewhere if needed.
+ *
+ * @param clientSocketFd File descriptor of the connected client socket.
+ */
+void Server::_sendResponseToClient(int clientSocketFd)
 {
 	// check that clients exists
-	if (_clients.find(fd) == _clients.end())
+	if (_clients.find(clientSocketFd) == _clients.end())
 		return;
 
-	std::string& msg = _clients.at(fd).responseBuffer;
-	const char*  buffer = msg.c_str();
-	size_t       buffer_size = msg.size();
+	std::string& msg = _clients.at(clientSocketFd).responseBuffer;
 
 	if (msg.empty())
 		return;
 
-	LOG_DEBUG(ws::to_string(msg.size()));
-	int bytesSent = 0;
-	while (buffer_size > 0)
-	{
-		bytesSent = send(fd, msg.c_str(), msg.size(), 0);
-
-		if (bytesSent == -1 && errno == EAGAIN)
-			LOG_DEBUG("Buffer is full");
-
-		if (bytesSent == -1)
-		{
-			LOG_DEBUG("Error when sending");
-			return;
-		}
-
-		LOG_DEBUG("SENT BYTES: " + ws::to_string(bytesSent));
-		buffer += bytesSent;
-		buffer_size -= bytesSent;
-	}
+	int bytesSent = send(clientSocketFd, msg.c_str(), msg.size(), 0);
 
 	if (bytesSent >= 0)
 	{
 		msg.clear();
-		_clients.at(fd).requestBuffer.clear(); // Empty for new request
+		_clients.at(clientSocketFd).requestBuffer.clear();
+		std::cout << "Response send" << std::endl;
 
-		// reset Poll event : To reading
-		for (size_t i = 0; i < _pollfds.size(); i++)
-		{
-			if (_pollfds[i].fd == fd)
-			{
-				_pollfds[i].events = POLLIN;
-				break;
-			}
-		}
+		set_event(clientSocketFd, POLLIN);
 	}
 }
 
-void Server::_cleanupClient(int fd)
+/**
+ * @brief Clean up and remove a disconnected client.
+ *
+ * @param clientSocketFd File descriptor of the client to clean up
+ */
+void Server::_cleanupClient(int clientSocketFd)
 {
-	// Close socket
-	close(fd);
+	close(clientSocketFd);
 
-	// delete from poll vector
-	for (size_t i = 0; i < _pollfds.size(); i++)
+	for (size_t i = 0; i < _pollSockets.size(); i++)
 	{
-		if (_pollfds[i].fd == fd)
+		if (_pollSockets[i].fd == clientSocketFd)
 		{
-			_pollfds.erase(_pollfds.begin() + i);
+			_pollSockets.erase(_pollSockets.begin() + i);
 			break;
 		}
 	}
-	// delete from client map
-	_clients.erase(fd);
+	_clients.erase(clientSocketFd);
 
-	// std::cout << "Client disconnected" << std::endl;
 	LOG_DEBUG("Client disconnected");
-	// Logger::log(DEBUG, "client disconnected");
 }
