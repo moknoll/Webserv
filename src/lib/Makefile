@@ -1,6 +1,7 @@
 NAME = libws.a
 
 SRC = string_utils.cpp \
+	  file_utils.cpp \
 
 OBJ = $(SRC:.cpp=.o)
 

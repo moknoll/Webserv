@@ -1,4 +1,20 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   string_utils.cpp                                   :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/01 13:20:01 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/01 13:20:02 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "ws.hpp"
+#include <cctype>
+#include <cstddef>
+#include <sstream>
+#include <string>
 
 std::string ws::strip(const std::string& s)
 {
@@ -32,4 +48,21 @@ std::vector< std::string > ws::strSplit(const std::string& s,
 	tokens.push_back(s.substr(start));
 
 	return tokens;
+}
+
+size_t ws::stosize(const std::string& s)
+{
+	size_t             n = 0;
+	std::istringstream ss(s);
+	ss >> n;
+	return n;
+}
+
+void ws::toLowerCase(std::string& s)
+{
+	for (size_t i = 0; i < s.size(); ++i)
+	{
+		unsigned char c = static_cast< unsigned char >(s[i]);
+		s[i] = std::tolower(c);
+	}
 }
