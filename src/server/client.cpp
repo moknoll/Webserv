@@ -1,8 +1,8 @@
-#include <client.hpp>
+#include "client.hpp"
 
 Client::Client(){}
 
-Client::Client(){}
+Client::Client(int clientFD) : _clientFd(clientFD) {}
 
 void Client::clearBuffers()
 {
@@ -24,4 +24,16 @@ void Client::setResponseBuffer(const std::string &response)
 bool Client::getComplete()const
 {
 	return this->_requestComplete;
+}
+
+
+std::string Client::getResponseBuffer()const
+{
+	return this->_responseBuffer;
+}
+
+
+std::string Client::getRequestBuffer()const
+{
+	return this->_requestBuffer;
 }

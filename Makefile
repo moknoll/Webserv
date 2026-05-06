@@ -9,6 +9,9 @@ OBJDIR		:= .build
 
 SRC			:= src/main.cpp \
 			   src/server/server.cpp \
+			   src/server/core.cpp \
+			   src/server/socket.cpp \
+			   src/server/client.cpp \
 			   src/ConfigParser/ConfigParser.cpp \
 			   src/ConfigParser/ServerConfig.cpp \
 			   src/http/request/HttpHeader.cpp \
@@ -16,6 +19,9 @@ SRC			:= src/main.cpp \
 
 OBJ			:= $(OBJDIR)/main.o \
 			   $(OBJDIR)/server/server.o \
+			   $(OBJDIR)/server/core.o \
+			   $(OBJDIR)/server/socket.o \
+			   $(OBJDIR)/server/client.o \
 			   $(OBJDIR)/ConfigParser/ConfigParser.o \
 			   $(OBJDIR)/ConfigParser/ServerConfig.o \
 			   $(OBJDIR)/http/request/HttpHeader.o \
@@ -25,16 +31,11 @@ LIB_NAME	:= libws.a
 LIB_DIR		:= src/lib/
 LIB			:= $(LIB_DIR)$(LIB_NAME)
 
-
-#################################################
-CLIENT 		:= client.exe
-CLIENT_DIR	:=	src/client/
-
 ################################################
 
 # OBJ			:= $(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SRC))
 
-all: $(NAME) $(CLIENT)
+all: $(NAME) 
 
 $(NAME): $(OBJ) $(LIB)
 	$(CXX) $(CXXFLAGS) $(OBJ) $(LIB) -o $(NAME)
@@ -52,9 +53,6 @@ $(LIB):
 	# @make -C $(LIB_DIR) --no-print-directory
 	@make -C $(LIB_DIR)
 
-$(CLIENT):
-	@make -C $(CLIENT_DIR)
-
 clean:
 	$(RM) $(OBJ)
 	$(RMDIR) $(OBJDIR)
@@ -63,7 +61,6 @@ clean:
 fclean: clean
 	$(RM) $(NAME)
 	@make fclean -C $(LIB_DIR) --no-print-directory
-	@make fclean -C $(CLIENT_DIR) --no-print-directory
 
 re: fclean all
 

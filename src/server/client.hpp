@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:17:41 by mknoll            #+#    #+#             */
-/*   Updated: 2026/05/05 16:05:38 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/05/06 13:17:07 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,6 +35,7 @@ class Client
 		std::string getResponseBuffer()const;
 		std::string getRequestBuffer()const;
 		bool getComplete()const;
+		int get_Client_FD()const {return _clientFd;}
 
 		void setResponseBuffer(const std::string &response);
 		void setRequestBuffer(const std::string &request);

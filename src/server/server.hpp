@@ -1,6 +1,11 @@
 #pragma once
+#include <vector>
+#include <map>
+#include <poll.h>
 #include "socket.hpp"
+#include "client.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
+
 
 class Server{
 	private: 
@@ -10,8 +15,9 @@ class Server{
 	public:  
 		Server(const ServerConfig &config);
 		Server();
+		~Server();
 		//Server operator=();
 		
-		//setSocket()?
+		void setSocket(); 
 		Socket getSocket()const;
 };

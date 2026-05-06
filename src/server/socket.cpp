@@ -1,4 +1,5 @@
 #include "socket.hpp"
+#include <string>
 
 Socket::Socket() : _sockFd(-1) {}
 
@@ -43,3 +44,16 @@ void Socket::setFD(int sockFD)
 {
 	this->_sockFd = sockFD;
 }
+
+void Socket::setPort(int Port)
+{
+	this->_port = Port; 
+}
+
+void Socket::setHost(std::string host)
+{
+	this->_host = host;
+}
+
+
+Socket::~Socket() {}

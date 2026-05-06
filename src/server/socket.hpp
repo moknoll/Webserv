@@ -1,6 +1,4 @@
 #pragma once
-#include "core.hpp"
-#include "server.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
 #include <string>
 
@@ -20,5 +18,6 @@ class Socket{
 		int getPort()const;
 		std::string getHost()const;
 		void setFD(int sockfd);
-		void setPort();
+		void setPort(int Port);
+		void setHost(std::string host); 
 };	

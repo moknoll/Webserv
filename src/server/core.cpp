@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   core.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/05/05 16:06:01 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/05/06 13:45:03 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,11 +18,13 @@
 #include "client.hpp"
 #include <sstream>
 #include "socket.hpp"
+#include <map>
 // #include "../http/request/HttpHeader.hpp"
+
+Core::Core(){}
 
 Core::Core(std::vector<ServerConfig> &configs)
 {
-	// Iterat over configs and set each server with host and port
 	for(size_t i = 0; i < configs.size(); i++)
 	{
 		Server server(configs[i]);
@@ -107,8 +109,6 @@ void Core::init()
 		_pollSockets.push_back(pfd);
 
 		_servers[i].getSocket().setFD(sock_fd);
-
-		_serverByFd[sock_fd] = _servers[i];
 		// // Debug: Log the server config mapping
 		// std::ostringstream oss;
 		// oss << "Server Socket FD: " << sock_fd 
@@ -121,6 +121,15 @@ void Core::init()
 	}
 }
 
+Server* Core::find_server_by_Fd(int serverFd)
+{
+    for (size_t i = 0; i < _servers.size(); i++)
+    {
+        if (_servers[i].getSocket().getFd() == serverFd)
+            return &_servers[i];
+    }
+    return nullptr;
+}
 
 /**
  * @brief Runs the main event loop for the server.
@@ -140,8 +149,9 @@ void Core::run()
 		{
 			if(_pollSockets[i].revents & POLLIN)
 			{
-				if(_serverByFd.count(_pollSockets[i].fd))
-					_acceptNewClient(_pollSockets[i].fd);
+				Server *server = find_server_by_Fd(_pollSockets[i].fd); 
+				if (server == nullptr)
+					_acceptNewClient(_pollSockets[i].fd); 
 				else 
 					_handleClientMessage(_pollSockets[i].fd);
 			}
@@ -200,7 +210,7 @@ void Core::_acceptNewClient(int serverSocketFd)
 	// 	<< " | Assigned Config Port: " << config->port 
 	// 	<< " | Config Host: " << config->host 
 	// 	<< " | Config Root: " << config->root;
-	LOG_DEBUG(oss.str());
+	// LOG_DEBUG(oss.str());
 	
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
 
@@ -209,17 +219,30 @@ void Core::_acceptNewClient(int serverSocketFd)
 	pfd.events = POLLIN;
 	_pollSockets.push_back(pfd);
 	
-	_clients.insert(std::make_pair(newClientFd, Client(newClientFd)));
+	_clients[newClientFd] = Client(newClientFd);
 	
-	// std::cout << "New Client connected: " <<  << std::endl;
-	//LOG_DEBUG( "New client connected");
+	std::cout << "New Client connected: " << newClientFd<< std::endl;
+	LOG_DEBUG( "New client connected");
 }
 
+
+void Core::set_event(int clientsocketFD, int state)
+{
+	// Change Poll event to writing
+	for(size_t i = 0; i < _pollSockets.size(); i++)
+	{
+		if(_pollSockets[i].fd == clientsocketFD)
+		{
+			_pollSockets[i].events = state;
+			break;
+		}
+	}
+}
 
 
 /**
  * @brief Reads incoming data from a client socket and prepares a response.
- *
+ * 
  * @param clientSocketFd File descriptor of the connected client socket
  * @return void
  */
@@ -232,25 +255,15 @@ void Core::_handleClientMessage(int clientSocketFd)
 		_cleanupClient(clientSocketFd);
 	else
 	{
-		_clients.at(clientSocketFd).requestBuffer.append(buffer, bytes);
-
-		Logger::getInstance().log(INFO, "Received", _clients.at(clientSocketFd).requestBuffer);
+		// _clients.at(clientSocketFd)._requestBuffer.append(buffer, bytes);
+		printf("recv()'d %d bytes of data in buf\n", bytes);
+		// Logger::getInstance().log(INFO, "Received", _clients.at(clientSocketFd).getRequestBuffer());
 		
-		if (_clients.at(clientSocketFd))
+		if (_clients.at(clientSocketFd).getComplete())
 		{	 
 			std::string response = "Hello from Server"; 
-        
-       		_clients.at(clientSocketFd).responseBuffer = response;
-
-			// Change Poll event to writing
-			for(size_t i = 0; i < _pollSockets.size(); i++)
-			{
-				if(_pollSockets[i].fd == clientSocketFd)
-					{
-						_pollSockets[i].events = POLLIN | POLLOUT;
-						break;
-					}
-			}
+       		_clients.at(clientSocketFd).setResponseBuffer(response);
+			set_event(clientSocketFd, POLLIN |POLLOUT); 
 		}
 	}
 }
@@ -273,7 +286,7 @@ void Core::_sendResponseToClient(int clientSocketFd)
 	if (_clients.find(clientSocketFd) == _clients.end())
 		return;
 	
-	std::string &msg = _clients.at(clientSocketFd).responseBuffer;
+	std::string msg = _clients.at(clientSocketFd).getResponseBuffer();
 		
 	if(msg.empty())
 		return;
@@ -283,16 +296,9 @@ void Core::_sendResponseToClient(int clientSocketFd)
 	if(bytesSent >= 0)
 	{
 		msg.clear();
-		_clients.at(clientSocketFd).requestBuffer.clear();
+		_clients.at(clientSocketFd).getRequestBuffer().clear();
 		std::cout << "Response send" << std::endl; 
-		for (size_t i = 0; i < _pollSockets.size(); i++)
-		{
-			if(_pollSockets[i].fd == clientSocketFd)
-			{
-				_pollSockets[i].events = POLLIN;
-				break;
-			}
-		}
+		set_event(clientSocketFd, POLLIN);
 	}
 	else 
 	{
@@ -320,7 +326,7 @@ void Core::_cleanupClient(int clientSocketFd)
 			break;
 		}
 	}
-	_clients.erase(clientSocketFd);
+	_clients.erase(clientSocketFd); 
     
 	LOG_DEBUG("Client disconnected");
 }
