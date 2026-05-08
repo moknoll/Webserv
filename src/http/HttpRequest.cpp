@@ -13,13 +13,17 @@
 #include "HttpRequest.hpp"
 #include "../lib/ws.hpp"
 #include "constants.hpp"
+#include <cstddef>
+#include <iostream>
 #include <string>
 #include <vector>
 
-HttpRequest::HttpRequest(const std::string& req_message)
-{
-	this->err_status_ = _parser(req_message);
-}
+HttpRequest::HttpRequest() {}
+
+// HttpRequest::HttpRequest(const std::string& req_message)
+// {
+// 	// this->err_status_ = _parser(req_message);
+// }
 
 HttpRequest::HttpRequest(const HttpRequest& other)
     : method_(other.method_), uri_(other.uri_),
@@ -43,6 +47,130 @@ HttpRequest& HttpRequest::operator=(const HttpRequest& other)
 		this->headers_ = other.headers_;
 	}
 	return *this;
+}
+
+void HttpRequest::print_parsed()
+{
+	std::cout << "status:" << err_status_ << '\n';
+	std::cout << "method_:" << method_ << '\n';
+	std::cout << "Content_length_:" << Content_length_ << '\n';
+	std::cout << "method_str_:" << method_str_ << '\n';
+	std::cout << "uri_:" << uri_ << '\n';
+	std::cout << "http_version_:" << http_version_ << '\n';
+	std::map< std::string, std::string >::iterator it = headers_.begin();
+	for (; it != this->headers_.end(); ++it)
+	{
+		std::cout << it->first << ":" << it->second << '\n';
+	}
+
+	std::cout << "body_:" << body_ << '\n';
+}
+
+// void HttpRequest::parse_request_line(const std::string& raw)
+// {
+// 	size_t pos = pos_;
+// 	for (; pos < raw.size(); ++pos)
+// 	{
+// 		switch (state_)
+// 		{
+// 			case sw_start:
+// 			{
+// 				size_t p = raw.find(' ');
+// 				if (p == std::string::npos && raw.size() > 7)
+// 				{
+// 					err_status_ = HTTP_BAD_REQUEST;
+// 					return;
+// 				}
+// 			}
+// 		}
+// 	}
+// }
+
+void HttpRequest::parseHeaderLine(const std::string& header_line)
+{
+	size_t p = header_line.find(':');
+	if (p == std::string::npos)
+	{
+		err_status_ = HTTP_BAD_REQUEST;
+		state_ = sw_done;
+		return;
+	}
+	std::string name = header_line.substr(0, p);
+
+	size_t      start_value = p + 1;
+	size_t      end_line = header_line.find(CRLF);
+	std::string value = header_line.substr(start_value, end_line - start_value);
+	headers_[name] = value;
+}
+
+void HttpRequest::parse(const std::string& raw)
+{
+	// state_t state = state_;
+
+	std::cout << "parse\n";
+	size_t pos = 0;
+	while (pos < raw.size())
+	{
+		switch (state_)
+		{
+			case sw_start:
+			{
+				size_t p = raw.find(' ', pos);
+				if (p == std::string::npos)
+					return;
+				this->method_str_ = raw.substr(0, p);
+				pos = p + 1;
+				state_ = sw_uri;
+				break;
+			}
+			case sw_uri:
+			{
+				size_t p = raw.find(' ', pos);
+				if (p == std::string::npos)
+					return;
+				this->uri_ = raw.substr(pos, p - pos);
+				if (this->uri_.size() > 4048) // in HTTP/1.1 version 8000 octet
+				{
+					err_status_ = HTTP_REQUEST_URI_TOO_LARGE;
+					state_ = sw_done;
+					return;
+				}
+				pos = p + 1;
+				state_ = sw_version;
+				break;
+			}
+			case sw_version:
+			{
+				size_t p = raw.find(CRLF, pos);
+				if (p == std::string::npos)
+					return;
+				this->http_version_ = raw.substr(pos, p - pos);
+				pos = p + 2;
+				state_ = sw_headers;
+				break;
+			}
+			case sw_headers:
+			{
+				size_t p = raw.find(CRLF CRLF, pos);
+				if (p == std::string::npos)
+				{
+					size_t pp = raw.find(CRLF, pos);
+					if (pp == std::string::npos)
+						return;
+
+					std::string header_line = raw.substr(pos, pp - pos);
+					std::cout << "HEADER_LINE:" << header_line;
+					parseHeaderLine(header_line);
+					pos += 2;
+					return;
+				}
+				state_ = sw_done;
+				this->body_ = raw.substr(pos, p - pos);
+				break;
+			}
+			case sw_done: return;
+		}
+	}
 }
 
 int HttpRequest::_parser(const std::string& req_message)

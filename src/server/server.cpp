@@ -13,7 +13,7 @@
 #include "server.hpp"
 #include "../ConfigParser/ServerConfig.hpp"
 #include "../http/HttpHandler.hpp"
-#include "../http/HttpRequest.hpp"
+// #include "../http/HttpRequest.hpp"
 #include "../http/HttpResponse.hpp"
 #include "../lib/ws.hpp"
 #include "../logger/Logger.hpp"
@@ -252,11 +252,14 @@ void Server::_handleClientMessage(int clientSocketFd)
 		if (_isCompleteRequest(_clients.at(clientSocketFd).requestBuffer))
 		{
 			// std::string response = "Hello from Server";
-			std::string  response = _clients.at(clientSocketFd).requestBuffer;
-			HttpRequest  req(response);
-			HttpHandler  handle(_configs[0]);
+			std::string request_buf = _clients.at(clientSocketFd).requestBuffer;
+			HttpRequest req;
+			req.parse(request_buf);
+			req.print_parsed();
+			HttpHandler handle(_configs[0]);
+			req.setStatus(403);
 			HttpResponse resp = handle.handle(req);
-			LOG_DEBUG(response);
+			// LOG_DEBUG(response);
 
 			_clients.at(clientSocketFd).responseBuffer = resp.buildResponse();
 
