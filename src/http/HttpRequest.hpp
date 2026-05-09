@@ -27,6 +27,17 @@ typedef enum state_e
 	sw_done
 } state_t;
 
+typedef struct req_buf_s
+{
+	size_t  pos;
+	state_t state;
+
+} req_buf_t;
+
+#define MAX_URL_LEN     4048
+#define MAX_METHOD_LEN  7
+#define MAX_HEADER_SIZE 1024 * 32
+
 class HttpRequest
 {
   public:
@@ -43,7 +54,15 @@ class HttpRequest
 
 	void         print_parsed();
 	void         parse(const std::string& raw);
-	void         setStatus(int status)
+	bool         isComplete() const
+	{
+		// if (err_status_ != HTTP_OK)
+		// 	return true;
+		if (state_ == sw_done)
+			return true;
+		return false;
+	}
+	void setStatus(int status)
 	{
 		err_status_ = status;
 	}
@@ -51,7 +70,7 @@ class HttpRequest
   private:
 	int                                  err_status_;
 	int                                  method_;
-	size_t                               Content_length_;
+	size_t                               content_length_;
 	std::string                          method_str_;
 	std::string                          uri_;
 	std::string                          http_version_;
@@ -68,8 +87,9 @@ class HttpRequest
 
 	void    parse_request_line(const std::string& raw);
 	void    parseHeaderLine(const std::string& header_line);
+	void    fail(int status);
 
-	size_t  pos_;
+	size_t  current_pos_;
 	state_t state_;
 };
 

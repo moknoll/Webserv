@@ -19,6 +19,7 @@
 #include "../logger/Logger.hpp"
 #include "client.hpp"
 
+#include <iostream>
 #include <sstream>
 #include <sys/poll.h>
 // #include "../http/request/HttpHeader.hpp"
@@ -255,16 +256,16 @@ void Server::_handleClientMessage(int clientSocketFd)
 			std::string request_buf = _clients.at(clientSocketFd).requestBuffer;
 			HttpRequest req;
 			req.parse(request_buf);
-			req.print_parsed();
+			std::cout << '\n'<< req.getRequestStatus() << '\n';
+			std::cout << '\n'<< req.getURI() << '\n';
 			HttpHandler handle(_configs[0]);
-			req.setStatus(403);
 			HttpResponse resp = handle.handle(req);
-			// LOG_DEBUG(response);
 
 			_clients.at(clientSocketFd).responseBuffer = resp.buildResponse();
 
 			// Change Poll event to writing
-			set_event(clientSocketFd, POLLIN | POLLOUT);
+			// set_event(clientSocketFd, POLLIN | POLLOUT);
+			set_event(clientSocketFd, POLLOUT);
 		}
 	}
 }

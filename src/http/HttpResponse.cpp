@@ -209,12 +209,14 @@ const char* HttpResponse::getStatusMsg(int status) const
 		case HTTP_CONFLICT:                 return "409 Conflict";
 		case HTTP_REQUEST_ENTITY_TOO_LARGE: return "413 Content Too Large";
 		case HTTP_REQUEST_URI_TOO_LARGE:    return "414 URI Too Long";
-		case HTTP_INTERNAL_SERVER_ERROR:    return "500 Internal Server Error";
-		case HTTP_NOT_IMPLEMENTED:          return "501 Not Implemented";
-		case HTTP_BAD_GATEWAY:              return "502 Bad Gateway";
-		case HTTP_SERVICE_UNAVAILABLE:      return "503 Service Unavailable";
-		case HTTP_GATEWAY_TIME_OUT:         return "504 Gateway Timeout";
-		default:                            return "500 Internal Server Error";
+		case HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE:
+			return "431 Request Header Fields Too Large";
+		case HTTP_INTERNAL_SERVER_ERROR: return "500 Internal Server Error";
+		case HTTP_NOT_IMPLEMENTED:       return "501 Not Implemented";
+		case HTTP_BAD_GATEWAY:           return "502 Bad Gateway";
+		case HTTP_SERVICE_UNAVAILABLE:   return "503 Service Unavailable";
+		case HTTP_GATEWAY_TIME_OUT:      return "504 Gateway Timeout";
+		default:                         return "500 Internal Server Error";
 	}
 }
 

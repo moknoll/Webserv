@@ -116,7 +116,7 @@ HttpResponse HttpHandler::makeError(int status, const Location* loc)
 	HttpResponse res(status);
 	std::string  content;
 
-	if (!loc)
+	if (loc != NULL)
 	{
 		std::map< int, std::string >::const_iterator it =
 		    loc->error_pages.find(status);
@@ -128,7 +128,6 @@ HttpResponse HttpHandler::makeError(int status, const Location* loc)
 				return res;
 			}
 		}
-		return res;
 	}
 
 	res.setFullResponse(res.buildErrorPage(status), "html");
