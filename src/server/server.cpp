@@ -328,8 +328,8 @@ void Server::_sendResponseToClient(int clientSocketFd)
 
 	// if (bytesSent >= 0)
 	// {
-	client.request.reset();
-	client.response.reset();
+	client.request.clear();
+	client.response.clear();
 	msg.clear();
 	_clients.at(clientSocketFd).requestBuffer.clear();
 	std::cout << "Response send" << std::endl;

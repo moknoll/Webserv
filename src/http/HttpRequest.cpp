@@ -24,11 +24,6 @@ HttpRequest::HttpRequest()
     : err_status_(HTTP_OK), content_length_(0), chunked(false), temp_file(""),
       state_(sw_start)
 {
-	if (state_ == sw_start)
-		std::cout << "STATE = SW_START\n";
-
-	else
-		std::cout << "STATE not initialized\n";
 }
 
 HttpRequest::HttpRequest(const HttpRequest& other)
@@ -42,7 +37,7 @@ HttpRequest::HttpRequest(const HttpRequest& other)
 
 HttpRequest::~HttpRequest() {}
 
-void HttpRequest::reset()
+void HttpRequest::clear()
 {
 	err_status_ = HTTP_OK;
 	content_length_ = 0;

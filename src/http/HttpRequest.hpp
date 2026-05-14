@@ -65,7 +65,7 @@ class HttpRequest
 	bool              isComplete() const;
 	bool              isAlmostDone() const;
 
-	void              reset();
+	void              clear();
 
   private:
 	int                                  err_status_;

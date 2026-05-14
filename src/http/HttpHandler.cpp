@@ -107,7 +107,6 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
 bool HttpHandler::writeToFile(const std::string& data)
 {
 	int n = write(upload_fd_, data.c_str(), data.size());
-	std::cout << "NNNNNN:=" << n << '\n';
 	if (n == -1)
 	{
 		close(upload_fd_);
@@ -137,7 +136,6 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 	{
 		if (!writeToFile(body))
 			return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
-		;
 
 		if (writen_bytes < content_length)
 			return res;

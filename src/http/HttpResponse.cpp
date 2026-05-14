@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 
-HttpResponse::HttpResponse() : status_(HTTP_OK), status_line_(""), body_("") {}
+HttpResponse::HttpResponse() : status_(0), status_line_(""), body_("") {}
 
 HttpResponse::HttpResponse(const int status) : status_(status) {}
 
@@ -33,7 +33,7 @@ HttpResponse::HttpResponse(const HttpResponse& other)
 
 HttpResponse::~HttpResponse() {}
 
-void HttpResponse::reset()
+void HttpResponse::clear()
 {
 	status_ = HTTP_OK;
 	status_line_.clear();
@@ -65,6 +65,9 @@ HttpResponse& HttpResponse::operator=(const HttpResponse& other)
 
 std::string HttpResponse::buildResponse() const
 {
+	if (status_ == 0)
+		return "";
+
 	std::string res;
 
 	res = "HTTP/1.1 ";
@@ -120,7 +123,7 @@ std::string HttpResponse::buildErrorPage(int err_status) const
 	return html_page.str();
 }
 
-std::string HttpResponse::trucateName(const std::string& name)
+std::string HttpResponse::truncateName(const std::string& name)
 {
 	if (name.size() > 51)
 		return name.substr(0, 47) + "..&gt;";
@@ -132,7 +135,7 @@ std::string HttpResponse::formatEntry(const std::string& name,
                                       const std::string& size)
 {
 	std::ostringstream ss;
-	std::string        dispay_name = trucateName(name) + "</a>";
+	std::string        dispay_name = truncateName(name) + "</a>";
 
 	ss << std::left << std::setw(55) << dispay_name << std::right
 	   << std::setw(11) << time << std::right << std::setw(20) << size;
