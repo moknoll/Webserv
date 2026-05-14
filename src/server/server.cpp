@@ -19,6 +19,8 @@
 #include "../logger/Logger.hpp"
 #include "client.hpp"
 
+#include <cstddef>
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include <sys/poll.h>
@@ -238,30 +240,41 @@ void Server::set_event(int fd, int state)
  */
 void Server::_handleClientMessage(int clientSocketFd)
 {
+	if (_clients.find(clientSocketFd) == _clients.end())
+		return;
+
 	char buffer[8192];
-	int  bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
+	std::memset(buffer, 0, 8192);
+	int     bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
+
+	Client& client = _clients.at(clientSocketFd);
+	std::cout << "BUFF>>" << buffer << "<<BUF";
 
 	if (bytes <= 0)
 		_cleanupClient(clientSocketFd);
 	else
 	{
-		_clients.at(clientSocketFd).requestBuffer.append(buffer, bytes);
+		// _clients.at(clientSocketFd).requestBuffer.append(buffer, bytes);
+		client.requestBuffer.append(buffer, bytes);
 
 		// Logger::getInstance().log(
 		// INFO, "Received", _clients.at(clientSocketFd).requestBuffer);
 
 		if (_isCompleteRequest(_clients.at(clientSocketFd).requestBuffer))
+		// if (client.request.isComplete())
 		{
 			// std::string response = "Hello from Server";
-			std::string request_buf = _clients.at(clientSocketFd).requestBuffer;
-			HttpRequest req;
-			req.parse(request_buf);
-			std::cout << '\n'<< req.getRequestStatus() << '\n';
-			std::cout << '\n'<< req.getURI() << '\n';
-			HttpHandler handle(_configs[0]);
-			HttpResponse resp = handle.handle(req);
+			// std::string request_buf = client.requestBuffer;
+			client.request.parse(client.requestBuffer);
+			// HttpHandler handle(_configs[0]);
+			client.response = client.handler.handle(client.request);
 
-			_clients.at(clientSocketFd).responseBuffer = resp.buildResponse();
+			client.responseBuffer = client.response.buildResponse();
+			if (client.handler.getState())
+				return;
+
+			// _clients.at(clientSocketFd).responseBuffer =
+			// resp.buildResponse();
 
 			// Change Poll event to writing
 			// set_event(clientSocketFd, POLLIN | POLLOUT);
@@ -288,21 +301,41 @@ void Server::_sendResponseToClient(int clientSocketFd)
 	if (_clients.find(clientSocketFd) == _clients.end())
 		return;
 
-	std::string& msg = _clients.at(clientSocketFd).responseBuffer;
-
-	if (msg.empty())
+	Client& client = _clients.at(clientSocketFd);
+	if (client.handler.getState())
 		return;
 
-	int bytesSent = send(clientSocketFd, msg.c_str(), msg.size(), 0);
+	std::cout << "LAST Response:\n";
+	client.requestBuffer = client.response.buildResponse();
 
-	if (bytesSent >= 0)
+	if (client.responseBuffer.empty())
+		return;
+
+	std::string& msg = client.responseBuffer;
+	size_t       buff_size = msg.size();
+
+	int          bytesSent = send(clientSocketFd, msg.c_str(), msg.size(), 0);
+
+	size_t       sent = static_cast< size_t >(bytesSent);
+
+	if (sent < buff_size)
 	{
-		msg.clear();
-		_clients.at(clientSocketFd).requestBuffer.clear();
-		std::cout << "Response send" << std::endl;
-
-		set_event(clientSocketFd, POLLIN);
+		// LOG_DEBUG("SENT: " + ws::to_string(sent));
+		// LOG_DEBUG("buff size: " + ws::to_string(buff_size));
+		msg.erase(0, sent);
+		return;
 	}
+
+	// if (bytesSent >= 0)
+	// {
+	client.request.reset();
+	client.response.reset();
+	msg.clear();
+	_clients.at(clientSocketFd).requestBuffer.clear();
+	std::cout << "Response send" << std::endl;
+
+	set_event(clientSocketFd, POLLIN);
+	// }
 }
 
 /**

@@ -17,6 +17,10 @@
 #include <map>
 #include <string>
 
+#define MAX_URL_LEN     4048
+#define MAX_METHOD_LEN  7
+#define MAX_HEADER_SIZE 1024 * 32
+
 typedef enum state_e
 {
 	sw_start = 0,
@@ -24,6 +28,7 @@ typedef enum state_e
 	sw_uri,
 	sw_version,
 	sw_headers,
+	sw_almost_done,
 	sw_done
 } state_t;
 
@@ -34,10 +39,6 @@ typedef struct req_buf_s
 
 } req_buf_t;
 
-#define MAX_URL_LEN     4048
-#define MAX_METHOD_LEN  7
-#define MAX_HEADER_SIZE 1024 * 32
-
 class HttpRequest
 {
   public:
@@ -46,50 +47,43 @@ class HttpRequest
 	HttpRequest(const HttpRequest& other);
 	~HttpRequest();
 
-	HttpRequest& operator=(const HttpRequest& other);
+	HttpRequest&      operator=(const HttpRequest& other);
 
-	std::string  getURI() const;
-	std::string  getHeader(const std::string& name) const;
-	int          getRequestStatus() const;
+	std::string       getURI() const;
+	std::string       getHeader(const std::string& name) const;
+	std::string       getMethod() const;
+	const std::string getbody() const;
+	int               getRequestStatus() const;
+	size_t            getContentLenght() const;
 
-	void         print_parsed();
-	void         parse(const std::string& raw);
-	bool         isComplete() const
-	{
-		// if (err_status_ != HTTP_OK)
-		// 	return true;
-		if (state_ == sw_done)
-			return true;
-		return false;
-	}
-	void setStatus(int status)
-	{
-		err_status_ = status;
-	}
+	void              setStatus(int status);
+
+	void              print_parsed();
+	void              parse(std::string& raw);
+	bool              isValidMethod(const std::string& method);
+	bool              isChunked() const;
+	bool              isComplete() const;
+	bool              isAlmostDone() const;
+
+	void              reset();
 
   private:
 	int                                  err_status_;
-	int                                  method_;
 	size_t                               content_length_;
-	std::string                          method_str_;
+	std::string                          method_;
 	std::string                          uri_;
 	std::string                          http_version_;
 	std::string                          request_line_;
 	std::string                          host_;
 	std::string                          body_;
-	std::string                          extension_;
-	std::string                          unparsed_uri_;
 	std::map< std::string, std::string > headers_;
+	bool                                 chunked;
+	std::string                          temp_file;
+	state_t                              state_;
 
-	int     _parser(const std::string& req_message);
-	int     _parse_request_line(const std::string& line);
-	void    _parse_headers(const std::string& header);
-
-	void    parse_request_line(const std::string& raw);
-	void    parseHeaderLine(const std::string& header_line);
-	void    fail(int status);
-
-	size_t  current_pos_;
-	state_t state_;
+	void parse_request_line(const std::string& raw);
+	void parseBody(const std::string& raw);
+	void parseHeaderLine(const std::string& header_line);
+	void fail(int status);
 };
 

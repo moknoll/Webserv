@@ -41,6 +41,7 @@ class HttpResponse
 	                               const std::string&                path,
 	                               const std::string&                uri);
 	const char* getStatusMsg(int status) const;
+	void        reset();
 
   private:
 	int                                  status_;

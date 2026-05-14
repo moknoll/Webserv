@@ -31,7 +31,8 @@
 #include <vector>
 
 HttpHandler::HttpHandler(const ServerConfig& cfg)
-    : config_(cfg), error_(HTTP_OK)
+    : config_(cfg), error_(HTTP_OK), upload_fd_(-1), uploading(false),
+      writen_bytes(0)
 {
 }
 
@@ -45,6 +46,7 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
+	const std::string& method = req.getMethod();
 	const Location*    loc = findMatchUri(uri, config_.locations);
 	// const std::string  method = req.getMethod();
 
@@ -60,15 +62,15 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	if (loc->redirect.first != -1)
 		return redirect(loc->redirect.first, loc->redirect.second, host);
 
-	if (!isAllowedMethod("GET", *loc))
+	if (!isAllowedMethod(method, *loc))
 		return makeError(HTTP_NOT_ALLOWED, loc);
 	// if (!loc->cgi_extension.empty())
 	// 		handleCGI();
 
-	// if (method == "GET")
-	return handleGET(req, *loc);
-	// else if (method == "POST")
-	// return handlePOST(req, *loc);
+	if (method == "GET")
+		return handleGET(req, *loc);
+	else if (method == "POST")
+		return handlePOST(req, *loc);
 	// else if (method == "DELETE")
 	// return handleDELETE(req, loc);
 
@@ -83,7 +85,6 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
 
 	if (ws::isDirectory(path))
 	{
-		std::cout << "PATH: " << path << '\n';
 		if (uri[uri.length() - 1] != '/' && uri != "/"
 		    && uri[uri.size() - 1] != '/')
 			return redirect(HTTP_MOVED_PERMANENTLY, uri + "/", host);
@@ -103,12 +104,87 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
 	return makeFileResponse(path, &loc);
 }
 
+bool HttpHandler::writeToFile(const std::string& data)
+{
+	int n = write(upload_fd_, data.c_str(), data.size());
+	std::cout << "NNNNNN:=" << n << '\n';
+	if (n == -1)
+	{
+		close(upload_fd_);
+		upload_fd_ = -1;
+		writen_bytes = 0;
+		uploading = false;
+		return false;
+	}
+	writen_bytes += n;
+	return true;
+}
+
 HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
                                      const Location&    loc)
 {
-	(void) req;
-	(void) loc;
-	return HttpResponse(200);
+	const std::string& uri = req.getURI();
+	const std::string& body = req.getbody();
+	const std::string& path = buildPath(uri, loc);
+	const size_t       content_length = req.getContentLenght();
+	HttpResponse       res;
+
+	std::cout << "BODY>>" << body << "<<";
+	std::cout << "WRITEN: " << writen_bytes << '\n'
+	          << "size body: " << body.size() << '\n';
+	std::cout << "Content Length: " << content_length << '\n';
+	if (uploading)
+	{
+		if (!writeToFile(body))
+			return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
+		;
+
+		if (writen_bytes < content_length)
+			return res;
+		else if (writen_bytes == content_length)
+		{
+			close(upload_fd_);
+			upload_fd_ = -1;
+			writen_bytes = 0;
+			uploading = false;
+			return makeError(HTTP_CREATED, &loc);
+		}
+		else
+		{
+			close(upload_fd_);
+			upload_fd_ = -1;
+			writen_bytes = 0;
+			uploading = false;
+
+			return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
+		}
+	}
+
+	// if (content_length > loc.client_max_body_size)
+	// return makeError(HTTP_REQUEST_ENTITY_TOO_LARGE, &loc);
+
+	upload_fd_ = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (upload_fd_ == -1)
+	{
+		if (errno == EACCES || errno == EISDIR)
+			return makeError(HTTP_FORBIDDEN, &loc);
+		return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
+	}
+
+	if (!writeToFile(body))
+		return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
+
+	if (writen_bytes < content_length)
+	{
+		uploading = true;
+		return res;
+	}
+
+	close(upload_fd_);
+	upload_fd_ = -1;
+	writen_bytes = 0;
+	uploading = false;
+	return makeError(HTTP_CREATED, &loc);
 }
 
 HttpResponse HttpHandler::makeError(int status, const Location* loc)

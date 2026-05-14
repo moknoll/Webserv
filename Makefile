@@ -9,6 +9,7 @@ OBJDIR		:= .build
 
 SRC			:= src/main.cpp \
 			   src/server/server.cpp \
+			   src/server/client.cpp \
 			   src/ConfigParser/ConfigParser.cpp \
 			   src/ConfigParser/ServerConfig.cpp \
 			   src/http/HttpRequest.cpp \
@@ -18,6 +19,7 @@ SRC			:= src/main.cpp \
 
 OBJ			:= $(OBJDIR)/main.o \
 			   $(OBJDIR)/server/server.o \
+			   $(OBJDIR)/server/client.o \
 			   $(OBJDIR)/ConfigParser/ConfigParser.o \
 			   $(OBJDIR)/ConfigParser/ServerConfig.o \
 			   $(OBJDIR)/http/HttpRequest.o \

@@ -58,9 +58,10 @@ ServerConfig getConfig(const std::string& host, int port)
 	root_loc.index = "index.html";
 	root_loc.error_pages[404] = "./www/404.html";
 	root_loc.error_pages[500] = "./www/500.html";
-	root_loc.allowed_methods.push_back("GET");   // = {"GET", "POST"};
+	root_loc.allowed_methods.push_back("GET"); // = {"GET", "POST"};
 	root_loc.allowed_methods.push_back("POST");
-	root_loc.client_max_body_size = 1024 * 1024; // 1MB
+	// root_loc.client_max_body_size = 1024 * 1024; // 1MB
+	root_loc.client_max_body_size = 10;
 	root_loc.autoindex = false;
 	root_loc.redirect = std::make_pair(-1, "");
 

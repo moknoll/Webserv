@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 
-HttpResponse::HttpResponse() {}
+HttpResponse::HttpResponse() : status_(HTTP_OK), status_line_(""), body_("") {}
 
 HttpResponse::HttpResponse(const int status) : status_(status) {}
 
@@ -32,6 +32,14 @@ HttpResponse::HttpResponse(const HttpResponse& other)
 }
 
 HttpResponse::~HttpResponse() {}
+
+void HttpResponse::reset()
+{
+	status_ = HTTP_OK;
+	status_line_.clear();
+	headers_.clear();
+	body_.clear();
+}
 
 HttpResponse& HttpResponse::operator=(const HttpResponse& other)
 {

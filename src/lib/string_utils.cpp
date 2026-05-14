@@ -13,6 +13,8 @@
 #include "ws.hpp"
 #include <cctype>
 #include <cstddef>
+#include <cstdlib>
+#include <ctime>
 #include <sstream>
 #include <string>
 
@@ -65,4 +67,23 @@ void ws::toLowerCase(std::string& s)
 		unsigned char c = static_cast< unsigned char >(s[i]);
 		s[i] = std::tolower(c);
 	}
+}
+
+std::string ws::randString()
+{
+	std::srand(std::time(0));
+
+	const char  char_set[] = "abcdefghijklmnopqrstuvwxyz"
+	                         "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+	const int   char_set_size = sizeof(char_set) - 1;
+
+	std::string rand_string;
+
+	for (size_t i = 0; i < 5; ++i)
+	{
+		size_t rand_index = std::rand() % char_set_size;
+		rand_string += char_set[rand_index];
+	}
+	return rand_string;
 }

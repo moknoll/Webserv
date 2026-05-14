@@ -12,21 +12,37 @@
 
 #pragma once
 
-#include <string>
 #include "../ConfigParser/ServerConfig.hpp"
+#include "../http/HttpHandler.hpp"
+#include "../http/HttpRequest.hpp"
+#include "../http/HttpResponse.hpp"
+#include <iostream>
+#include <string>
 
 class Client
 {
   public:
-	int         clientFd;             // file descriptor for the client socket
+	int         clientFd;       // file descriptor for the client socket
 	std::string requestBuffer;  // buffer to store incoming request data
 	std::string responseBuffer; // buffer to store response data to be sent back
 	                            // to the client
 	bool        isReadyToWrite; // flag to indicate if the full request has been
 	                            // received
-	ServerConfig *config;
+	ServerConfig* config;
+	HttpHandler   handler;
+	HttpRequest   request;
+	HttpResponse  response;
 
-	Client(int clientFd, ServerConfig *cfg) : clientFd(clientFd), isReadyToWrite(false), config(cfg) {}
+	Client(int clientFd, ServerConfig* cfg);
+	//     : clientFd(clientFd), isReadyToWrite(false), config(cfg),
+	//       handler(config[0]), request(), response()
+	// {
+	// 	std::cout << "CALL Client contructor\n";
+	// 	std::cout << request.getRequestStatus();
+	//
+	// }
+	
+	Client(const Client& other);
 	~Client() {}
 
 	void clearBuffers()

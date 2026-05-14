@@ -16,6 +16,7 @@
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 
+#include <cstddef>
 #include <string>
 
 class HttpHandler
@@ -29,10 +30,18 @@ class HttpHandler
 
 	HttpResponse handle(const HttpRequest& req);
 
+	bool         getState()
+	{
+		return uploading;
+	}
+
   private:
 	const ServerConfig& config_;
 	Location            loc_;
 	int                 error_;
+	int                 upload_fd_;
+	bool                uploading;
+	size_t              writen_bytes;
 
 	HttpResponse        handleGET(const HttpRequest& req, const Location& loc);
 	HttpResponse        handlePOST(const HttpRequest& req, const Location& loc);
@@ -58,5 +67,7 @@ class HttpHandler
 	std::string buildPath(const std::string& uri, const Location& loc);
 
 	bool isAllowedMethod(const std::string& method, const Location& loc) const;
+
+	bool writeToFile(const std::string& data);
 };
 

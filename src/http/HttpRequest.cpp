@@ -15,89 +15,174 @@
 #include "constants.hpp"
 #include <cstddef>
 #include <cstring>
+#include <fstream>
+#include <ios>
 #include <iostream>
 #include <string>
 
 HttpRequest::HttpRequest()
-    : err_status_(HTTP_OK), content_length_(0), current_pos_(0),
+    : err_status_(HTTP_OK), content_length_(0), chunked(false), temp_file(""),
       state_(sw_start)
 {
+	if (state_ == sw_start)
+		std::cout << "STATE = SW_START\n";
+
+	else
+		std::cout << "STATE not initialized\n";
 }
 
-// HttpRequest::HttpRequest(const std::string& req_message)
-// {
-// 	// this->err_status_ = _parser(req_message);
-// }
-
 HttpRequest::HttpRequest(const HttpRequest& other)
-    : method_(other.method_), uri_(other.uri_),
+    : err_status_(other.err_status_), content_length_(other.content_length_),
+      method_(other.method_), uri_(other.uri_),
       http_version_(other.http_version_), request_line_(other.request_line_),
-      host_(other.host_), body_(other.body_), headers_(other.headers_)
+      host_(other.host_), body_(other.body_), headers_(other.headers_),
+      chunked(other.chunked), state_(other.state_)
 {
 }
 
 HttpRequest::~HttpRequest() {}
 
+void HttpRequest::reset()
+{
+	err_status_ = HTTP_OK;
+	content_length_ = 0;
+	method_.clear();
+	uri_.clear();
+	http_version_.clear();
+	request_line_.clear();
+	host_.clear();
+	body_.clear();
+	headers_.clear();
+	chunked = false;
+	temp_file.clear();
+	state_ = sw_start;
+}
+
 HttpRequest& HttpRequest::operator=(const HttpRequest& other)
 {
 	if (this != &other)
 	{
-		this->method_ = other.method_;
+		err_status_ = other.err_status_;
 		this->uri_ = other.uri_;
 		this->http_version_ = other.http_version_;
 		this->request_line_ = other.request_line_;
 		this->host_ = other.host_;
 		this->body_ = other.body_;
 		this->headers_ = other.headers_;
+		state_ = other.state_;
 	}
 	return *this;
 }
 
-void HttpRequest::print_parsed()
-{
-	std::cout << "status:" << err_status_ << '\n';
-	std::cout << "method_:" << method_ << '\n';
-	std::cout << "Content_length_:" << content_length_ << '\n';
-	std::cout << "method_str_:" << method_str_ << '\n';
-	std::cout << "uri_:" << uri_ << '\n';
-	std::cout << "http_version_:" << http_version_ << '\n';
-	std::map< std::string, std::string >::iterator it = headers_.begin();
-	for (; it != this->headers_.end(); ++it)
-	{
-		std::cout << it->first << ":" << it->second << '\n';
-	}
-
-	std::cout << "body_:" << body_ << '\n';
-}
-
 void HttpRequest::parseHeaderLine(const std::string& header_line)
 {
-	size_t p = header_line.find(':');
+	std::string::size_type p = header_line.find(':');
 	if (p == std::string::npos)
 	{
 		fail(HTTP_BAD_REQUEST);
 		return;
 	}
 	std::string name = header_line.substr(0, p);
+	if (name.find(' ') != std::string::npos)
+	{
+		fail(HTTP_BAD_REQUEST);
+		return;
+	}
 
-	size_t      start_value = p + 1;
-	size_t      end_line = header_line.find(CRLF);
-	std::string value = header_line.substr(start_value, end_line - start_value);
+	std::string value = header_line.substr(p + 1);
 	headers_[name] = ws::strip(value);
-	if (name == "Content-Lenght")
+
+	if (name == "Content-Length")
 		content_length_ = ws::stosize(headers_[name]);
+	else if (name == "Transfer-Encoding" && headers_[name] == "chunked")
+		chunked = true;
 	if (name == "Host")
 		host_ = headers_[name];
 }
 
-void HttpRequest::parse(const std::string& raw)
+void HttpRequest::parseBody(const std::string& raw)
 {
-	size_t pos = current_pos_;
+	if (temp_file == "")
+		temp_file = "/tmp/wstemp_" + ws::randString();
+
+	std::ofstream fout(temp_file.c_str(), std::ios::binary | std::ios::app);
+	if (!fout.is_open())
+		return;
+	std::cout << "IN: parsbody\n";
+
+	if (!body_.empty())
+		fout.write(body_.c_str(), body_.size());
+	fout.write(raw.c_str(), raw.size());
+	fout.close();
+}
+
+bool HttpRequest::isValidMethod(const std::string& method)
+{
+	if (method == "GET" || method == "POST" || method == "DELETE")
+		return true;
+	if (method == "HEAD" || method == "PUT" || method == "CONNECT"
+	    || method == "OPTIONS" || method == "TRACE" || method == "PATCH"
+	    || method == "MOVE")
+	{
+		fail(HTTP_NOT_ALLOWED);
+		return false;
+	}
+	fail(HTTP_BAD_REQUEST);
+	return false;
+}
+
+// void parseBody(const std::string& raw) {}
+
+bool HttpRequest::isAlmostDone() const
+{
+	if (state_ == sw_almost_done)
+		return true;
+	return false;
+}
+
+bool HttpRequest::isComplete() const
+{
+	// if (err_status_ != HTTP_OK)
+	// 	return true;
+	if (state_ == sw_done)
+		return true;
+	return false;
+}
+
+void HttpRequest::setStatus(int status)
+{
+	this->err_status_ = status;
+}
+
+bool HttpRequest::isChunked() const
+{
+	return this->chunked;
+}
+
+std::string extractBoundary(const std::string& content_type)
+{
+	std::string::size_type p = content_type.find("boundary=");
+	if (p == std::string::npos)
+		return "";
+	return "--" + content_type.substr(p + 9);
+}
+
+void HttpRequest::parse(std::string& raw)
+{
+	static size_t CRLF_LEN = 2;
+	size_t        pos = 0;
+
 	while (pos < raw.size())
 	{
 		switch (state_)
 		{
 			case sw_done: return;
+			case sw_almost_done:
+			{
+				body_ = raw;
+				raw.clear();
+				return;
+			}
 			case sw_start:
 			{
 				std::string::size_type p = raw.find(' ', pos);
@@ -107,9 +192,10 @@ void HttpRequest::parse(const std::string& raw)
 						fail(HTTP_BAD_REQUEST);
 					return;
 				}
-				this->method_str_ = raw.substr(0, p);
+				this->method_ = raw.substr(0, p);
 				pos = p + 1;
 				state_ = sw_uri;
+				isValidMethod(method_);
 				break;
 			}
 			case sw_uri:
@@ -119,7 +205,7 @@ void HttpRequest::parse(const std::string& raw)
 				{
 					if (raw.size() - MAX_METHOD_LEN > MAX_METHOD_LEN)
 						fail(HTTP_REQUEST_URI_TOO_LARGE);
-					current_pos_ = pos;
+					raw.erase(0, pos);
 					return;
 				}
 
@@ -135,11 +221,11 @@ void HttpRequest::parse(const std::string& raw)
 				{
 					if (raw.size() - pos > std::strlen(HTTP_VERSION))
 						fail(HTTP_BAD_REQUEST);
-					current_pos_ = pos;
+					raw.erase(0, pos);
 					return;
 				}
 				this->http_version_ = raw.substr(pos, p - pos);
-				pos = p + 2;
+				pos = p + CRLF_LEN;
 				state_ = sw_headers;
 				break;
 			}
@@ -150,25 +236,25 @@ void HttpRequest::parse(const std::string& raw)
 				{
 					if (raw.size() > MAX_HEADER_SIZE)
 						fail(HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE);
-					current_pos_ = pos;
+					raw.erase(0, pos);
 					return;
 				}
 
+				parseHeaderLine(raw.substr(pos, p - pos));
+
 				if (raw.compare(p, 4, CRLF CRLF) == 0)
 				{
-					state_ = sw_done;
-					current_pos_ = pos + 4;
-					this->body_ = raw.substr(pos, p - pos);
+					state_ = sw_almost_done;
+					pos = p + CRLF_LEN + CRLF_LEN;
+					this->body_ = raw.substr(pos);
+					raw.clear();
 					return;
 				}
-				std::string header_line = raw.substr(pos, p - pos);
-				parseHeaderLine(header_line);
-				pos = p + 2;
+				pos = p + CRLF_LEN;
 				break;
 			}
 		}
 	}
-	current_pos_ = pos;
 }
 
 void HttpRequest::fail(int status)
@@ -177,14 +263,29 @@ void HttpRequest::fail(int status)
 	state_ = sw_done;
 }
 
+std::string HttpRequest::getMethod() const
+{
+	return this->method_;
+}
+
 std::string HttpRequest::getURI() const
 {
 	return this->uri_;
 }
 
+const std::string HttpRequest::getbody() const
+{
+	return body_;
+}
+
 int HttpRequest::getRequestStatus() const
 {
 	return this->err_status_;
+}
+
+size_t HttpRequest::getContentLenght() const
+{
+	return content_length_;
 }
 
 std::string HttpRequest::getHeader(const std::string& name) const
