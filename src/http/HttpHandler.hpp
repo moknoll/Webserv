@@ -30,6 +30,8 @@ class HttpHandler
 
 	HttpResponse handle(const HttpRequest& req);
 
+	void         reset();
+
 	bool         getState()
 	{
 		return uploading;
@@ -37,9 +39,10 @@ class HttpHandler
 
   private:
 	const ServerConfig& config_;
-	Location            loc_;
+	Location*           loc_;
 	int                 error_;
-	int                 upload_fd_;
+	int                 state_;
+	int                 fd_;
 	bool                uploading;
 	size_t              writen_bytes;
 

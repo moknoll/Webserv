@@ -31,8 +31,7 @@
 #include <vector>
 
 HttpHandler::HttpHandler(const ServerConfig& cfg)
-    : config_(cfg), error_(HTTP_OK), upload_fd_(-1), uploading(false),
-      writen_bytes(0)
+    : config_(cfg), error_(0), fd_(-1), uploading(false), writen_bytes(0)
 {
 }
 
@@ -55,8 +54,6 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 
 	if (loc == NULL)
 		return makeError(HTTP_NOT_FOUND, loc);
-
-	this->loc_ = *loc;
 
 	// if redirect -> redirect(status, location)
 	if (loc->redirect.first != -1)
@@ -85,8 +82,7 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
 
 	if (ws::isDirectory(path))
 	{
-		if (uri[uri.length() - 1] != '/' && uri != "/"
-		    && uri[uri.size() - 1] != '/')
+		if (uri != "/" && uri[uri.size() - 1] != '/')
 			return redirect(HTTP_MOVED_PERMANENTLY, uri + "/", host);
 
 		std::string index_file =
@@ -106,15 +102,9 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
 
 bool HttpHandler::writeToFile(const std::string& data)
 {
-	int n = write(upload_fd_, data.c_str(), data.size());
+	int n = write(fd_, data.c_str(), data.size());
 	if (n == -1)
-	{
-		close(upload_fd_);
-		upload_fd_ = -1;
-		writen_bytes = 0;
-		uploading = false;
 		return false;
-	}
 	writen_bytes += n;
 	return true;
 }
@@ -126,63 +116,34 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 	const std::string& body = req.getbody();
 	const std::string& path = buildPath(uri, loc);
 	const size_t       content_length = req.getContentLenght();
-	HttpResponse       res;
+
+	// if (content_length > loc.client_max_body_size)
+	// return makeError(HTTP_REQUEST_ENTITY_TOO_LARGE, &loc);
 
 	std::cout << "BODY>>" << body << "<<";
 	std::cout << "WRITEN: " << writen_bytes << '\n'
 	          << "size body: " << body.size() << '\n';
 	std::cout << "Content Length: " << content_length << '\n';
-	if (uploading)
+
+	if (fd_ == -1)
 	{
-		if (!writeToFile(body))
-			return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
-
-		if (writen_bytes < content_length)
-			return res;
-		else if (writen_bytes == content_length)
+		fd_ =
+		    open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0644);
+		if (fd_ == -1)
 		{
-			close(upload_fd_);
-			upload_fd_ = -1;
-			writen_bytes = 0;
-			uploading = false;
-			return makeError(HTTP_CREATED, &loc);
-		}
-		else
-		{
-			close(upload_fd_);
-			upload_fd_ = -1;
-			writen_bytes = 0;
-			uploading = false;
-
+			if (errno == EACCES || errno == EISDIR)
+				return makeError(HTTP_FORBIDDEN, &loc);
 			return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
 		}
-	}
-
-	// if (content_length > loc.client_max_body_size)
-	// return makeError(HTTP_REQUEST_ENTITY_TOO_LARGE, &loc);
-
-	upload_fd_ = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (upload_fd_ == -1)
-	{
-		if (errno == EACCES || errno == EISDIR)
-			return makeError(HTTP_FORBIDDEN, &loc);
-		return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
 	}
 
 	if (!writeToFile(body))
 		return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
 
-	if (writen_bytes < content_length)
-	{
-		uploading = true;
-		return res;
-	}
+	if (!req.isComplete())
+		return makeError(HTTP_CREATED, &loc);
 
-	close(upload_fd_);
-	upload_fd_ = -1;
-	writen_bytes = 0;
-	uploading = false;
-	return makeError(HTTP_CREATED, &loc);
+	return HttpResponse();
 }
 
 HttpResponse HttpHandler::makeError(int status, const Location* loc)
@@ -323,4 +284,17 @@ bool HttpHandler::isAllowedMethod(const std::string& method,
 			return true;
 	}
 	return false;
+}
+
+void HttpHandler::reset()
+{
+	loc_ = NULL;
+	error_ = 0;
+	if (fd_ != -1)
+	{
+		close(fd_);
+		fd_ = -1;
+	}
+	uploading = false;
+	writen_bytes = 0;
 }

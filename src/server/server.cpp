@@ -254,28 +254,15 @@ void Server::_handleClientMessage(int clientSocketFd)
 		_cleanupClient(clientSocketFd);
 	else
 	{
-		// _clients.at(clientSocketFd).requestBuffer.append(buffer, bytes);
 		client.requestBuffer.append(buffer, bytes);
-
-		// Logger::getInstance().log(
-		// INFO, "Received", _clients.at(clientSocketFd).requestBuffer);
-
-		if (_isCompleteRequest(_clients.at(clientSocketFd).requestBuffer))
-		// if (client.request.isComplete())
+		client.request.parse(client.requestBuffer);
+		if (client.request.isComplete() || client.request.isAlmostDone())
 		{
-			// std::string response = "Hello from Server";
-			// std::string request_buf = client.requestBuffer;
-			client.request.parse(client.requestBuffer);
-			// HttpHandler handle(_configs[0]);
 			client.response = client.handler.handle(client.request);
-
 			client.responseBuffer = client.response.buildResponse();
-			if (client.handler.getState())
-				return;
 
-			// _clients.at(clientSocketFd).responseBuffer =
-			// resp.buildResponse();
-
+			// if (client.handler.getState())
+			// 	return;
 			// Change Poll event to writing
 			// set_event(clientSocketFd, POLLIN | POLLOUT);
 			set_event(clientSocketFd, POLLOUT);
@@ -302,11 +289,6 @@ void Server::_sendResponseToClient(int clientSocketFd)
 		return;
 
 	Client& client = _clients.at(clientSocketFd);
-	if (client.handler.getState())
-		return;
-
-	std::cout << "LAST Response:\n";
-	client.requestBuffer = client.response.buildResponse();
 
 	if (client.responseBuffer.empty())
 		return;
@@ -328,8 +310,8 @@ void Server::_sendResponseToClient(int clientSocketFd)
 
 	// if (bytesSent >= 0)
 	// {
-	client.request.clear();
-	client.response.clear();
+	client.request.reset();
+	client.response.reset();
 	msg.clear();
 	_clients.at(clientSocketFd).requestBuffer.clear();
 	std::cout << "Response send" << std::endl;

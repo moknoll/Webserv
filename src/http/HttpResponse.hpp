@@ -28,20 +28,19 @@ class HttpResponse
 
 	std::string   buildResponse() const;
 
-	void        setHeader(const std::string& header_name, const std::string& v);
-	void        setBody(const std::string& content);
-	void        setFullResponse(const std::string& content,
-	                            const std::string& extention);
-	void        setStatus(int status);
+	void          setStatus(int status);
+	void          setHeader(const std::string& name, const std::string& v);
+	void          setBody(const std::string& content);
+	void          setFullResponse(const std::string& content,
+	                              const std::string& extention);
 
-	std::string getHeader(const std::string& header_name) const;
-	std::string buildErrorPage(int err_status) const;
+	std::string   getHeader(const std::string& header_name) const;
+	std::string   buildErrorPage(int err_status) const;
 
-	std::string buildDirectoryPage(const std::vector< std::string >& files,
-	                               const std::string&                path,
-	                               const std::string&                uri);
-	const char* getStatusMsg(int status) const;
-	void        clear();
+	std::string   buildDirectoryPage(const std::vector< std::string >& files,
+	                                 const std::string&                path,
+	                                 const std::string&                uri);
+	void          reset();
 
   private:
 	int                                  status_;
@@ -49,6 +48,7 @@ class HttpResponse
 	std::map< std::string, std::string > headers_;
 	std::string                          body_;
 
+	const char*                          getStatusMsg(int status) const;
 	const std::string                    getHttpTime() const;
 	const std::string getMimeType(const std::string& ext) const;
 	std::string       truncateName(const std::string& name);

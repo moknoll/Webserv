@@ -15,41 +15,33 @@
 #include "constants.hpp"
 #include <cstddef>
 #include <cstring>
-#include <fstream>
-#include <ios>
-#include <iostream>
 #include <string>
 
 HttpRequest::HttpRequest()
-    : err_status_(HTTP_OK), content_length_(0), chunked(false), temp_file(""),
-      state_(sw_start)
+    : err_status_(HTTP_OK), content_length_(0), chunked(false), state_(sw_start)
 {
 }
 
 HttpRequest::HttpRequest(const HttpRequest& other)
     : err_status_(other.err_status_), content_length_(other.content_length_),
       method_(other.method_), uri_(other.uri_),
-      http_version_(other.http_version_), request_line_(other.request_line_),
-      host_(other.host_), body_(other.body_), headers_(other.headers_),
-      chunked(other.chunked), state_(other.state_)
+      http_version_(other.http_version_), body_(other.body_),
+      headers_(other.headers_), chunked(other.chunked), state_(other.state_)
 {
 }
 
 HttpRequest::~HttpRequest() {}
 
-void HttpRequest::clear()
+void HttpRequest::reset()
 {
 	err_status_ = HTTP_OK;
 	content_length_ = 0;
 	method_.clear();
 	uri_.clear();
 	http_version_.clear();
-	request_line_.clear();
-	host_.clear();
 	body_.clear();
 	headers_.clear();
 	chunked = false;
-	temp_file.clear();
 	state_ = sw_start;
 }
 
@@ -60,13 +52,18 @@ HttpRequest& HttpRequest::operator=(const HttpRequest& other)
 		err_status_ = other.err_status_;
 		this->uri_ = other.uri_;
 		this->http_version_ = other.http_version_;
-		this->request_line_ = other.request_line_;
-		this->host_ = other.host_;
 		this->body_ = other.body_;
 		this->headers_ = other.headers_;
 		state_ = other.state_;
 	}
 	return *this;
+}
+std::string extractBoundary(const std::string& content_type)
+{
+	std::string::size_type p = content_type.find("boundary=");
+	if (p == std::string::npos)
+		return "";
+	return "--" + content_type.substr(p + 9);
 }
 
 void HttpRequest::parseHeaderLine(const std::string& header_line)
@@ -91,24 +88,12 @@ void HttpRequest::parseHeaderLine(const std::string& header_line)
 		content_length_ = ws::stosize(headers_[name]);
 	else if (name == "Transfer-Encoding" && headers_[name] == "chunked")
 		chunked = true;
-	if (name == "Host")
-		host_ = headers_[name];
-}
-
-void HttpRequest::parseBody(const std::string& raw)
-{
-	if (temp_file == "")
-		temp_file = "/tmp/wstemp_" + ws::randString();
-
-	std::ofstream fout(temp_file.c_str(), std::ios::binary | std::ios::app);
-	if (!fout.is_open())
-		return;
-	std::cout << "IN: parsbody\n";
-
-	if (!body_.empty())
-		fout.write(body_.c_str(), body_.size());
-	fout.write(raw.c_str(), raw.size());
-	fout.close();
+	if (name == "Content-Type")
+	{
+		if (value.compare(0, 30, "multipart/form-data; boundary=") == 0)
+			multipart = true;
+		boundary = extractBoundary(value);
+	}
 }
 
 bool HttpRequest::isValidMethod(const std::string& method)
@@ -127,40 +112,6 @@ bool HttpRequest::isValidMethod(const std::string& method)
 }
 
 // void parseBody(const std::string& raw) {}
-
-bool HttpRequest::isAlmostDone() const
-{
-	if (state_ == sw_almost_done)
-		return true;
-	return false;
-}
-
-bool HttpRequest::isComplete() const
-{
-	// if (err_status_ != HTTP_OK)
-	// 	return true;
-	if (state_ == sw_done)
-		return true;
-	return false;
-}
-
-void HttpRequest::setStatus(int status)
-{
-	this->err_status_ = status;
-}
-
-bool HttpRequest::isChunked() const
-{
-	return this->chunked;
-}
-
-std::string extractBoundary(const std::string& content_type)
-{
-	std::string::size_type p = content_type.find("boundary=");
-	if (p == std::string::npos)
-		return "";
-	return "--" + content_type.substr(p + 9);
-}
 
 void HttpRequest::parse(std::string& raw)
 {
@@ -198,7 +149,7 @@ void HttpRequest::parse(std::string& raw)
 				std::string::size_type p = raw.find(' ', pos);
 				if (p == std::string::npos)
 				{
-					if (raw.size() - MAX_METHOD_LEN > MAX_METHOD_LEN)
+					if (raw.size() - MAX_METHOD_LEN > MAX_URL_LEN)
 						fail(HTTP_REQUEST_URI_TOO_LARGE);
 					raw.erase(0, pos);
 					return;
@@ -290,3 +241,28 @@ std::string HttpRequest::getHeader(const std::string& name) const
 
 	return "";
 }
+
+bool HttpRequest::isAlmostDone() const
+{
+	if (state_ == sw_almost_done)
+		return true;
+	return false;
+}
+
+bool HttpRequest::isComplete() const
+{
+	if (state_ == sw_done)
+		return true;
+	return false;
+}
+
+void HttpRequest::setStatus(int status)
+{
+	this->err_status_ = status;
+}
+
+bool HttpRequest::isChunked() const
+{
+	return this->chunked;
+}
+

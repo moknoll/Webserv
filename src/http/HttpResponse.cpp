@@ -33,7 +33,7 @@ HttpResponse::HttpResponse(const HttpResponse& other)
 
 HttpResponse::~HttpResponse() {}
 
-void HttpResponse::clear()
+void HttpResponse::reset()
 {
 	status_ = HTTP_OK;
 	status_line_.clear();
@@ -90,10 +90,9 @@ void HttpResponse::setStatus(int status)
 	this->status_ = status;
 }
 
-void HttpResponse::setHeader(const std::string& header_name,
-                             const std::string& v)
+void HttpResponse::setHeader(const std::string& name, const std::string& v)
 {
-	headers_[header_name] = v;
+	headers_[name] = v;
 }
 
 void HttpResponse::setFullResponse(const std::string& content,
