@@ -120,7 +120,7 @@ int main(int argc, char* argv[])
 	// std::string filename = argv[1];
 	(void) argc;
 	(void) argv;
-	Logger::getInstance().setLevel(DEBUG);
+	Logger::getInstance().setLevel(LOG_DEBUG);
 
 	try
 	{

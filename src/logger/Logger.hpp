@@ -14,19 +14,19 @@
 
 #include <string>
 
-#define LOG_DEBUG(msg)    Logger::getInstance().log(DEBUG, msg)
-#define LOG_INFO(msg)     Logger::getInstance().log(INFO, msg)
-#define LOG_WARNING(msg)  Logger::getInstance().log(WARNING, msg)
-#define LOG_ERROR(msg)    Logger::getInstance().log(ERROR, msg)
-#define LOG_CRITICAL(msg) Logger::getInstance().log(ERROR, msg)
+#define LOG_DEBUG(msg)    Logger::getInstance().log(LOG_DEBUG, msg)
+#define LOG_INFO(msg)     Logger::getInstance().log(LOG_INFO, msg)
+#define LOG_WARNING(msg)  Logger::getInstance().log(LOG_WARNING, msg)
+#define LOG_ERROR(msg)    Logger::getInstance().log(LOG_ERROR, msg)
+#define LOG_CRITICAL(msg) Logger::getInstance().log(LOG_ERROR, msg)
 
 enum LogLevel
 {
-	DEBUG,
-	INFO,
-	WARNING,
-	ERROR,
-	CRITICAL
+	LOG_DEBUG = 0,
+	LOG_INFO,
+	LOG_WARNING,
+	LOG_ERROR,
+	LOG_CRITICAL
 };
 
 class Logger

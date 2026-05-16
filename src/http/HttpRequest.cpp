@@ -12,13 +12,17 @@
 
 #include "HttpRequest.hpp"
 #include "../lib/ws.hpp"
+#include "BodyStream.hpp"
 #include "constants.hpp"
 #include <cstddef>
 #include <cstring>
+#include <iostream>
+#include <map>
 #include <string>
 
 HttpRequest::HttpRequest()
-    : err_status_(HTTP_OK), content_length_(0), chunked(false), state_(sw_start)
+    : err_status_(HTTP_OK), content_length_(0), chunked(false),
+      multipart(false), recv_bytes(0), state_(sw_start)
 {
 }
 
@@ -26,7 +30,9 @@ HttpRequest::HttpRequest(const HttpRequest& other)
     : err_status_(other.err_status_), content_length_(other.content_length_),
       method_(other.method_), uri_(other.uri_),
       http_version_(other.http_version_), body_(other.body_),
-      headers_(other.headers_), chunked(other.chunked), state_(other.state_)
+      headers_(other.headers_), chunked(other.chunked),
+      boundary_(other.boundary_), recv_bytes(other.recv_bytes),
+      state_(other.state_), body_data(other.body_data)
 {
 }
 
@@ -43,6 +49,10 @@ void HttpRequest::reset()
 	headers_.clear();
 	chunked = false;
 	state_ = sw_start;
+	boundary_.clear();
+	multipart = false;
+	recv_bytes = 0;
+	body_data.reset();
 }
 
 HttpRequest& HttpRequest::operator=(const HttpRequest& other)
@@ -58,12 +68,44 @@ HttpRequest& HttpRequest::operator=(const HttpRequest& other)
 	}
 	return *this;
 }
+
 std::string extractBoundary(const std::string& content_type)
 {
 	std::string::size_type p = content_type.find("boundary=");
 	if (p == std::string::npos)
 		return "";
-	return "--" + content_type.substr(p + 9);
+	return content_type.substr(p + 9);
+}
+
+void HttpRequest::parseHeaders(const std::string& headers)
+{
+	size_t pos = 0;
+	while (pos < headers.size())
+	{
+		std::string::size_type p = headers.find(CRLF, pos);
+		if (p == std::string::npos)
+		{
+			fail(HTTP_BAD_REQUEST);
+			return;
+		}
+		parseHeaderLine(headers.substr(pos, p - pos));
+		pos = p + 2;
+	}
+
+	std::map< std::string, std::string >::iterator it = headers_.begin();
+	for (; it != headers_.end(); ++it)
+	{
+		if (it->first == "Content-Length")
+			content_length_ = ws::stosize(it->second);
+		if (it->first == "Transfer-Encoding" && it->second == "chunked")
+			chunked = true;
+		if (it->first == "Content-Type"
+		    && it->second.find("multipart/form-data; boundary=") == 0)
+		{
+			boundary_ = extractBoundary(it->second);
+			body_data.setBoundary(boundary_);
+		}
+	}
 }
 
 void HttpRequest::parseHeaderLine(const std::string& header_line)
@@ -75,25 +117,11 @@ void HttpRequest::parseHeaderLine(const std::string& header_line)
 		return;
 	}
 	std::string name = header_line.substr(0, p);
-	if (name.find(' ') != std::string::npos)
-	{
-		fail(HTTP_BAD_REQUEST);
-		return;
-	}
+
+	p += 1;
 
 	std::string value = header_line.substr(p + 1);
 	headers_[name] = ws::strip(value);
-
-	if (name == "Content-Length")
-		content_length_ = ws::stosize(headers_[name]);
-	else if (name == "Transfer-Encoding" && headers_[name] == "chunked")
-		chunked = true;
-	if (name == "Content-Type")
-	{
-		if (value.compare(0, 30, "multipart/form-data; boundary=") == 0)
-			multipart = true;
-		boundary = extractBoundary(value);
-	}
 }
 
 bool HttpRequest::isValidMethod(const std::string& method)
@@ -113,92 +141,91 @@ bool HttpRequest::isValidMethod(const std::string& method)
 
 // void parseBody(const std::string& raw) {}
 
-void HttpRequest::parse(std::string& raw)
+void HttpRequest::parse(std::string& raw_data)
 {
 	static size_t CRLF_LEN = 2;
-	size_t        pos = 0;
 
-	while (pos < raw.size())
+	while (true)
 	{
 		switch (state_)
 		{
 			case sw_done: return;
 			case sw_almost_done:
 			{
-				body_ = raw;
-				raw.clear();
+				std::cout << "RECV BYTES:" << recv_bytes << '\n';
+				std::cout << "content_length_:" << content_length_ << '\n';
+				std::cout << "raw_data SIZE:" << raw_data.size() << '\n';
+				recv_bytes += raw_data.size();
+				if (recv_bytes > content_length_)
+				{
+					std::cout << "START PARS BODY\n";
+					state_ = sw_done;
+					return;
+				}
+				body_data.parse(raw_data);
 				return;
 			}
 			case sw_start:
 			{
-				std::string::size_type p = raw.find(' ', pos);
+				std::string::size_type p = raw_data.find(' ');
 				if (p == std::string::npos)
 				{
-					if (raw.size() > MAX_METHOD_LEN)
+					if (raw_data.size() > MAX_METHOD_LEN)
 						fail(HTTP_BAD_REQUEST);
 					return;
 				}
-				this->method_ = raw.substr(0, p);
-				pos = p + 1;
+				this->method_ = raw_data.substr(0, p);
+				p += 1;
+				raw_data.erase(0, p);
 				state_ = sw_uri;
 				isValidMethod(method_);
 				break;
 			}
 			case sw_uri:
 			{
-				std::string::size_type p = raw.find(' ', pos);
+				std::string::size_type p = raw_data.find(' ');
 				if (p == std::string::npos)
 				{
-					if (raw.size() - MAX_METHOD_LEN > MAX_URL_LEN)
+					if (raw_data.size() - MAX_METHOD_LEN > MAX_URL_LEN)
 						fail(HTTP_REQUEST_URI_TOO_LARGE);
-					raw.erase(0, pos);
 					return;
 				}
 
-				this->uri_ = raw.substr(pos, p - pos);
-				pos = p + 1;
+				this->uri_ = raw_data.substr(0, p);
+				p += 1;
+				raw_data.erase(0, p);
 				state_ = sw_version;
 				break;
 			}
 			case sw_version:
 			{
-				std::string::size_type p = raw.find(CRLF, pos);
+				std::string::size_type p = raw_data.find(CRLF);
 				if (p == std::string::npos)
 				{
-					if (raw.size() - pos > std::strlen(HTTP_VERSION))
+					if (raw_data.size() > std::strlen(HTTP_VERSION))
 						fail(HTTP_BAD_REQUEST);
-					raw.erase(0, pos);
 					return;
 				}
-				this->http_version_ = raw.substr(pos, p - pos);
-				pos = p + CRLF_LEN;
+				this->http_version_ = raw_data.substr(0, p);
+				raw_data.erase(0, p + CRLF_LEN);
 				state_ = sw_headers;
 				break;
 			}
 			case sw_headers:
 			{
-				std::string::size_type p = raw.find(CRLF, pos);
+				std::string::size_type p = raw_data.find(CRLF CRLF);
 				if (p == std::string::npos)
 				{
-					if (raw.size() > MAX_HEADER_SIZE)
+					if (raw_data.size() > MAX_HEADER_SIZE)
 						fail(HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE);
-					raw.erase(0, pos);
 					return;
 				}
 
-				parseHeaderLine(raw.substr(pos, p - pos));
-
-				if (raw.compare(p, 4, CRLF CRLF) == 0)
-				{
-					state_ = sw_almost_done;
-					pos = p + CRLF_LEN + CRLF_LEN;
-					this->body_ = raw.substr(pos);
-					raw.clear();
-					return;
-				}
-				pos = p + CRLF_LEN;
-				break;
+				parseHeaders(raw_data.substr(0, p + CRLF_LEN));
+				raw_data.erase(0, p + CRLF_LEN + CRLF_LEN);
+				state_ = sw_almost_done;
 			}
+			break;
 		}
 	}
 }
@@ -266,3 +293,7 @@ bool HttpRequest::isChunked() const
 	return this->chunked;
 }
 
+BodyStream HttpRequest::getbodyStream() const
+{
+	return body_data;
+}

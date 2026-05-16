@@ -12,6 +12,7 @@
 
 #include "HttpHandler.hpp"
 #include "../lib/ws.hpp"
+#include "BodyStream.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 #include "constants.hpp"
@@ -43,6 +44,7 @@ HttpHandler::~HttpHandler() {}
 
 HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
+	std::cout << "IN HANDL";
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
 	const std::string& method = req.getMethod();
@@ -112,19 +114,32 @@ bool HttpHandler::writeToFile(const std::string& data)
 HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
                                      const Location&    loc)
 {
+	std::string        path;
 	const std::string& uri = req.getURI();
-	const std::string& body = req.getbody();
-	const std::string& path = buildPath(uri, loc);
-	const size_t       content_length = req.getContentLenght();
+	const BodyStream   body = req.getbodyStream();
+	const std::string& data = body.getData();
+	const std::string  filename = body.getFileName();
+	if (!filename.empty())
+	{
+		path = loc.root;
+		if (path[path.size() - 1] != '/')
+			path += '/';
+		path += filename;
+	}
+	else
+		path = buildPath(uri, loc);
+
+	// const size_t       content_length = req.getContentLenght();
 
 	// if (content_length > loc.client_max_body_size)
 	// return makeError(HTTP_REQUEST_ENTITY_TOO_LARGE, &loc);
 
-	std::cout << "BODY>>" << body << "<<";
-	std::cout << "WRITEN: " << writen_bytes << '\n'
-	          << "size body: " << body.size() << '\n';
-	std::cout << "Content Length: " << content_length << '\n';
+	// std::cout << "BODY>>" << body << "<<";
+	// std::cout << "WRITEN: " << writen_bytes << '\n'
+	// << "size body: " << body.size() << '\n';
+	// std::cout << "Content Length: " << content_length << '\n';
 
+	std::cout << "WRITE TO FILE\n";
 	if (fd_ == -1)
 	{
 		fd_ =
@@ -137,11 +152,14 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 		}
 	}
 
-	if (!writeToFile(body))
+	if (!writeToFile(data))
 		return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
 
-	if (!req.isComplete())
+	if (req.isComplete() || body.eof())
+	{
+		state_ = HTTP_WRITING_STATE;
 		return makeError(HTTP_CREATED, &loc);
+	}
 
 	return HttpResponse();
 }
@@ -297,4 +315,11 @@ void HttpHandler::reset()
 	}
 	uploading = false;
 	writen_bytes = 0;
+	state_ = 0;
 }
+
+int HttpHandler::getState() const
+{
+	return state_;
+}
+

@@ -24,6 +24,7 @@ class Server
 	std::vector< struct pollfd >  _pollSockets;
 	std::map< int, Client >       _clients;
 
+
 	void                          _acceptNewClient(int serverSocketFd);
 	void                          _handleClientMessage(int clientSocketFd);
 	void                          _sendResponseToClient(int clientSocketFd);

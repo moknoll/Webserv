@@ -22,6 +22,14 @@
 class Client
 {
   public:
+	enum HTTP_STATE
+	{
+		HTTP_READING_STATE = 0,
+		HTTP_WRITING_STATE,
+		HTTP_KEEPALIVE_STATE,
+		HTTP_CLOSE
+	};
+
 	int         clientFd;       // file descriptor for the client socket
 	std::string requestBuffer;  // buffer to store incoming request data
 	std::string responseBuffer; // buffer to store response data to be sent back
@@ -41,7 +49,7 @@ class Client
 	// 	std::cout << request.getRequestStatus();
 	//
 	// }
-	
+
 	Client(const Client& other);
 	~Client() {}
 

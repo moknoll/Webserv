@@ -15,6 +15,7 @@
 #include "../ConfigParser/ServerConfig.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
+#include "constants.hpp"
 
 #include <cstddef>
 #include <string>
@@ -22,6 +23,14 @@
 class HttpHandler
 {
   public:
+	enum HTTP_STATE
+	{
+		HTTP_READING_STATE = 0,
+		HTTP_WRITING_STATE,
+		HTTP_KEEPALIVE_STATE,
+		HTTP_CLOSE
+	};
+
 	HttpHandler(const ServerConfig& cfg);
 	// HttpHandler(const HttpHandler& other);
 	~HttpHandler();
@@ -29,13 +38,8 @@ class HttpHandler
 	// HttpHandler& operator=(const HttpHandler& other);
 
 	HttpResponse handle(const HttpRequest& req);
-
+	int          getState() const;
 	void         reset();
-
-	bool         getState()
-	{
-		return uploading;
-	}
 
   private:
 	const ServerConfig& config_;

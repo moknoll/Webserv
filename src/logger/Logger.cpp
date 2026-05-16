@@ -24,7 +24,7 @@ Logger& Logger::getInstance()
 	return instance;
 }
 
-Logger::Logger() : currentLevel(INFO) {}
+Logger::Logger() : currentLevel(LOG_INFO) {}
 
 void Logger::setLevel(LogLevel newLevel)
 {
@@ -61,11 +61,11 @@ const std::string Logger::_levelToString(LogLevel level)
 {
 	switch (level)
 	{
-		case DEBUG:    return "DEBUG";
-		case INFO:     return "INFO";
-		case WARNING:  return "WARNING";
-		case ERROR:    return "ERROR";
-		case CRITICAL: return "CRITICAL";
+		case LOG_DEBUG:    return "DEBUG";
+		case LOG_INFO:     return "INFO";
+		case LOG_WARNING:  return "WARNING";
+		case LOG_ERROR:    return "ERROR";
+		case LOG_CRITICAL: return "CRITICAL";
 		default:       return "UNKNOWN";
 	}
 }

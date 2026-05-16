@@ -18,6 +18,19 @@
 #include <sstream>
 #include <string>
 
+std::string ws::trim(const std::string& s, char c)
+{
+	std::string::size_type begin = s.find_first_not_of(c);
+	if (begin == std::string::npos)
+		return "";
+
+	std::string::size_type end = s.find_last_not_of(c);
+	if (end == std::string::npos)
+		return "";
+
+	return s.substr(begin, end - begin + 1);
+}
+
 std::string ws::strip(const std::string& s)
 {
 	const char* whitespaces = " \t\n\r\f\v";

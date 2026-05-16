@@ -22,6 +22,19 @@ class ws
 {
   public:
 	/**
+	 * @brief Removes all leading and trailing occurrences of a specified
+	 * character.
+	 * @param s The input string to trim.
+	 * @param c The character to remove from both ends (defaults to space if
+	 * omitted).
+	 * @return A new string with trimmed characters, or an empty string if all
+	 * characters match.
+	 * @note If the string contains only 'c' characters, an empty string is
+	 * returned. Does not modify the original string.
+	 */
+	static std::string                trim(const std::string& s, char c = ' ');
+
+	/**
 	 * Splits a string into a vector of substrings based on a specific
 	 * delimiter.
 	 * * @param s The input string to be split.

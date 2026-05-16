@@ -13,6 +13,7 @@
 #pragma once
 
 // #include <cstdint>
+#include "BodyStream.hpp"
 #include <cstddef>
 #include <map>
 #include <string>
@@ -45,6 +46,7 @@ class HttpRequest
 	std::string       getHeader(const std::string& name) const;
 	std::string       getMethod() const;
 	const std::string getbody() const;
+	BodyStream        getbodyStream() const; // WIP
 	int               getRequestStatus() const;
 	size_t            getContentLenght() const;
 
@@ -68,13 +70,15 @@ class HttpRequest
 	std::map< std::string, std::string > headers_;
 	bool                                 chunked;
 	bool                                 multipart;
-	std::string                          boundary;
+	std::string                          boundary_;
 	size_t                               recv_bytes;
 	State                                state_;
+	BodyStream                           body_data; // WIP
 
 	void parse_request_line(const std::string& raw);
 	void parseBody(const std::string& raw);
 	void parseHeaderLine(const std::string& header_line);
+	void parseHeaders(const std::string& headers);
 	void fail(int status);
 };
 

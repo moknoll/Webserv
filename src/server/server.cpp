@@ -15,11 +15,13 @@
 #include "../http/HttpHandler.hpp"
 // #include "../http/HttpRequest.hpp"
 #include "../http/HttpResponse.hpp"
+#include "../http/constants.hpp"
 #include "../lib/ws.hpp"
 #include "../logger/Logger.hpp"
 #include "client.hpp"
 
 #include <cstddef>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -240,6 +242,7 @@ void Server::set_event(int fd, int state)
  */
 void Server::_handleClientMessage(int clientSocketFd)
 {
+
 	if (_clients.find(clientSocketFd) == _clients.end())
 		return;
 
@@ -248,7 +251,7 @@ void Server::_handleClientMessage(int clientSocketFd)
 	int     bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
 
 	Client& client = _clients.at(clientSocketFd);
-	std::cout << "BUFF>>" << buffer << "<<BUF";
+	// std::cout << "BUFF>>" << buffer << "<<BUF";
 
 	if (bytes <= 0)
 		_cleanupClient(clientSocketFd);
@@ -256,13 +259,17 @@ void Server::_handleClientMessage(int clientSocketFd)
 	{
 		client.requestBuffer.append(buffer, bytes);
 		client.request.parse(client.requestBuffer);
+		BodyStream b = client.request.getbodyStream();
+		b.printBodyStream();
 		if (client.request.isComplete() || client.request.isAlmostDone())
+		// if (client.request.isComplete())
 		{
 			client.response = client.handler.handle(client.request);
 			client.responseBuffer = client.response.buildResponse();
 
-			// if (client.handler.getState())
-			// 	return;
+			if (client.handler.getState() == HTTP_READING_STATE)
+				return;
+
 			// Change Poll event to writing
 			// set_event(clientSocketFd, POLLIN | POLLOUT);
 			set_event(clientSocketFd, POLLOUT);
@@ -312,6 +319,7 @@ void Server::_sendResponseToClient(int clientSocketFd)
 	// {
 	client.request.reset();
 	client.response.reset();
+	client.handler.reset();
 	msg.clear();
 	_clients.at(clientSocketFd).requestBuffer.clear();
 	std::cout << "Response send" << std::endl;
