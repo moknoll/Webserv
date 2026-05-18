@@ -9,15 +9,14 @@
 
 class Server{
 	private: 
-		Socket socket;
-		//HTTPhandler h;
+		Socket _socket;
+		ServerConfig *_config; 
 
 	public:  
-		Server(const ServerConfig &config);
 		Server();
+		Server(const ServerConfig &config);
 		~Server();
-		//Server operator=();
-		
-		void setSocket(); 
-		Socket getSocket()const;
+		 
+		Socket get_socket()const { return this->_socket; }
+		ServerConfig get_config() { return *this->_config; }
 };

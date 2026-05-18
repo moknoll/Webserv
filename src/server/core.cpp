@@ -6,7 +6,7 @@
 /*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:48 by mknoll            #+#    #+#             */
-/*   Updated: 2026/05/06 13:45:03 by moritzknoll      ###   ########.fr       */
+/*   Updated: 2026/05/16 13:00:56 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,8 +27,14 @@ Core::Core(std::vector<ServerConfig> &configs)
 {
 	for(size_t i = 0; i < configs.size(); i++)
 	{
-		Server server(configs[i]);
-		_servers.push_back(server);
+		Server s(configs[i]);
+		_servers.push_back(s);
+
+        struct pollfd pfd;
+		pfd.fd = s.get_socket().getFd();
+        std::cout <<"sock_fd:" << s.get_socket().getFd() << std::endl;
+		pfd.events = POLLIN;
+		_pollSockets.push_back(pfd);
 	}
 }
 
@@ -42,90 +48,12 @@ Core::~Core()
 	//Check later on how to close? 
 }
 
-/**
- * @brief Initializes the server by setting up listening sockets.
- * 
- * @throws std::runtime_error if socket creation, configuration, binding, or
- *         listening fails
- * 
- * @see Server::_configs for the list of configurations to initialize
- */
-void Core::init()
-{
-	int yes = 1;
-	int status; 
-	for (size_t i = 0; i < _servers.size(); i++)
-	{
-		struct addrinfo hints;
-		struct addrinfo *servinfo, *p;
-		memset(&hints, 0, sizeof(hints));
-		hints.ai_family = AF_INET; 
-		hints.ai_socktype = SOCK_STREAM;
-		hints.ai_flags = AI_PASSIVE;// check this
-		std::string host = _servers[i].getSocket().getHost();
-		std::string port = std::to_string(_servers[i].getSocket().getPort());
-
-		std::cout << "Config " << i << ": host='" << host << "' port='" << port << "'" << std::endl;
-		if ((status = getaddrinfo(host.c_str(), port.c_str(), &hints, &servinfo)) != 0)
-			throw std::runtime_error(std::string("getaddrinfo failed: ") + gai_strerror(status));
-
-		int sock_fd = -1; 
-
-		for (p = servinfo; p != NULL; p = p->ai_next)
-		{
-			if((sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)))
-				if (sock_fd == SOCKET_ERROR)
-					continue;
-			if ((setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))) == SOCKET_ERROR)
-			{
-				close(sock_fd); 
-				continue;
-			}
-			if ((fcntl(sock_fd, F_SETFL, O_NONBLOCK)) == SOCKET_ERROR)
-			{
-				close(sock_fd); 
-				continue;
-			}
-			if ((bind(sock_fd, p->ai_addr, p->ai_addrlen)) == SOCKET_ERROR)
-			{
-				close(sock_fd); 
-				continue;
-			}
-			break; 
-			std::cout << "Setup complete" << std::endl; 
-		}
-		
-		if (p == NULL)
-			throw std::runtime_error("Could not bind to" + host + ":" + port); 
-		
-		freeaddrinfo(servinfo);
-		
-		if (listen(sock_fd, BACKLOG) == SOCKET_ERROR)
-			throw std::runtime_error("listen failed"); 
-		
-		struct pollfd pfd;
-		pfd.fd = sock_fd;
-		pfd.events = POLLIN;
-		_pollSockets.push_back(pfd);
-
-		_servers[i].getSocket().setFD(sock_fd);
-		// // Debug: Log the server config mapping
-		// std::ostringstream oss;
-		// oss << "Server Socket FD: " << sock_fd 
-		// 	<< " | Port: " << _configs[i].port 
-		// 	<< " | Host: " << _configs[i].host 
-		// 	<< " | Root: " << _configs[i].root 
-		// 	<< " | Index: " << _configs[i].index
-		// 	<< " | Max Body Size: " << _configs[i].client_max_body_size;
-		// LOG_DEBUG(oss.str());	
-	}
-}
 
 Server* Core::find_server_by_Fd(int serverFd)
 {
     for (size_t i = 0; i < _servers.size(); i++)
     {
-        if (_servers[i].getSocket().getFd() == serverFd)
+        if (_servers[i].get_socket().getFd() == serverFd)
             return &_servers[i];
     }
     return nullptr;
@@ -140,8 +68,7 @@ void Core::run()
 {
 	while(1) 
 	{
-		int ret = poll(_pollSockets.data(), _pollSockets.size(), -1);
-		
+		int ret = poll(_pollSockets.data(), _pollSockets.size(), 3000);
 		if(ret == -1)
 			throw std::runtime_error("Poll failed");
 		
@@ -150,7 +77,7 @@ void Core::run()
 			if(_pollSockets[i].revents & POLLIN)
 			{
 				Server *server = find_server_by_Fd(_pollSockets[i].fd); 
-				if (server == nullptr)
+				if (server != nullptr)
 					_acceptNewClient(_pollSockets[i].fd); 
 				else 
 					_handleClientMessage(_pollSockets[i].fd);
@@ -252,7 +179,10 @@ void Core::_handleClientMessage(int clientSocketFd)
 	int bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
 	
 	if (bytes <= 0)
+    {
+        std::cout << "im here" << std::endl; 
 		_cleanupClient(clientSocketFd);
+    }
 	else
 	{
 		// _clients.at(clientSocketFd)._requestBuffer.append(buffer, bytes);
@@ -304,6 +234,7 @@ void Core::_sendResponseToClient(int clientSocketFd)
 	{
 		// Handle send error (e.g., EAGAIN, EWOULDBLOCK, or other errors)
 		// For simplicity, we will just clean up the client on any send error
+        std::cout << "im here" << std::endl; 
 		_cleanupClient(clientSocketFd);
 	}
 }

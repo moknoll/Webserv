@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   main.cpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
+/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:52 by mknoll            #+#    #+#             */
-/*   Updated: 2026/05/05 13:50:08 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/05/16 12:35:07 by moritzknoll      ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -77,10 +77,7 @@ int main(int argc, char* argv[])
 		}
 		// TODO: Use the parsed config to initialize and run the server
 
-		Core webserver(
-		    configs); // <--------- This needs to be config (ans not my port),
-		              // but for testing we will use the defined MYPORT
-		webserver.init();
+		Core webserver(configs); // <--------- This needs to be config (ans not my port),
 		webserver.run();
 	}
 	catch (const std::exception& e)
