@@ -178,7 +178,7 @@ void HttpRequest::parse(std::string& raw_data)
 				if (p == std::string::npos)
 				{
 					if (raw_data.size() - MAX_METHOD_LEN > MAX_URL_LEN)
-						fail(HTTP_REQUEST_URI_TOO_LARGE);
+						fail(HTTP_URI_TOO_LONG);
 					return;
 				}
 

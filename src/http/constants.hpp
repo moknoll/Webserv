@@ -60,8 +60,8 @@
 #define HTTP_CONFLICT                        409
 #define HTTP_LENGTH_REQUIRED                 411
 #define HTTP_PRECONDITION_FAILED             412
-#define HTTP_REQUEST_ENTITY_TOO_LARGE        413
-#define HTTP_REQUEST_URI_TOO_LARGE           414
+#define HTTP_CONTENT_TOO_LARGE               413
+#define HTTP_URI_TOO_LONG                    414
 #define HTTP_UNSUPPORTED_MEDIA_TYPE          415
 #define HTTP_RANGE_NOT_SATISFIABLE           416
 #define HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE 431

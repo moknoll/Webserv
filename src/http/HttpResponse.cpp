@@ -212,29 +212,30 @@ const char* HttpResponse::getStatusMsg(int status) const
 {
 	switch (status)
 	{
-		case HTTP_OK:                       return "200 OK";
-		case HTTP_CREATED:                  return "201 Created";
-		case HTTP_NO_CONTENT:               return "204 No Content";
-		case HTTP_PARTIAL_CONTENT:          return "206 Partial Content";
-		case HTTP_MOVED_PERMANENTLY:        return "301 Moved Permanently";
-		case HTTP_MOVED_TEMPORARILY:        return "302 Moved Temporarily";
-		case HTTP_NOT_MODIFIED:             return "304 Not Modified";
-		case HTTP_BAD_REQUEST:              return "400 Bad Request";
-		case HTTP_FORBIDDEN:                return "403 Forbidden";
-		case HTTP_NOT_FOUND:                return "404 Not Found";
-		case HTTP_NOT_ALLOWED:              return "405 Method Not Allowed";
-		case HTTP_REQUEST_TIME_OUT:         return "408 Request Timeout";
-		case HTTP_CONFLICT:                 return "409 Conflict";
-		case HTTP_REQUEST_ENTITY_TOO_LARGE: return "413 Content Too Large";
-		case HTTP_REQUEST_URI_TOO_LARGE:    return "414 URI Too Long";
-		case HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE:
-			return "431 Request Header Fields Too Large";
+		case HTTP_OK:                    return "200 OK";
+		case HTTP_CREATED:               return "201 Created";
+		case HTTP_NO_CONTENT:            return "204 No Content";
+		case HTTP_PARTIAL_CONTENT:       return "206 Partial Content";
+		case HTTP_MOVED_PERMANENTLY:     return "301 Moved Permanently";
+		case HTTP_MOVED_TEMPORARILY:     return "302 Found";
+		case HTTP_NOT_MODIFIED:          return "304 Not Modified";
+		case HTTP_BAD_REQUEST:           return "400 Bad Request";
+		case HTTP_FORBIDDEN:             return "403 Forbidden";
+		case HTTP_NOT_FOUND:             return "404 Not Found";
+		case HTTP_NOT_ALLOWED:           return "405 Method Not Allowed";
+		case HTTP_REQUEST_TIME_OUT:      return "408 Request Timeout";
+		case HTTP_CONFLICT:              return "409 Conflict";
+		case HTTP_CONTENT_TOO_LARGE:     return "413 Content Too Large";
+		case HTTP_URI_TOO_LONG:          return "414 URI Too Long";
 		case HTTP_INTERNAL_SERVER_ERROR: return "500 Internal Server Error";
 		case HTTP_NOT_IMPLEMENTED:       return "501 Not Implemented";
 		case HTTP_BAD_GATEWAY:           return "502 Bad Gateway";
 		case HTTP_SERVICE_UNAVAILABLE:   return "503 Service Unavailable";
 		case HTTP_GATEWAY_TIME_OUT:      return "504 Gateway Timeout";
-		default:                         return "500 Internal Server Error";
+		case HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE:
+			return "431 Request Header Fields Too Large";
+
+		default: return "500 Internal Server Error";
 	}
 }
 
