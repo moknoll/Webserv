@@ -198,6 +198,36 @@ void ConfigParser::validateIPv4(const std::string &s)
     }
 }
 
+size_t ConfigParser::parseSize(const std::string &s)
+{
+    if (s.empty())
+        throw std::runtime_error("client_max_body_size: empty value");
+
+    // Якщо останній символ — літера (суфікс)
+    char last = s[s.size() - 1];
+
+    size_t multiplier = 1;
+    std::string number = s;
+
+    if (last == 'K' || last == 'M' || last == 'G')
+    {
+        number = s.substr(0, s.size() - 1); // відкидаємо суфікс
+
+        if (last == 'K') multiplier = 1024;
+        else if (last == 'M') multiplier = 1024 * 1024;
+        else if (last == 'G') multiplier = 1024 * 1024 * 1024;
+    }
+
+    // Перевіряємо, що number — це чисте число
+    for (size_t i = 0; i < number.size(); i++)
+        if (!isdigit(number[i]))
+            throw std::runtime_error("client_max_body_size: invalid number: " + s);
+
+    size_t base = static_cast<size_t>(std::atoi(number.c_str()));
+    return base * multiplier;
+}
+
+
 void ConfigParser::validateMethod(const std::string &m)
 {
     if (m != "GET" && m != "POST" && m != "DELETE")
@@ -213,13 +243,13 @@ void ConfigParser::validateAutoindex(const std::string &s)
 void ConfigParser::validateRedirectCode(int code)
 {
     if (code != 301 && code != 302 && code != 307 && code != 308)
-        throw std::runtime_error("wrong redirect code: " + std::to_string(code));
+        throw std::runtime_error("wrong redirect code");
 }
 
 void ConfigParser::validateErrorCode(int code)
 {
     if (code < 300 || code > 599)
-        throw std::runtime_error("Wrong error_page код: " + std::to_string(code));
+        throw std::runtime_error("Wrong error_page код");
 }
 
 void ConfigParser::validatePath(const std::string &p)
@@ -272,14 +302,14 @@ void ConfigParser::parseServer()
         {
             parseLocation(server);
         }
-        else if (tok == "host")
+        else if (tok == "server_name")
         {
             std::string h = tokenizer.next();
-            validateIPv4(h);
+            //validateIPv4(h);
             server.host = h;
             expect(";");
         }
-        else if (tok == "port")
+        else if (tok == "listen")
         {
             std::string p = tokenizer.next();
             validateNumber(p);
@@ -305,8 +335,8 @@ void ConfigParser::parseServer()
         else if (tok == "client_max_body_size")
         {
             std::string s = tokenizer.next();
-            validateNumber(s);
-            server.client_max_body_size = std::atoi(s.c_str());
+
+            server.client_max_body_size = parseSize(s.c_str());
             expect(";");
         }
         else if (tok == "error_page")
@@ -322,16 +352,16 @@ void ConfigParser::parseServer()
             server.error_pages[code] = path;
             expect(";");
         }
-        else if (tok == "redirect")
+        else if (tok == "redirect" || tok == "return")
         {
             std::string codeStr = tokenizer.next();
             validateNumber(codeStr);
             int code = std::atoi(codeStr.c_str());
             validateRedirectCode(code);
-
+        
             std::string path = tokenizer.next();
             validatePath(path);
-
+        
             server.redirect = std::make_pair(code, path);
             expect(";");
         }
@@ -412,18 +442,17 @@ void ConfigParser::parseLocation(ServerConfig &server)
             loc.error_pages[code] = path;
             expect(";");
         }
-        else if (tok == "redirect")
+        else if (tok == "redirect" || tok == "return")
         {
             std::string codeStr = tokenizer.next();
             validateNumber(codeStr);
             int code = std::atoi(codeStr.c_str());
             validateRedirectCode(code);
-
+        
             std::string path = tokenizer.next();
             validatePath(path);
-
-            loc.redirect = std::make_pair(code, path);
-            loc.has_redirect = true;
+        
+            server.redirect = std::make_pair(code, path);
             expect(";");
         }
         else if (tok == "upload_path")

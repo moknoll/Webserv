@@ -6,7 +6,7 @@
 /*   By: oklimov <oklimov@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/07 14:18:07 by oklimov           #+#    #+#             */
-/*   Updated: 2026/05/07 16:19:32 by oklimov          ###   ########.fr       */
+/*   Updated: 2026/05/19 13:00:05 by oklimov          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,7 +39,7 @@ Tokenizer::Tokenizer(const Tokenizer &other)
 
 Tokenizer &Tokenizer::operator=(const Tokenizer &other)
 {
-    if (this != this) {
+    if (this != &other) {
         tokens = other.tokens;
         pos = other.pos;
     }

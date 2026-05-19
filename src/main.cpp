@@ -64,7 +64,9 @@ int main(int argc, char* argv[])
 	
 	try
 	{
-		std::vector< ServerConfig > configs = setupConfigDefaultToTest();
+		ConfigParser parser(argv[1]);
+        parser.parse();
+		std::vector< ServerConfig > configs = parser.getServers();
 
 		std::cout << "Parsed Configurations:" << std::endl;
 		for (size_t i = 0; i < configs.size(); i++)

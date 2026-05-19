@@ -20,6 +20,7 @@ private:
     void validateErrorCode(int code);
     void validatePath(const std::string &p);
     void validateExtension(const std::string &ext);
+    size_t parseSize(const std::string &s);
 
     void parseServer();
     void parseLocation(ServerConfig &server);
