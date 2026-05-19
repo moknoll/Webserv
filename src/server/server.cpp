@@ -242,7 +242,6 @@ void Server::set_event(int fd, int state)
  */
 void Server::_handleClientMessage(int clientSocketFd)
 {
-
 	if (_clients.find(clientSocketFd) == _clients.end())
 		return;
 
@@ -267,12 +266,12 @@ void Server::_handleClientMessage(int clientSocketFd)
 			client.response = client.handler.handle(client.request);
 			client.responseBuffer = client.response.buildResponse();
 
-			if (client.handler.getState() == HTTP_READING_STATE)
-				return;
-
-			// Change Poll event to writing
-			// set_event(clientSocketFd, POLLIN | POLLOUT);
-			set_event(clientSocketFd, POLLOUT);
+			// if (client.handler.getState() == HTTP_READING_STATE)
+			if (client.request.getbodyStream().eof()
+			    || client.request.isComplete())
+				// Change Poll event to writing
+				// set_event(clientSocketFd, POLLIN | POLLOUT);
+				set_event(clientSocketFd, POLLOUT);
 		}
 	}
 }
@@ -297,21 +296,31 @@ void Server::_sendResponseToClient(int clientSocketFd)
 
 	Client& client = _clients.at(clientSocketFd);
 
-	if (client.responseBuffer.empty())
+	// if (client.responseBuffer.empty())
+	if (client.request.isAlmostDone())
 		return;
 
-	std::string& msg = client.responseBuffer;
-	size_t       buff_size = msg.size();
+	std::string& buffer = client.responseBuffer;
 
-	int          bytesSent = send(clientSocketFd, msg.c_str(), msg.size(), 0);
+	std::string  file_chunk = client.handler.getFileChunk();
+	buffer += file_chunk;
+	size_t buff_size = buffer.size();
 
-	size_t       sent = static_cast< size_t >(bytesSent);
+	int    bytesSent = send(clientSocketFd, buffer.c_str(), buffer.size(), 0);
+	if (bytesSent == -1)
+	{
+		_cleanupClient(clientSocketFd);
+		return;
+	}
+
+	size_t sent = static_cast< size_t >(bytesSent);
 
 	if (sent < buff_size)
 	{
+		LOG_DEBUG("START SENDING");
 		// LOG_DEBUG("SENT: " + ws::to_string(sent));
 		// LOG_DEBUG("buff size: " + ws::to_string(buff_size));
-		msg.erase(0, sent);
+		buffer.erase(0, sent);
 		return;
 	}
 
@@ -320,8 +329,8 @@ void Server::_sendResponseToClient(int clientSocketFd)
 	client.request.reset();
 	client.response.reset();
 	client.handler.reset();
-	msg.clear();
-	_clients.at(clientSocketFd).requestBuffer.clear();
+	buffer.clear();
+	// _clients.at(clientSocketFd).requestBuffer.clear();
 	std::cout << "Response send" << std::endl;
 
 	set_event(clientSocketFd, POLLIN);

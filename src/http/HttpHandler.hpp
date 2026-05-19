@@ -39,6 +39,7 @@ class HttpHandler
 
 	HttpResponse handle(const HttpRequest& req);
 	int          getState() const;
+	std::string  getFileChunk();
 	void         reset();
 
   private:

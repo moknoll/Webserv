@@ -35,8 +35,18 @@ HttpHandler::HttpHandler(const ServerConfig& cfg)
     : config_(cfg), error_(0), fd_(-1), uploading(false), writen_bytes(0)
 {
 }
+Location* loc_;
+int       error_;
+int       state_;
+int       fd_;
+bool      uploading;
+size_t    writen_bytes;
 
-// HttpHandler::HttpHandler(const HttpHandler& other): config(other.config),
+// HttpHandler::HttpHandler(const HttpHandler& other)
+//     : loc_(other.loc_), error_(other.error_), state_(other.state_)
+// {
+// }
+
 // error(other.error)  {}
 HttpHandler::~HttpHandler() {}
 
@@ -44,7 +54,6 @@ HttpHandler::~HttpHandler() {}
 
 HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
-	std::cout << "IN HANDL";
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
 	const std::string& method = req.getMethod();
@@ -216,14 +225,37 @@ HttpResponse HttpHandler::makeFileResponse(const std::string& path,
 		default:             return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
 	}
 
-	std::string content;
-	if (!ws::readFile(path.c_str(), content))
+	// std::string content;
+	// if (!ws::readFile(path.c_str(), content))
+	// 	return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
+	this->fd_ = open(path.c_str(), O_RDONLY);
+	if (fd_ == -1)
 		return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
 
 	HttpResponse res(HTTP_OK);
 
-	res.setFullResponse(content, ws::getFileExtension(path));
+	size_t       cl = ws::getFileSize(path.c_str());
+	res.setFullResponse("", ws::getFileExtension(path));
+	res.setHeader("Content-Length", ws::to_string(cl));
 	return res;
+}
+
+std::string HttpHandler::getFileChunk()
+{
+	static const ssize_t FILE_CHUNK = 512 * 1024;
+	std::string          ret(FILE_CHUNK, '\0');
+
+	if (fd_ == -1)
+		return "";
+
+	ssize_t n = read(fd_, &ret[0], FILE_CHUNK);
+	if (n == -1)
+		return "";
+
+	if (n < FILE_CHUNK)
+		ret.resize(n);
+
+	return ret;
 }
 
 const Location*
@@ -315,7 +347,7 @@ void HttpHandler::reset()
 	}
 	uploading = false;
 	writen_bytes = 0;
-	state_ = 0;
+	state_ = HTTP_READING_STATE;
 }
 
 int HttpHandler::getState() const

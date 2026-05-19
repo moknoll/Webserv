@@ -21,7 +21,12 @@
 #include <string>
 #include <vector>
 
-HttpResponse::HttpResponse() : status_(0), status_line_(""), body_("") {}
+HttpResponse::HttpResponse() : status_(0), status_line_(""), body_("")
+{
+	this->status_line_ = "HTTP/1.1 ";
+	this->status_line_ += getStatusMsg(status_);
+	this->status_line_ += CRLF;
+}
 
 HttpResponse::HttpResponse(const int status) : status_(status) {}
 
@@ -35,7 +40,7 @@ HttpResponse::~HttpResponse() {}
 
 void HttpResponse::reset()
 {
-	status_ = HTTP_OK;
+	status_ = 0;
 	status_line_.clear();
 	headers_.clear();
 	body_.clear();
@@ -88,6 +93,9 @@ std::string HttpResponse::buildResponse() const
 void HttpResponse::setStatus(int status)
 {
 	this->status_ = status;
+	this->status_line_ = "HTTP/1.1 ";
+	this->status_line_ += getStatusMsg(status_);
+	this->status_line_ += CRLF;
 }
 
 void HttpResponse::setHeader(const std::string& name, const std::string& v)

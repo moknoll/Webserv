@@ -96,6 +96,7 @@ void BodyStream::parseMultiPart(std::string& raw_data)
 				}
 				raw_data.erase(0, p + 4);
 				state_ = sw_data;
+				break;
 			}
 			case sw_data:
 			{
@@ -144,7 +145,7 @@ void BodyStream::setBoundary(const std::string& boundary)
 {
 	this->boundary_ = boundary;
 	delimeter_ = "--" + boundary_ + CRLF;
-	end_delimeter_ = "--" + boundary + "--";
+	end_delimeter_ = "--" + boundary_ + "--";
 }
 
 bool BodyStream::eof() const

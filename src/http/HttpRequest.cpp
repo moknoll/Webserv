@@ -139,8 +139,6 @@ bool HttpRequest::isValidMethod(const std::string& method)
 	return false;
 }
 
-// void parseBody(const std::string& raw) {}
-
 void HttpRequest::parse(std::string& raw_data)
 {
 	static size_t CRLF_LEN = 2;
@@ -152,17 +150,10 @@ void HttpRequest::parse(std::string& raw_data)
 			case sw_done: return;
 			case sw_almost_done:
 			{
-				std::cout << "RECV BYTES:" << recv_bytes << '\n';
-				std::cout << "content_length_:" << content_length_ << '\n';
-				std::cout << "raw_data SIZE:" << raw_data.size() << '\n';
 				recv_bytes += raw_data.size();
-				if (recv_bytes > content_length_)
-				{
-					std::cout << "START PARS BODY\n";
-					state_ = sw_done;
-					return;
-				}
 				body_data.parse(raw_data);
+				if (recv_bytes >= content_length_)
+					state_ = sw_done;
 				return;
 			}
 			case sw_start:
@@ -223,7 +214,7 @@ void HttpRequest::parse(std::string& raw_data)
 
 				parseHeaders(raw_data.substr(0, p + CRLF_LEN));
 				raw_data.erase(0, p + CRLF_LEN + CRLF_LEN);
-				state_ = sw_almost_done;
+				state_ = method_ == "GET" ? sw_done : sw_almost_done;
 			}
 			break;
 		}
