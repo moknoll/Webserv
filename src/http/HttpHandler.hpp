@@ -15,7 +15,6 @@
 #include "../ConfigParser/ServerConfig.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
-#include "constants.hpp"
 
 #include <cstddef>
 #include <string>
@@ -23,45 +22,46 @@
 class HttpHandler
 {
   public:
-	enum HTTP_STATE
+	enum STATE
 	{
-		HTTP_READING_STATE = 0,
-		HTTP_WRITING_STATE,
-		HTTP_KEEPALIVE_STATE,
-		HTTP_CLOSE
+		INIT_STATE = 0,
+		RECV_STATE,
+		SEND_STATE,
+		COMPLETED
 	};
 
 	HttpHandler(const ServerConfig& cfg);
-	// HttpHandler(const HttpHandler& other);
 	~HttpHandler();
 
-	// HttpHandler& operator=(const HttpHandler& other);
+	HttpHandler(const HttpHandler& other);
+	HttpHandler& operator=(const HttpHandler& other);
 
 	HttpResponse handle(const HttpRequest& req);
 	int          getState() const;
 	std::string  getFileChunk();
+	bool         hadMoreData() const;
 	void         reset();
 
   private:
+	static const size_t FILE_CHUNK_SIZE = 512 * 1024;
+
 	const ServerConfig& config_;
 	Location*           loc_;
 	int                 error_;
-	int                 state_;
+	STATE               state_;
+	std::string         upload_file_path_;
 	int                 fd_;
-	bool                uploading;
-	size_t              writen_bytes;
 
 	HttpResponse        handleGET(const HttpRequest& req, const Location& loc);
 	HttpResponse        handlePOST(const HttpRequest& req, const Location& loc);
-	HttpResponse        makeError(int status, const Location* loc);
-
-	// WIP
-	HttpResponse        makeDirectoryPage(const std::string& path,
-	                                      const std::string& uri,
-	                                      const Location*    loc);
+	HttpResponse        makeStatusResponse(int status, const Location* loc);
+	HttpResponse makeFileResponse(const std::string& path, const Location* loc);
 
 	std::vector< std::string > getListOfFiles(const std::string& path);
-	HttpResponse makeFileResponse(const std::string& path, const Location* loc);
+	// WIP
+	HttpResponse               makeDirectoryPage(const std::string& path,
+	                                             const std::string& uri,
+	                                             const Location*    loc);
 
 	// WIP
 	HttpResponse
@@ -73,9 +73,15 @@ class HttpHandler
 
 	// WIP
 	std::string buildPath(const std::string& uri, const Location& loc);
-
 	bool isAllowedMethod(const std::string& method, const Location& loc) const;
 
-	bool writeToFile(const std::string& data);
+	std::string buildUploadPath(const HttpRequest& req, const Location& loc);
+	bool        openUploadFile(const std::string& path,
+	                           HttpResponse&      erro_resp,
+	                           const Location&    loc);
+
+	bool        writeToFile(const std::string& data);
+	void        resetUpload();
+	void        closeFile();
 };
 

@@ -20,6 +20,7 @@
 #include <cctype>
 #include <cerrno>
 #include <cstddef>
+#include <cstdio>
 #include <cstring>
 #include <ctime>
 #include <dirent.h>
@@ -29,28 +30,25 @@
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
+
 #include <vector>
 
 HttpHandler::HttpHandler(const ServerConfig& cfg)
-    : config_(cfg), error_(0), fd_(-1), uploading(false), writen_bytes(0)
+    : config_(cfg), loc_(NULL), error_(0), state_(INIT_STATE), fd_(-1)
 {
 }
-Location* loc_;
-int       error_;
-int       state_;
-int       fd_;
-bool      uploading;
-size_t    writen_bytes;
 
-// HttpHandler::HttpHandler(const HttpHandler& other)
-//     : loc_(other.loc_), error_(other.error_), state_(other.state_)
-// {
-// }
+HttpHandler::HttpHandler(const HttpHandler& other)
+    : config_(other.config_), loc_(other.loc_), error_(other.error_),
+      state_(other.state_), upload_file_path_(other.upload_file_path_),
+      fd_(other.fd_)
+{
+}
 
-// error(other.error)  {}
-HttpHandler::~HttpHandler() {}
-
-// HttpHandler&	HttpHandlerHt::operator=(const HttpHandler& other) {}
+HttpHandler::~HttpHandler()
+{
+	closeFile();
+}
 
 HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
@@ -58,20 +56,20 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	const std::string& host = req.getHeader("Host");
 	const std::string& method = req.getMethod();
 	const Location*    loc = findMatchUri(uri, config_.locations);
-	// const std::string  method = req.getMethod();
 
 	if (req.getRequestStatus() != HTTP_OK)
-		return makeError(req.getRequestStatus(), loc);
+		return makeStatusResponse(req.getRequestStatus(), loc);
 
 	if (loc == NULL)
-		return makeError(HTTP_NOT_FOUND, loc);
+		return makeStatusResponse(HTTP_NOT_FOUND, loc);
 
 	// if redirect -> redirect(status, location)
 	if (loc->redirect.first != -1)
 		return redirect(loc->redirect.first, loc->redirect.second, host);
 
 	if (!isAllowedMethod(method, *loc))
-		return makeError(HTTP_NOT_ALLOWED, loc);
+		return makeStatusResponse(HTTP_NOT_ALLOWED, loc);
+
 	// if (!loc->cgi_extension.empty())
 	// 		handleCGI();
 
@@ -82,7 +80,7 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	// else if (method == "DELETE")
 	// return handleDELETE(req, loc);
 
-	return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
+	return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, loc);
 }
 
 HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
@@ -105,7 +103,7 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
 		if (loc.autoindex)
 			return makeDirectoryPage(path, uri, &loc);
 
-		return makeError(HTTP_FORBIDDEN, &loc);
+		return makeStatusResponse(HTTP_FORBIDDEN, &loc);
 	}
 
 	return makeFileResponse(path, &loc);
@@ -116,64 +114,101 @@ bool HttpHandler::writeToFile(const std::string& data)
 	int n = write(fd_, data.c_str(), data.size());
 	if (n == -1)
 		return false;
-	writen_bytes += n;
+	return true;
+}
+
+std::string HttpHandler::buildUploadPath(const HttpRequest& req,
+                                         const Location&    loc)
+{
+	const std::string& filename = req.getbodyStream().getFileName();
+	std::string        path;
+
+	if (!filename.empty())
+	{
+		// std::string safe_name = sanitizeFileName(filename);
+
+		path = loc.root;
+		if (!path.empty() && path[path.size() - 1] != '/')
+			path += '/';
+		path += filename; // safename
+	}
+	else
+		path = buildPath(req.getURI(), loc);
+
+	return path;
+}
+
+bool HttpHandler::openUploadFile(const std::string& path,
+                                 HttpResponse&      erro_resp,
+                                 const Location&    loc)
+{
+	// if (!validateUploadPath())
+	// {
+	// 	erro_resp = makeStatusResponse(HTTP_FORBIDDEN, loc);
+	// 	return false;
+	// }
+	//
+
+	fd_ = open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
+	if (fd_ == -1)
+	{
+		if (errno == EEXIST)
+			erro_resp = makeStatusResponse(HTTP_CONFLICT, &loc);
+		else if (errno == EACCES || errno == EISDIR)
+			erro_resp = makeStatusResponse(HTTP_FORBIDDEN, &loc);
+		else if (errno == ENOSPC)
+			erro_resp = makeStatusResponse(HTTP_INSUFFICIENT_STORAGE, &loc);
+		else
+			erro_resp = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, &loc);
+
+		return false;
+	}
 	return true;
 }
 
 HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
                                      const Location&    loc)
 {
-	std::string        path;
-	const std::string& uri = req.getURI();
-	const BodyStream   body = req.getbodyStream();
-	const std::string& data = body.getData();
-	const std::string  filename = body.getFileName();
-	if (!filename.empty())
+	// if (req.getContentLenght() > loc.client_max_body_size)
+	// return makeError(HTTP_CONTENT_TOO_LARGE, &loc);
+
+	if (state_ == INIT_STATE)
 	{
-		path = loc.root;
-		if (path[path.size() - 1] != '/')
-			path += '/';
-		path += filename;
-	}
-	else
-		path = buildPath(uri, loc);
+		std::string  path = buildUploadPath(req, loc);
 
-	// const size_t       content_length = req.getContentLenght();
-
-	// if (content_length > loc.client_max_body_size)
-	// return makeError(HTTP_REQUEST_ENTITY_TOO_LARGE, &loc);
-
-	// std::cout << "BODY>>" << body << "<<";
-	// std::cout << "WRITEN: " << writen_bytes << '\n'
-	// << "size body: " << body.size() << '\n';
-	// std::cout << "Content Length: " << content_length << '\n';
-
-	std::cout << "WRITE TO FILE\n";
-	if (fd_ == -1)
-	{
-		fd_ =
-		    open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW, 0644);
-		if (fd_ == -1)
+		HttpResponse error_respons;
+		if (!openUploadFile(path, error_respons, loc))
 		{
-			if (errno == EACCES || errno == EISDIR)
-				return makeError(HTTP_FORBIDDEN, &loc);
-			return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
+			resetUpload();
+			return error_respons;
+		}
+
+		upload_file_path_ = path;
+		state_ = RECV_STATE;
+	}
+
+	const std::string& data = req.getbodyStream().getData();
+	if (data.empty())
+	{
+		if (!writeToFile(data))
+		{
+			resetUpload();
+			return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, &loc);
 		}
 	}
 
-	if (!writeToFile(data))
-		return makeError(HTTP_INTERNAL_SERVER_ERROR, &loc);
-
-	if (req.isComplete() || body.eof())
+	if (req.isComplete() || req.getbodyStream().eof())
 	{
-		state_ = HTTP_WRITING_STATE;
-		return makeError(HTTP_CREATED, &loc);
+		std::cout <<  "COMPET\n";
+		closeFile();
+		state_ = COMPLETED;
+		return makeStatusResponse(HTTP_CREATED, &loc);
 	}
 
 	return HttpResponse();
 }
 
-HttpResponse HttpHandler::makeError(int status, const Location* loc)
+HttpResponse HttpHandler::makeStatusResponse(int status, const Location* loc)
 {
 	HttpResponse res(status);
 	std::string  content;
@@ -219,43 +254,48 @@ HttpResponse HttpHandler::makeFileResponse(const std::string& path,
 	switch (ws::checkFile(path.c_str()))
 	{
 		case FILE_OK:        break;
-		case ERR_NOT_FOUND:  return makeError(HTTP_NOT_FOUND, loc);
-		case ERR_PERMISSION: return makeError(HTTP_FORBIDDEN, loc);
-		case ERR_IS_DIR:     return makeError(HTTP_FORBIDDEN, loc);
-		default:             return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
+		case ERR_NOT_FOUND:  return makeStatusResponse(HTTP_NOT_FOUND, loc);
+		case ERR_PERMISSION: return makeStatusResponse(HTTP_FORBIDDEN, loc);
+		case ERR_IS_DIR:     return makeStatusResponse(HTTP_FORBIDDEN, loc);
+		default:             return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, loc);
 	}
 
-	// std::string content;
-	// if (!ws::readFile(path.c_str(), content))
-	// 	return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
 	this->fd_ = open(path.c_str(), O_RDONLY);
 	if (fd_ == -1)
-		return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
+		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, loc);
 
 	HttpResponse res(HTTP_OK);
-
 	size_t       cl = ws::getFileSize(path.c_str());
 	res.setFullResponse("", ws::getFileExtension(path));
 	res.setHeader("Content-Length", ws::to_string(cl));
 	return res;
 }
 
+bool HttpHandler::hadMoreData() const
+{
+	return this->fd_ != -1;
+}
+
 std::string HttpHandler::getFileChunk()
 {
-	static const ssize_t FILE_CHUNK = 512 * 1024;
-	std::string          ret(FILE_CHUNK, '\0');
-
 	if (fd_ == -1)
 		return "";
 
-	ssize_t n = read(fd_, &ret[0], FILE_CHUNK);
-	if (n == -1)
+	std::string buffer(FILE_CHUNK_SIZE, '\0');
+	ssize_t     n = read(fd_, &buffer[0], FILE_CHUNK_SIZE);
+	if (n <= 0)
+	{
+		closeFile();
 		return "";
+	}
 
-	if (n < FILE_CHUNK)
-		ret.resize(n);
+	if (static_cast< size_t >(n) < FILE_CHUNK_SIZE)
+	{
+		buffer.resize(static_cast< size_t >(n));
+		closeFile();
+	}
 
-	return ret;
+	return buffer;
 }
 
 const Location*
@@ -304,7 +344,7 @@ HttpResponse HttpHandler::makeDirectoryPage(const std::string& path,
 {
 	DIR* dir = opendir(path.c_str());
 	if (dir == NULL)
-		return makeError(HTTP_INTERNAL_SERVER_ERROR, loc);
+		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, loc);
 
 	std::vector< std::string > files;
 	struct dirent*             entry;
@@ -339,19 +379,34 @@ bool HttpHandler::isAllowedMethod(const std::string& method,
 void HttpHandler::reset()
 {
 	loc_ = NULL;
+	closeFile();
 	error_ = 0;
-	if (fd_ != -1)
-	{
-		close(fd_);
-		fd_ = -1;
-	}
-	uploading = false;
-	writen_bytes = 0;
-	state_ = HTTP_READING_STATE;
+	state_ = INIT_STATE;
+	upload_file_path_.clear();
 }
 
 int HttpHandler::getState() const
 {
 	return state_;
+}
+
+void HttpHandler::closeFile()
+{
+	if (fd_ != -1)
+	{
+		close(fd_);
+		fd_ = -1;
+	}
+}
+
+void HttpHandler::resetUpload()
+{
+	if (fd_)
+		closeFile();
+
+	if (!upload_file_path_.empty())
+		std::remove(upload_file_path_.c_str());
+
+	state_ = INIT_STATE;
 }
 

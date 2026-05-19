@@ -232,6 +232,7 @@ const char* HttpResponse::getStatusMsg(int status) const
 		case HTTP_BAD_GATEWAY:           return "502 Bad Gateway";
 		case HTTP_SERVICE_UNAVAILABLE:   return "503 Service Unavailable";
 		case HTTP_GATEWAY_TIME_OUT:      return "504 Gateway Timeout";
+		case HTTP_INSUFFICIENT_STORAGE:  return "507 Insufficient Storage";
 		case HTTP_REQUEST_HEADER_FIELDS_TOO_LARGE:
 			return "431 Request Header Fields Too Large";
 
