@@ -36,7 +36,6 @@ class HttpResponse
 
 	std::string   getHeader(const std::string& header_name) const;
 	std::string   buildErrorPage(int err_status) const;
-
 	std::string   buildDirectoryPage(const std::vector< std::string >& files,
 	                                 const std::string&                path,
 	                                 const std::string&                uri);

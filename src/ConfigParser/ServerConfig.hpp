@@ -36,6 +36,7 @@ class ServerConfig
 
 	ServerConfig();
 	int _getPort();
+	ServerConfig(const ServerConfig& other);
 };
 
 /*

@@ -11,6 +11,9 @@
 /* ************************************************************************** */
 
 #include "../server/sockets.hpp"
+#include <cstdio>
+#include <cstring>
+#include <iostream>
 
 int main(int argc, char *argv[])
 {

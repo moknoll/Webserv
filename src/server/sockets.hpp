@@ -16,20 +16,13 @@
 #include <netinet/in.h>	// 
 #include <arpa/inet.h> 
 #include <netdb.h>
-#include <iostream> 
 #include <sys/types.h>
-#include <cstring> // memset
 #include <unistd.h> // close() 
-#include <signal.h> 
 #include <sys/wait.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 #include <netdb.h>
 #include <fcntl.h> 
-#include <vector> 
-#include <map>
 #include <poll.h>
 
 #define MYPORT 16000 // Port users will be connecting to 

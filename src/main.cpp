@@ -13,6 +13,7 @@
 #include "ConfigParser/ConfigParser.hpp"
 #include "ConfigParser/ServerConfig.hpp"
 #include "logger/Logger.hpp"
+#include "server/core.hpp"
 #include "server/server.hpp"
 #include "server/sockets.hpp"
 
@@ -137,11 +138,12 @@ int main(int argc, char* argv[])
 		}
 		// TODO: Use the parsed config to initialize and run the server
 
-		Server webserver(
-		    configs); // <--------- This needs to be config (ans not my port),
-		              // but for testing we will use the defined MYPORT
-		webserver.init();
-		webserver.run();
+		// Server webserver(
+		//     configs); // <--------- This needs to be config (ans not my
+		//     port),
+		// but for testing we will use the defined MYPORT
+		Core webserv(configs);
+		webserv.run();
 	}
 	catch (const std::exception& e)
 	{

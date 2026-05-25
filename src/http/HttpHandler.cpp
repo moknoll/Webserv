@@ -17,21 +17,19 @@
 #include "HttpResponse.hpp"
 #include "constants.hpp"
 
-#include <cctype>
 #include <cerrno>
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
-#include <ctime>
+// #include <ctime>
 #include <dirent.h>
 #include <fcntl.h>
-#include <iostream>
-#include <map>
+// #include <map>
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <vector>
+// #include <vector>
 
 HttpHandler::HttpHandler(const ServerConfig& cfg)
     : config_(cfg), loc_(NULL), error_(0), state_(INIT_STATE), fd_(-1)
@@ -117,15 +115,49 @@ bool HttpHandler::writeToFile(const std::string& data)
 	return true;
 }
 
+bool validateUploadPath(const std::string& path)
+{
+	if (path.empty())
+		return false;
+
+	if (path.find("..") != std::string::npos)
+		return false;
+
+	return true;
+}
+
+std::string HttpHandler::sanitizeFileName(const std::string& filename)
+{
+	std::string safe_name;
+
+	for (size_t i = 0; i < filename.size(); ++i)
+	{
+		char c = filename[i];
+
+		if (c == '/' || c == '\\' || c == '\0')
+			continue;
+
+		if (c == '.' && (i == 0 || filename[i - 1] == '/'))
+			continue;
+
+		safe_name += c;
+	}
+
+	if (safe_name.empty())
+		safe_name = "upload_file"; // generate file name
+
+	return safe_name;
+}
+
 std::string HttpHandler::buildUploadPath(const HttpRequest& req,
                                          const Location&    loc)
 {
-	const std::string& filename = req.getbodyStream().getFileName();
-	std::string        path;
+	const std::string filename = req.getbodyStream().getFileName();
+	std::string       path;
 
 	if (!filename.empty())
 	{
-		// std::string safe_name = sanitizeFileName(filename);
+		std::string safe_name = sanitizeFileName(filename);
 
 		path = loc.root;
 		if (!path.empty() && path[path.size() - 1] != '/')
@@ -187,7 +219,7 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 		state_ = RECV_STATE;
 	}
 
-	const std::string& data = req.getbodyStream().getData();
+	const std::string data = req.getbodyStream().getData();
 	if (data.empty())
 	{
 		if (!writeToFile(data))
@@ -199,7 +231,6 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 
 	if (req.isComplete() || req.getbodyStream().eof())
 	{
-		std::cout <<  "COMPET\n";
 		closeFile();
 		state_ = COMPLETED;
 		return makeStatusResponse(HTTP_CREATED, &loc);
@@ -271,7 +302,7 @@ HttpResponse HttpHandler::makeFileResponse(const std::string& path,
 	return res;
 }
 
-bool HttpHandler::hadMoreData() const
+bool HttpHandler::hasMoreData() const
 {
 	return this->fd_ != -1;
 }
