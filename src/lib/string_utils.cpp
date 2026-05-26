@@ -82,7 +82,7 @@ void ws::toLowerCase(std::string& s)
 	}
 }
 
-std::string ws::randString()
+std::string ws::randString(size_t len)
 {
 	std::srand(std::time(0));
 
@@ -93,7 +93,7 @@ std::string ws::randString()
 
 	std::string rand_string;
 
-	for (size_t i = 0; i < 5; ++i)
+	for (size_t i = 0; i < len; ++i)
 	{
 		size_t rand_index = std::rand() % char_set_size;
 		rand_string += char_set[rand_index];

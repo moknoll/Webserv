@@ -21,14 +21,14 @@
 #include <string>
 #include <vector>
 
-HttpResponse::HttpResponse() : status_(0), status_line_(""), body_("")
+HttpResponse::HttpResponse() : status_(0), status_line_(""), body_("") {}
+
+HttpResponse::HttpResponse(const int status) : status_(status)
 {
 	this->status_line_ = "HTTP/1.1 ";
 	this->status_line_ += getStatusMsg(status_);
 	this->status_line_ += CRLF;
 }
-
-HttpResponse::HttpResponse(const int status) : status_(status) {}
 
 HttpResponse::HttpResponse(const HttpResponse& other)
     : status_(other.status_), status_line_(other.status_line_),
@@ -44,6 +44,11 @@ void HttpResponse::reset()
 	status_line_.clear();
 	headers_.clear();
 	body_.clear();
+}
+
+bool HttpResponse::isReady() const
+{
+	return status_ != 0;
 }
 
 HttpResponse& HttpResponse::operator=(const HttpResponse& other)
@@ -68,7 +73,7 @@ HttpResponse& HttpResponse::operator=(const HttpResponse& other)
  * <html><body>Some text</body></html>
  */
 
-std::string HttpResponse::buildResponse() const
+std::string HttpResponse::toString() const
 {
 	if (status_ == 0)
 		return "";

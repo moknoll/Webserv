@@ -1,6 +1,10 @@
 #pragma once
+
 #include "../ConfigParser/ServerConfig.hpp"
 #include <string>
+
+#define SOCKET_ERROR -1
+#define BACKLOG      10 // How may pending connections queue will hold
 
 class Socket
 {

@@ -13,8 +13,8 @@
 #pragma once
 
 // #include "../ConfigParser/ServerConfig.hpp"
-#include "client.hpp"
-#include "server.hpp"
+#include "Client.hpp"
+#include "Server.hpp"
 #include <map>
 #include <vector>
 

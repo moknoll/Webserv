@@ -2,7 +2,7 @@
 
 #include "../ConfigParser/ServerConfig.hpp"
 
-#include "socket.hpp"
+#include "Socket.hpp"
 #include <poll.h>
 
 class Server

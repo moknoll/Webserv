@@ -22,17 +22,19 @@
 #include <cstdio>
 #include <cstring>
 // #include <ctime>
+#include <ctime>
 #include <dirent.h>
 #include <fcntl.h>
 // #include <map>
 #include <string>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 // #include <vector>
 
 HttpHandler::HttpHandler(const ServerConfig& cfg)
-    : config_(cfg), loc_(NULL), error_(0), state_(INIT_STATE), fd_(-1)
+    : config_(cfg), loc_(NULL), error_(0), state_(HTTP_INIT), fd_(-1)
 {
 }
 
@@ -46,6 +48,8 @@ HttpHandler::HttpHandler(const HttpHandler& other)
 HttpHandler::~HttpHandler()
 {
 	closeFile();
+	if (state_ != HTTP_COMPLETE && !upload_file_path_.empty())
+		std::remove(upload_file_path_.c_str());
 }
 
 HttpResponse HttpHandler::handle(const HttpRequest& req)
@@ -109,13 +113,13 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
 
 bool HttpHandler::writeToFile(const std::string& data)
 {
-	int n = write(fd_, data.c_str(), data.size());
+	ssize_t n = write(fd_, data.data(), data.size());
 	if (n == -1)
 		return false;
 	return true;
 }
 
-bool validateUploadPath(const std::string& path)
+bool HttpHandler::validateUploadPath(const std::string& path)
 {
 	if (path.empty())
 		return false;
@@ -144,7 +148,7 @@ std::string HttpHandler::sanitizeFileName(const std::string& filename)
 	}
 
 	if (safe_name.empty())
-		safe_name = "upload_file"; // generate file name
+		safe_name = "upload_" + ws::randString(5); // generate file name
 
 	return safe_name;
 }
@@ -162,7 +166,7 @@ std::string HttpHandler::buildUploadPath(const HttpRequest& req,
 		path = loc.root;
 		if (!path.empty() && path[path.size() - 1] != '/')
 			path += '/';
-		path += filename; // safename
+		path += safe_name;
 	}
 	else
 		path = buildPath(req.getURI(), loc);
@@ -174,12 +178,11 @@ bool HttpHandler::openUploadFile(const std::string& path,
                                  HttpResponse&      erro_resp,
                                  const Location&    loc)
 {
-	// if (!validateUploadPath())
-	// {
-	// 	erro_resp = makeStatusResponse(HTTP_FORBIDDEN, loc);
-	// 	return false;
-	// }
-	//
+	if (!validateUploadPath(path))
+	{
+		erro_resp = makeStatusResponse(HTTP_FORBIDDEN, &loc);
+		return false;
+	}
 
 	fd_ = open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
 	if (fd_ == -1)
@@ -195,6 +198,7 @@ bool HttpHandler::openUploadFile(const std::string& path,
 
 		return false;
 	}
+
 	return true;
 }
 
@@ -204,7 +208,9 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 	// if (req.getContentLenght() > loc.client_max_body_size)
 	// return makeError(HTTP_CONTENT_TOO_LARGE, &loc);
 
-	if (state_ == INIT_STATE)
+	const std::string data = req.getbodyStream().getData();
+
+	if (state_ == HTTP_INIT && !data.empty())
 	{
 		std::string  path = buildUploadPath(req, loc);
 
@@ -216,11 +222,10 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 		}
 
 		upload_file_path_ = path;
-		state_ = RECV_STATE;
+		state_ = HTTP_RECV;
 	}
 
-	const std::string data = req.getbodyStream().getData();
-	if (data.empty())
+	if (!data.empty())
 	{
 		if (!writeToFile(data))
 		{
@@ -232,7 +237,7 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 	if (req.isComplete() || req.getbodyStream().eof())
 	{
 		closeFile();
-		state_ = COMPLETED;
+		state_ = HTTP_COMPLETE;
 		return makeStatusResponse(HTTP_CREATED, &loc);
 	}
 
@@ -412,7 +417,7 @@ void HttpHandler::reset()
 	loc_ = NULL;
 	closeFile();
 	error_ = 0;
-	state_ = INIT_STATE;
+	state_ = HTTP_INIT;
 	upload_file_path_.clear();
 }
 
@@ -432,12 +437,11 @@ void HttpHandler::closeFile()
 
 void HttpHandler::resetUpload()
 {
-	if (fd_)
-		closeFile();
+	closeFile();
 
 	if (!upload_file_path_.empty())
 		std::remove(upload_file_path_.c_str());
 
-	state_ = INIT_STATE;
+	state_ = HTTP_CLOSE;
 }
 

@@ -8,10 +8,10 @@ MKDIR		:= mkdir -p
 OBJDIR		:= .build
 
 SRC			:= src/main.cpp \
-			   src/server/server.cpp \
-			   src/server/core.cpp \
-			   src/server/socket.cpp \
-			   src/server/client.cpp \
+			   src/server/Server.cpp \
+			   src/server/Core.cpp \
+			   src/server/Socket.cpp \
+			   src/server/Client.cpp \
 			   src/ConfigParser/ConfigParser.cpp \
 			   src/ConfigParser/ServerConfig.cpp \
 			   src/http/HttpRequest.cpp \
@@ -21,10 +21,10 @@ SRC			:= src/main.cpp \
 			   src/logger/Logger.cpp \
 
 OBJ			:= $(OBJDIR)/main.o \
-			   $(OBJDIR)/server/server.o \
-			   $(OBJDIR)/server/core.o \
-			   $(OBJDIR)/server/socket.o \
-			   $(OBJDIR)/server/client.o \
+			   $(OBJDIR)/server/Server.o \
+			   $(OBJDIR)/server/Core.o \
+			   $(OBJDIR)/server/Socket.o \
+			   $(OBJDIR)/server/Client.o \
 			   $(OBJDIR)/ConfigParser/ConfigParser.o \
 			   $(OBJDIR)/ConfigParser/ServerConfig.o \
 			   $(OBJDIR)/http/HttpRequest.o \
@@ -39,14 +39,15 @@ LIB			:= $(LIB_DIR)$(LIB_NAME)
 
 
 #################################################
-CLIENT 		:= client.exe
-CLIENT_DIR	:=	src/client/
+# CLIENT 		:= client.exe
+# CLIENT_DIR	:=	src/client/
 
 ################################################
 
 # OBJ			:= $(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SRC))
 
-all: $(NAME) $(CLIENT)
+# all: $(NAME) $(CLIENT)
+all: $(NAME)
 
 $(NAME): $(OBJ) $(LIB)
 	$(CXX) $(CXXFLAGS) $(OBJ) $(LIB) -o $(NAME)
@@ -67,8 +68,8 @@ $(LIB):
 	# @make -C $(LIB_DIR) --no-print-directory
 	@make -C $(LIB_DIR)
 
-$(CLIENT):
-	@make -C $(CLIENT_DIR)
+# $(CLIENT):
+	# @make -C $(CLIENT_DIR)
 
 clean:
 	$(RM) $(OBJ)
@@ -78,7 +79,7 @@ clean:
 fclean: clean
 	$(RM) $(NAME)
 	@make fclean -C $(LIB_DIR) --no-print-directory
-	@make fclean -C $(CLIENT_DIR) --no-print-directory
+	# @make fclean -C $(CLIENT_DIR) --no-print-directory
 
 re: fclean all
 

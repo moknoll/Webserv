@@ -10,15 +10,18 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "core.hpp"
+#include "Core.hpp"
 // #include "../ConfigParser/ServerConfig.hpp"
 #include "../logger/Logger.hpp"
-#include "client.hpp"
-#include "server.hpp"
-#include "sockets.hpp"
+#include "Client.hpp"
+#include "Server.hpp"
+// #include "Sockets.hpp"
+
 #include <cstddef>
+#include <fcntl.h>
 #include <iostream>
 #include <map>
+#include <netdb.h>
 #include <sys/types.h>
 #include <vector>
 
@@ -192,22 +195,20 @@ void Core::_handleClientMessage(int clientSocketFd)
 		return;
 
 	char    buffer[RECV_BUFFER];
-	ssize_t bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
+	ssize_t recv_bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
 
-	if (bytes <= 0)
+	if (recv_bytes <= 0)
 	{
 		_cleanupClient(clientSocketFd);
 	}
 	else
 	{
-		client->appendBuffer(buffer);
+		client->appendRecvBuffer(buffer, recv_bytes);
 		client->processRequest();
 
 		if (client->isComplete())
 		{
-			// std::string response = "Hello from Server";
-			// _clients.at(clientSocketFd).setResponseBuffer(response);
-			setEvent(clientSocketFd, POLLIN | POLLOUT);
+			setEvent(clientSocketFd, POLLOUT);
 		}
 	}
 }
@@ -234,24 +235,32 @@ void Core::_sendResponseToClient(int clientSocketFd)
 		return;
 
 	std::string buffer = client->serialize();
+
 	if (buffer.empty())
 	{
 		client->reset();
 		std::cout << "Response sent" << std::endl;
-		setEvent(clientSocketFd, POLLIN);
+		if (client->isKeepElive())
+		{
+			setEvent(clientSocketFd, POLLIN);
+		}
+		else
+		{
+			_cleanupClient(clientSocketFd);
+		}
 		return;
 	}
 
-	ssize_t bytesSent = send(clientSocketFd, buffer.c_str(), buffer.size(), 0);
-	if (bytesSent == -1)
+	ssize_t sent_bytes = send(clientSocketFd, buffer.c_str(), buffer.size(), 0);
+	if (sent_bytes == -1)
 	{
 		_cleanupClient(clientSocketFd);
 		return;
 	}
 
-	size_t sent = static_cast< size_t >(bytesSent);
+	size_t sent = static_cast< size_t >(sent_bytes);
 	buffer.erase(0, sent);
-	client->setResponseBuffer(buffer);
+	client->setSendBuffer(buffer);
 }
 
 /**

@@ -10,12 +10,10 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "ConfigParser/ConfigParser.hpp"
+// #include "ConfigParser/ConfigParser.hpp"
 #include "ConfigParser/ServerConfig.hpp"
 #include "logger/Logger.hpp"
-#include "server/core.hpp"
-#include "server/server.hpp"
-#include "server/sockets.hpp"
+#include "server/Core.hpp"
 
 #include <cstdio>
 #include <ctime>
@@ -105,8 +103,8 @@ ServerConfig getConfig(const std::string& host, int port)
 
 std::vector< ServerConfig > setupConfigDefaultToTest()
 {
-	ServerConfig                s1 = getConfig("0.0.0.0", MYPORT);
-	ServerConfig                s2 = getConfig("127.0.0.1", MYPORT + 1);
+	ServerConfig                s1 = getConfig("0.0.0.0", 8080);
+	ServerConfig                s2 = getConfig("127.0.0.1", 8081);
 	std::vector< ServerConfig > configs;
 
 	configs.push_back(s1);

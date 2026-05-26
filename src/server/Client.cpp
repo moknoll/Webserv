@@ -1,7 +1,11 @@
-#include "client.hpp"
+#include "Client.hpp"
+#include <cstddef>
 #include <unistd.h>
 
-Client::Client(int fd, const ServerConfig& config) : fd_(fd), handler(config) {}
+Client::Client(int fd, const ServerConfig& config)
+    : fd_(fd), request_complete_(false), keep_elive_(true), handler(config)
+{
+}
 
 Client::~Client()
 {
@@ -15,7 +19,13 @@ void Client::processRequest()
 	if (request.isComplete() || request.isAlmostDone())
 	{
 		response = handler.handle(request);
-		send_buffer_ = response.buildResponse();
+		if (response.isReady())
+		{
+			request_complete_ = true;
+			if (handler.getState() == HttpHandler::HTTP_CLOSE)
+				keep_elive_ = false;
+			send_buffer_ = response.toString();
+		}
 	}
 }
 
@@ -27,15 +37,9 @@ std::string Client::serialize()
 	return send_buffer_;
 }
 
-void Client::appendBuffer(const std::string& buffer)
+void Client::appendRecvBuffer(const char* buffer, size_t size)
 {
-	recv_buffer_ += buffer;
-}
-
-void Client::clearBuffers()
-{
-	recv_buffer_.clear();
-	send_buffer_.clear();
+	recv_buffer_.append(buffer, size);
 }
 
 void Client::reset()
@@ -45,21 +49,27 @@ void Client::reset()
 	response.reset();
 	recv_buffer_.clear();
 	send_buffer_.clear();
+	request_complete_ = false;
 }
 
-void Client::setRequestBuffer(const std::string& buffer)
+void Client::setRecvBuffer(const std::string& buffer)
 {
 	this->recv_buffer_ = buffer;
 }
 
-void Client::setResponseBuffer(const std::string& buffer)
+void Client::setSendBuffer(const std::string& buffer)
 {
 	this->send_buffer_ = buffer;
 }
 
 bool Client::isComplete() const
 {
-	return request.isComplete() || request.getbodyStream().eof();
+	return request_complete_;
+}
+
+bool Client::isKeepElive() const
+{
+	return keep_elive_;
 }
 
 std::string Client::getResponseBuffer() const

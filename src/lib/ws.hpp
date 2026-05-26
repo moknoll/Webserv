@@ -143,7 +143,7 @@ class ws
 	 */
 	static const std::string getFileModificationTime(const std::string& path);
 
-	static std::string       randString();
+	static std::string       randString(size_t len = 5);
 
 	/**
 	 * @brief Converts a value of any type to its string representation.

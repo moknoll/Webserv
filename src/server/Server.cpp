@@ -1,5 +1,5 @@
-#include "server.hpp"
-#include "socket.hpp"
+#include "Server.hpp"
+#include "Socket.hpp"
 #include <unistd.h>
 
 Server::Server(const ServerConfig& config) : socket_(config), config_(config) {}

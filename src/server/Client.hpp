@@ -15,6 +15,7 @@
 #include "../http/HttpHandler.hpp"
 #include "../http/HttpRequest.hpp"
 #include "../http/HttpResponse.hpp"
+#include <cstddef>
 #include <string>
 
 class Client
@@ -24,6 +25,7 @@ class Client
 	std::string  recv_buffer_;
 	std::string  send_buffer_;
 	bool         request_complete_;
+	bool         keep_elive_;
 
 	HttpRequest  request;
 	HttpResponse response;
@@ -35,22 +37,20 @@ class Client
 
   public:
 	Client(int fd, const ServerConfig& config);
-
 	~Client();
 
-	void        clearBuffers(); // ???????
 	void        reset();
-	void        requestComplete();
 
 	void        processRequest(); // buildResponse()
 	std::string serialize();
-	void        appendBuffer(const std::string& buffer);
+	void        appendRecvBuffer(const char* buffer, size_t size);
 
 	std::string getResponseBuffer() const; // ??????????
 	std::string getRequestBuffer() const;  // ???????????
 	bool        isComplete() const;
+	bool        isKeepElive() const;
 	int         getClientFd() const;
 
-	void        setResponseBuffer(const std::string& response); // ???????
-	void        setRequestBuffer(const std::string& request);   // ??????????
+	void        setSendBuffer(const std::string& response); // ???????
+	void        setRecvBuffer(const std::string& request);   // ??????????
 };

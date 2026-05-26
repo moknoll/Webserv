@@ -1,19 +1,26 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   BodyStream.cpp                                     :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/26 19:25:33 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/26 19:25:35 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "BodyStream.hpp"
 #include "../lib/ws.hpp"
 #include "constants.hpp"
 #include <iostream>
 #include <string>
 
-BodyStream::BodyStream() : state_(sw_start) {}
-
-// private:
-// std::string boundary;
-// std::string delimeter_;
-// std::string end_delimeter_;
-// std::string name;
-// std::string filename;
-// State       state_;
-// std::string data;
+BodyStream::BodyStream()
+    : boundary_(""), delimeter_(""), end_delimeter_(""), buf_(""), name_(""),
+      filename_(""), state_(sb_start), data_("")
+{
+}
 
 // BodyStream::BodyStream(const BodyStream& other) {}
 
@@ -38,7 +45,6 @@ void BodyStream::printBodyStream() const
 	std::cout << "B0:" << boundary_ << '\n';
 }
 
-void setBoundary(const std::string& boundary);
 
 bool BodyStream::parseHeaders_(const std::string& headers)
 {
@@ -69,49 +75,48 @@ void BodyStream::parseMultiPart(std::string& raw_data)
 	{
 		switch (state_)
 		{
-			case sw_start:
+			case sb_start:
 			{
-				std::cout << "IN PARS BODY\n";
 				std::string::size_type p = raw_data.find(delimeter_);
 				if (p == std::string::npos)
 					return;
-				state_ = sw_header;
+				state_ = sb_header;
 				raw_data.erase(0, p + delimeter_.size());
 				break;
 			}
-			case sw_header:
+			case sb_header:
 			{
 				std::string::size_type p = raw_data.find(CRLF CRLF);
 				if (p == std::string::npos)
 				{
 					if (raw_data.size() > 8192)
-						state_ = sw_end; // error BadRequest
+						state_ = sb_end; // error BadRequest
 
 					return;
 				}
 				if (!parseHeaders_(raw_data.substr(0, p)))
 				{
-					state_ = sw_end; // error BadRequest
+					state_ = sb_end; // error BadRequest
 					return;
 				}
 				raw_data.erase(0, p + 4);
-				state_ = sw_data;
+				state_ = sb_data;
 				break;
 			}
-			case sw_data:
+			case sb_data:
 			{
 				std::string::size_type p = raw_data.find(end_delimeter_);
 				if (p != std::string::npos)
 				{
 					data_ = raw_data.substr(0, p - 2);
-					state_ = sw_end;
+					state_ = sb_end;
 					return;
 				}
 				data_ = raw_data;
 				raw_data.clear();
 				return;
 			}
-			case sw_end: return;
+			case sb_end: return;
 		}
 	}
 }
@@ -150,9 +155,7 @@ void BodyStream::setBoundary(const std::string& boundary)
 
 bool BodyStream::eof() const
 {
-	if (state_ == sw_end)
-		return true;
-	return false;
+	return state_ == sb_end;
 }
 
 const std::string& BodyStream::getData() const
@@ -168,7 +171,7 @@ void BodyStream::reset()
 	buf_.clear();
 	name_.clear();
 	filename_.clear();
-	state_ = sw_start;
+	state_ = sb_start;
 	data_.clear();
 }
 

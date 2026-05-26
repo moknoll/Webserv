@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   BodyStream.hpp                                     :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/26 19:25:18 by nmagomad          #+#    #+#             */
+/*   Updated: 2026/05/26 19:25:21 by nmagomad         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #pragma once
 
 #include <cstddef>
@@ -8,10 +20,10 @@ class BodyStream
   public:
 	enum State
 	{
-		sw_start = 0,
-		sw_header,
-		sw_data,
-		sw_end
+		sb_start = 0,
+		sb_header,
+		sb_data,
+		sb_end
 	};
 
 	BodyStream();

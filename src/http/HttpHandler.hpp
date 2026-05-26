@@ -24,10 +24,11 @@ class HttpHandler
   public:
 	enum STATE
 	{
-		INIT_STATE = 0,
-		RECV_STATE,
+		HTTP_INIT = 0,
+		HTTP_RECV,
 		SEND_STATE,
-		COMPLETED
+		HTTP_COMPLETE,
+		HTTP_CLOSE
 	};
 
 	HttpHandler(const ServerConfig& cfg);

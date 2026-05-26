@@ -26,7 +26,7 @@ class HttpResponse
 
 	HttpResponse& operator=(const HttpResponse& other);
 
-	std::string   buildResponse() const;
+	std::string   toString() const;
 
 	void          setStatus(int status);
 	void          setHeader(const std::string& name, const std::string& v);
@@ -40,6 +40,7 @@ class HttpResponse
 	                                 const std::string&                path,
 	                                 const std::string&                uri);
 	void          reset();
+	bool          isReady() const;
 
   private:
 	int                                  status_;

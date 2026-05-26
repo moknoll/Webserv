@@ -16,13 +16,12 @@
 #include "constants.hpp"
 #include <cstddef>
 #include <cstring>
-#include <iostream>
 #include <map>
 #include <string>
 
 HttpRequest::HttpRequest()
     : err_status_(HTTP_OK), content_length_(0), chunked(false),
-      multipart(false), recv_bytes(0), state_(sw_start)
+      multipart(false), recv_bytes(0), state_(sw_start), body_data()
 {
 }
 
@@ -262,16 +261,12 @@ std::string HttpRequest::getHeader(const std::string& name) const
 
 bool HttpRequest::isAlmostDone() const
 {
-	if (state_ == sw_almost_done)
-		return true;
-	return false;
+	return state_ == sw_almost_done;
 }
 
 bool HttpRequest::isComplete() const
 {
-	if (state_ == sw_done)
-		return true;
-	return false;
+	return state_ == sw_done;
 }
 
 void HttpRequest::setStatus(int status)

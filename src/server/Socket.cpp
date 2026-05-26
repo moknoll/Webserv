@@ -1,7 +1,8 @@
-#include "socket.hpp"
-#include "sockets.hpp"
+#include "Socket.hpp"
 #include <cstring>
+#include <fcntl.h>
 #include <iostream>
+#include <netdb.h>
 #include <sstream>
 #include <string>
 #include <unistd.h>
