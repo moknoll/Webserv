@@ -38,13 +38,13 @@ int checkArguments(int argc, char* argv[])
 	return 1;
 }
 
-ServerConfig getConfig(const std::string& host, int port)
+ServerConfig getConfig(const std::string& host, int port, const std::string& s_name)
 {
 	// listen 0.0.0.0:8080
 	ServerConfig server;
 	server.host = host;
 	server.port = port;
-	// server.server_name = "example.com";
+	server.server_name = s_name;
 
 	// Error pages
 	server.error_pages[404] = "./www/404.html";
@@ -81,7 +81,7 @@ ServerConfig getConfig(const std::string& host, int port)
 	redirect_loc.index = "";
 	redirect_loc.allowed_methods.push_back("GET");       // = {"GET"};
 	redirect_loc.client_max_body_size = 0;
-	redirect_loc.redirect = std::make_pair(301, "/new"); // 301 -> /new
+	redirect_loc.redirect = std::make_pair(301, "google.com"); // 301 -> /new
 
 	// Location: /autoindex
 	Location autoindex_loc;
@@ -103,8 +103,8 @@ ServerConfig getConfig(const std::string& host, int port)
 
 std::vector< ServerConfig > setupConfigDefaultToTest()
 {
-	ServerConfig                s1 = getConfig("0.0.0.0", 8080);
-	ServerConfig                s2 = getConfig("127.0.0.1", 8081);
+	ServerConfig                s1 = getConfig("0.0.0.0", 8081, "example.com");
+	ServerConfig                s2 = getConfig("0.0.0.0", 8082, "example2.com");
 	std::vector< ServerConfig > configs;
 
 	configs.push_back(s1);

@@ -32,10 +32,8 @@ class HttpHandler
 	};
 
 	HttpHandler(const ServerConfig& cfg);
-	~HttpHandler();
-
 	HttpHandler(const HttpHandler& other);
-	HttpHandler& operator=(const HttpHandler& other);
+	~HttpHandler();
 
 	HttpResponse handle(const HttpRequest& req);
 	int          getState() const;
@@ -44,26 +42,25 @@ class HttpHandler
 	void         reset();
 
   private:
-	static const size_t FILE_CHUNK_SIZE = 512 * 1024;
+	HttpHandler&               operator=(const HttpHandler& other);
 
-	const ServerConfig& config_;
-	Location*           loc_;
-	int                 error_;
-	STATE               state_;
-	std::string         upload_file_path_;
-	int                 fd_;
+	static const size_t        FILE_CHUNK_SIZE;
 
-	HttpResponse        handleGET(const HttpRequest& req, const Location& loc);
-	HttpResponse        handlePOST(const HttpRequest& req, const Location& loc);
-	HttpResponse        makeStatusResponse(int status, const Location* loc);
-	HttpResponse makeFileResponse(const std::string& path, const Location* loc);
+	const ServerConfig&        config_;
+	const Location*            loc_;
+	int                        error_;
+	STATE                      state_;
+	std::string                upload_file_path_;
+	int                        fd_;
+
+	HttpResponse               handleGET(const HttpRequest& req);
+	HttpResponse               handlePOST(const HttpRequest& req);
+	HttpResponse               makeStatusResponse(int status);
+	HttpResponse               makeFileResponse(const std::string& path);
 
 	std::vector< std::string > getListOfFiles(const std::string& path);
-	// WIP
 	HttpResponse               makeDirectoryPage(const std::string& path,
-	                                             const std::string& uri,
-	                                             const Location*    loc);
-
+	                                             const std::string& uri);
 	// WIP
 	HttpResponse
 	redirect(int status, const std::string& location, const std::string& host);
@@ -73,16 +70,13 @@ class HttpHandler
 	                         const std::vector< Location >& locations) const;
 
 	// WIP
-	std::string buildPath(const std::string& uri, const Location& loc);
-	bool isAllowedMethod(const std::string& method, const Location& loc) const;
+	std::string buildPath(const std::string& uri) const;
+	bool        isAllowedMethod(const std::string& method) const;
 
-	std::string buildUploadPath(const HttpRequest& req, const Location& loc);
+	std::string buildUploadPath(const HttpRequest& req);
 	std::string sanitizeFileName(const std::string& filename);
 	bool        validateUploadPath(const std::string& path);
-	bool        openUploadFile(const std::string& path,
-	                           HttpResponse&      erro_resp,
-	                           const Location&    loc);
-
+	bool        openUploadFile(const std::string& path, HttpResponse& err_resp);
 	bool        writeToFile(const std::string& data);
 	void        resetUpload();
 	void        closeFile();

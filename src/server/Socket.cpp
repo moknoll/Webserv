@@ -1,4 +1,5 @@
 #include "Socket.hpp"
+#include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
@@ -87,7 +88,7 @@ std::string Socket::getHost() const
 
 int Socket::getPort() const
 {
-	return atoi((this->port_).c_str());
+	return std::atoi((this->port_).c_str());
 }
 
 int Socket::getFd() const

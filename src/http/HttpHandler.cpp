@@ -21,17 +21,18 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
-// #include <ctime>
 #include <ctime>
 #include <dirent.h>
 #include <fcntl.h>
-// #include <map>
+#include <iostream>
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 // #include <vector>
+
+const size_t HttpHandler::FILE_CHUNK_SIZE = 512 * 1024;
 
 HttpHandler::HttpHandler(const ServerConfig& cfg)
     : config_(cfg), loc_(NULL), error_(0), state_(HTTP_INIT), fd_(-1)
@@ -57,39 +58,43 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
 	const std::string& method = req.getMethod();
-	const Location*    loc = findMatchUri(uri, config_.locations);
+
+	this->loc_ = findMatchUri(uri, config_.locations);
 
 	if (req.getRequestStatus() != HTTP_OK)
-		return makeStatusResponse(req.getRequestStatus(), loc);
+		return makeStatusResponse(req.getRequestStatus());
 
-	if (loc == NULL)
-		return makeStatusResponse(HTTP_NOT_FOUND, loc);
+	if (this->loc_ == NULL)
+		return makeStatusResponse(HTTP_NOT_FOUND);
 
 	// if redirect -> redirect(status, location)
-	if (loc->redirect.first != -1)
-		return redirect(loc->redirect.first, loc->redirect.second, host);
+	if (this->loc_->redirect.first != -1)
+		return redirect(loc_->redirect.first, loc_->redirect.second, host);
 
-	if (!isAllowedMethod(method, *loc))
-		return makeStatusResponse(HTTP_NOT_ALLOWED, loc);
+	if (!isAllowedMethod(method))
+		return makeStatusResponse(HTTP_NOT_ALLOWED);
 
 	// if (!loc->cgi_extension.empty())
 	// 		handleCGI();
 
 	if (method == "GET")
-		return handleGET(req, *loc);
+		return handleGET(req);
 	else if (method == "POST")
-		return handlePOST(req, *loc);
+		return handlePOST(req);
 	// else if (method == "DELETE")
 	// return handleDELETE(req, loc);
 
-	return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, loc);
+	return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 }
 
-HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
+HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 {
+	if (this->loc_ == NULL)
+		return HttpResponse(HTTP_INTERNAL_SERVER_ERROR);
+
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
-	std::string        path = buildPath(uri, loc);
+	std::string        path = buildPath(uri);
 
 	if (ws::isDirectory(path))
 	{
@@ -97,18 +102,18 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req, const Location& loc)
 			return redirect(HTTP_MOVED_PERMANENTLY, uri + "/", host);
 
 		std::string index_file =
-		    loc.index.empty() ? path + "index.html" : path + loc.index;
+		    loc_->index.empty() ? path + "index.html" : path + loc_->index;
 
 		if (ws::checkFile(index_file.c_str()) == FILE_OK)
-			return makeFileResponse(index_file, &loc);
+			return makeFileResponse(index_file);
 
-		if (loc.autoindex)
-			return makeDirectoryPage(path, uri, &loc);
+		if (loc_->autoindex)
+			return makeDirectoryPage(path, uri);
 
-		return makeStatusResponse(HTTP_FORBIDDEN, &loc);
+		return makeStatusResponse(HTTP_FORBIDDEN);
 	}
 
-	return makeFileResponse(path, &loc);
+	return makeFileResponse(path);
 }
 
 bool HttpHandler::writeToFile(const std::string& data)
@@ -153,8 +158,7 @@ std::string HttpHandler::sanitizeFileName(const std::string& filename)
 	return safe_name;
 }
 
-std::string HttpHandler::buildUploadPath(const HttpRequest& req,
-                                         const Location&    loc)
+std::string HttpHandler::buildUploadPath(const HttpRequest& req)
 {
 	const std::string filename = req.getbodyStream().getFileName();
 	std::string       path;
@@ -163,24 +167,23 @@ std::string HttpHandler::buildUploadPath(const HttpRequest& req,
 	{
 		std::string safe_name = sanitizeFileName(filename);
 
-		path = loc.root;
+		path = loc_->root;
 		if (!path.empty() && path[path.size() - 1] != '/')
 			path += '/';
 		path += safe_name;
 	}
 	else
-		path = buildPath(req.getURI(), loc);
+		path = buildPath(req.getURI());
 
 	return path;
 }
 
 bool HttpHandler::openUploadFile(const std::string& path,
-                                 HttpResponse&      erro_resp,
-                                 const Location&    loc)
+                                 HttpResponse&      err_resp)
 {
 	if (!validateUploadPath(path))
 	{
-		erro_resp = makeStatusResponse(HTTP_FORBIDDEN, &loc);
+		err_resp = makeStatusResponse(HTTP_FORBIDDEN);
 		return false;
 	}
 
@@ -188,13 +191,13 @@ bool HttpHandler::openUploadFile(const std::string& path,
 	if (fd_ == -1)
 	{
 		if (errno == EEXIST)
-			erro_resp = makeStatusResponse(HTTP_CONFLICT, &loc);
+			err_resp = makeStatusResponse(HTTP_CONFLICT);
 		else if (errno == EACCES || errno == EISDIR)
-			erro_resp = makeStatusResponse(HTTP_FORBIDDEN, &loc);
+			err_resp = makeStatusResponse(HTTP_FORBIDDEN);
 		else if (errno == ENOSPC)
-			erro_resp = makeStatusResponse(HTTP_INSUFFICIENT_STORAGE, &loc);
+			err_resp = makeStatusResponse(HTTP_INSUFFICIENT_STORAGE);
 		else
-			erro_resp = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, &loc);
+			err_resp = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 
 		return false;
 	}
@@ -202,20 +205,19 @@ bool HttpHandler::openUploadFile(const std::string& path,
 	return true;
 }
 
-HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
-                                     const Location&    loc)
+HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 {
-	// if (req.getContentLenght() > loc.client_max_body_size)
-	// return makeError(HTTP_CONTENT_TOO_LARGE, &loc);
+	// if (req.getContentLenght() > loc_->client_max_body_size)
+	// return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
 
 	const std::string data = req.getbodyStream().getData();
 
 	if (state_ == HTTP_INIT && !data.empty())
 	{
-		std::string  path = buildUploadPath(req, loc);
+		std::string  path = buildUploadPath(req);
 
 		HttpResponse error_respons;
-		if (!openUploadFile(path, error_respons, loc))
+		if (!openUploadFile(path, error_respons))
 		{
 			resetUpload();
 			return error_respons;
@@ -230,7 +232,7 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 		if (!writeToFile(data))
 		{
 			resetUpload();
-			return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, &loc);
+			return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 		}
 	}
 
@@ -238,22 +240,22 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
 	{
 		closeFile();
 		state_ = HTTP_COMPLETE;
-		return makeStatusResponse(HTTP_CREATED, &loc);
+		return makeStatusResponse(HTTP_CREATED);
 	}
 
 	return HttpResponse();
 }
 
-HttpResponse HttpHandler::makeStatusResponse(int status, const Location* loc)
+HttpResponse HttpHandler::makeStatusResponse(int status)
 {
 	HttpResponse res(status);
 	std::string  content;
 
-	if (loc != NULL)
+	if (loc_ != NULL)
 	{
 		std::map< int, std::string >::const_iterator it =
-		    loc->error_pages.find(status);
-		if (it != loc->error_pages.end())
+		    loc_->error_pages.find(status);
+		if (it != loc_->error_pages.end())
 		{
 			if (ws::readFile(it->second.c_str(), content))
 			{
@@ -284,21 +286,20 @@ HttpResponse HttpHandler::redirect(int                status,
 	return res;
 }
 
-HttpResponse HttpHandler::makeFileResponse(const std::string& path,
-                                           const Location*    loc)
+HttpResponse HttpHandler::makeFileResponse(const std::string& path)
 {
 	switch (ws::checkFile(path.c_str()))
 	{
 		case FILE_OK:        break;
-		case ERR_NOT_FOUND:  return makeStatusResponse(HTTP_NOT_FOUND, loc);
-		case ERR_PERMISSION: return makeStatusResponse(HTTP_FORBIDDEN, loc);
-		case ERR_IS_DIR:     return makeStatusResponse(HTTP_FORBIDDEN, loc);
-		default:             return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, loc);
+		case ERR_NOT_FOUND:  return makeStatusResponse(HTTP_NOT_FOUND);
+		case ERR_PERMISSION: return makeStatusResponse(HTTP_FORBIDDEN);
+		case ERR_IS_DIR:     return makeStatusResponse(HTTP_FORBIDDEN);
+		default:             return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 	}
 
 	this->fd_ = open(path.c_str(), O_RDONLY);
 	if (fd_ == -1)
-		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, loc);
+		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 
 	HttpResponse res(HTTP_OK);
 	size_t       cl = ws::getFileSize(path.c_str());
@@ -358,10 +359,10 @@ HttpHandler::findMatchUri(const std::string&             uri,
 	return best_loc;
 }
 
-std::string HttpHandler::buildPath(const std::string& uri, const Location& loc)
+std::string HttpHandler::buildPath(const std::string& uri) const
 {
-	std::string sub_uri = uri.substr(loc.path.length());
-	std::string path = loc.root;
+	std::string sub_uri = uri.substr(loc_->path.length());
+	std::string path = loc_->root;
 
 	if (!path.empty() && path[path.length() - 1] != '/')
 		path += '/';
@@ -375,12 +376,11 @@ std::string HttpHandler::buildPath(const std::string& uri, const Location& loc)
 }
 
 HttpResponse HttpHandler::makeDirectoryPage(const std::string& path,
-                                            const std::string& uri,
-                                            const Location*    loc)
+                                            const std::string& uri)
 {
 	DIR* dir = opendir(path.c_str());
 	if (dir == NULL)
-		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR, loc);
+		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 
 	std::vector< std::string > files;
 	struct dirent*             entry;
@@ -401,12 +401,11 @@ HttpResponse HttpHandler::makeDirectoryPage(const std::string& path,
 	return res;
 }
 
-bool HttpHandler::isAllowedMethod(const std::string& method,
-                                  const Location&    loc) const
+bool HttpHandler::isAllowedMethod(const std::string& method) const
 {
-	for (size_t i = 0; i < loc.allowed_methods.size(); i++)
+	for (size_t i = 0; i < loc_->allowed_methods.size(); i++)
 	{
-		if (method == loc.allowed_methods[i])
+		if (method == loc_->allowed_methods[i])
 			return true;
 	}
 	return false;

@@ -3,7 +3,7 @@
 - [x] MakeError Pages
 - [x] Write a function that generates a page from the content of a folder (directory)
 - [ ] Redirection
-- [ ] Implement POST request handling
+- [x] Implement POST request handling
 - [ ] Implement DELETE request handling
 
 ---
