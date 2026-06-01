@@ -11,16 +11,58 @@
 /* ************************************************************************** */
 
 // #include "ConfigParser/ConfigParser.hpp"
+#include "ConfigParser/ConfigParser.hpp"
 #include "ConfigParser/ServerConfig.hpp"
 #include "logger/Logger.hpp"
 #include "server/Core.hpp"
 
+#include <cstddef>
 #include <cstdio>
 #include <ctime>
 #include <fcntl.h>
 #include <iostream>
 #include <string>
 #include <utility>
+#include <vector>
+
+void printConfig(std::vector< ServerConfig > cfg)
+{
+	for (size_t i = 0; i < cfg.size(); ++i)
+	{
+		std::cout << "SERVER CONFIG\n";
+		std::cout << "host: " << cfg[i].host << '\n';
+		std::cout << "port: " << cfg[i].port << '\n';
+		std::cout << "server_name: " << cfg[i].server_name << '\n';
+		std::cout << "root: " << cfg[i].root << '\n';
+		std::cout << "index: " << cfg[i].index << '\n';
+		std::cout << "client_max_body_size: " << cfg[i].client_max_body_size
+		          << '\n';
+		std::cout << "index: " << cfg[i].index << '\n';
+		std::cout << "index: " << cfg[i].index << '\n';
+
+		for (size_t j = 0; j < cfg[i].locations.size(); ++j)
+		{
+			std::cout << "Location\n";
+			std::cout << "path" << cfg[i].locations[j].path << '\n';
+			std::cout << "root" << cfg[i].locations[j].root << '\n';
+			std::cout << "index" << cfg[i].locations[j].index << '\n';
+			std::cout << "autoindex" << cfg[i].locations[j].autoindex << '\n';
+			std::cout << "client_max_body_size"
+			          << cfg[i].locations[j].client_max_body_size << '\n';
+			// std::cout << "allowed_methods: "
+			//           << ss[i].locations[j].allowed_methods[0] << '\n';
+			std::cout << "upload path: " << cfg[i].locations[j].upload_path
+			          << '\n';
+			std::cout << "cgi_extension" << cfg[i].locations[j].cgi_extension
+			          << '\n';
+			std::cout << "cgi_path: " << cfg[i].locations[j].cgi_path << '\n';
+			std::cout << "has redirect: " << cfg[i].locations[j].has_redirect
+			          << '\n';
+
+			std::cout << "has_cgi: " << cfg[i].locations[j].has_cgi << '\n';
+		}
+	}
+}
 
 int checkArguments(int argc, char* argv[])
 {
@@ -38,7 +80,8 @@ int checkArguments(int argc, char* argv[])
 	return 1;
 }
 
-ServerConfig getConfig(const std::string& host, int port, const std::string& s_name)
+ServerConfig
+getConfig(const std::string& host, int port, const std::string& s_name)
 {
 	// listen 0.0.0.0:8080
 	ServerConfig server;
@@ -72,6 +115,7 @@ ServerConfig getConfig(const std::string& host, int port, const std::string& s_n
 	upload_loc.allowed_methods.push_back("GET");        // = {"GET"};
 	upload_loc.allowed_methods.push_back("POST");       // = {"POST"};
 	upload_loc.client_max_body_size = 10 * 1024 * 1024; // 10MB
+	upload_loc.upload_path = "./www/uploads";
 	upload_loc.redirect = std::make_pair(-1, "");
 
 	// Location: /old (redirect)
@@ -79,8 +123,9 @@ ServerConfig getConfig(const std::string& host, int port, const std::string& s_n
 	redirect_loc.path = "/old";
 	redirect_loc.root = "";
 	redirect_loc.index = "";
-	redirect_loc.allowed_methods.push_back("GET");       // = {"GET"};
+	redirect_loc.allowed_methods.push_back("GET");             // = {"GET"};
 	redirect_loc.client_max_body_size = 0;
+	redirect_loc.has_redirect = true;
 	redirect_loc.redirect = std::make_pair(301, "google.com"); // 301 -> /new
 
 	// Location: /autoindex

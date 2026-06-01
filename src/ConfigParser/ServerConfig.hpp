@@ -1,63 +1,38 @@
 #pragma once
 
-#include <map>
 #include <string>
-#include <utility>
 #include <vector>
+#include <map>
 
 struct Location
 {
-	std::string                   path;                 // "/"  "/upload"
-	std::string                   root;                 // "./www" or /tmp/www
-	std::string                   index;                // "index.html"
-	bool                          autoindex;            // default false
-	size_t                        client_max_body_size; // default 1M
-	std::string                   upload_path;          // "./uploads"
-	std::string                   cgi_extension;        // ".py", ".php"
-	std::string                   cgi_path;             // "/usr/bin/python3"
-	std::map< int, std::string >  error_pages;          // 404 ->
-	std::vector< std::string >    allowed_methods;      // default GET, POST
-	std::pair< int, std::string > redirect;             // return 301
-};
-
-class ServerConfig
-{
-  public:
-	int                           port;
-	std::string                   host;
-	std::string                   server_name;
-	std::string                   root;
-	std::string                   index;
-	bool                          autoindex;            // default false
-	size_t                        client_max_body_size; // default 1M
-	std::map< int, std::string >  error_pages;          // 404 ->
-	std::pair< int, std::string > redirect;             // return 301
-	std::vector< Location >       locations;
-
-	ServerConfig();
-	int _getPort();
-	ServerConfig(const ServerConfig& other);
-};
-
-/*
-struct Location
-{
-    std::string					path;					// "/"  "/upload"
-    std::string					root;					// "./www"
-    std::string					index;					// "index.html"
-    bool						autoindex;
-(from subject: Enabling or disabling directory listing) size_t
-client_max_body_size std::vector<std::string>	allowed_methods;		// GET
-POST DELETE (i think if not have this conf. allowed all,) (from subject: List of
-accepted HTTP methods for the route.) std::string					redirect;
-// if we need (i don't sure) return 301 (from subject: HTTP redirection)
+    std::string                     path;                   // "/uploads", "/cgi-bin/py"
+    std::string                     root;                   // "./www", "./cgi-bin/py"
+    std::string                     index;                  // "index.html"
+    bool                            autoindex;              // on/off
+    size_t                          client_max_body_size;   // override for this location
+    std::vector<std::string>        allowed_methods;        // GET, POST, DELETE
+    std::map<int, std::string>      error_pages;            // 404 -> "/error_pages/404.html" 
+    std::pair< int, std::string >   redirect;               // "301 /new-path" if no redir int = -1;
+    std::string                     upload_path;            // "./uploads"
+    std::string                     cgi_extension;          // ".py", ".php"
+    std::string                     cgi_path;               // "/usr/bin/python3"
+    bool                            has_redirect;           // 
+    bool                            has_cgi;                //
+    Location();
 };
 
 struct ServerConfig
 {
-    std::string					host;
-    int							port;
-    std::string					server_name;
-    std::map<int,std::string>	error_pages;			// 404 ->
-"./www/404.html" std::vector<Location>		locations;
-}; */
+    std::string                     host;                   // "127.0.0.1"
+    int                             port;                   // 8080
+    std::string                     server_name;            // "webserv"
+    std::string                     root;                   // "./www"
+    std::string                     index;                  // "index.html"
+    size_t                          client_max_body_size;
+    std::pair< int, std::string >   redirect;               // "301 /new-path" if no redir int = -1;
+    std::map<int, std::string>      error_pages;            // 404 -> "/error_pages/404.html"
+    std::vector<Location>           locations;              // all location blocks
+
+    ServerConfig();
+};

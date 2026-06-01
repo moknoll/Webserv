@@ -1,24 +1,27 @@
 #include "ServerConfig.hpp"
 
 ServerConfig::ServerConfig()
-{
-	port = 0;
-	root = "";
-	index = "";
-	host = "";
-	client_max_body_size = 0;
-}
-
-ServerConfig::ServerConfig(const ServerConfig& other)
-    : port(other.port), host(other.host), server_name(other.server_name),
-      root(other.root), index(other.index), autoindex(other.autoindex),
-      client_max_body_size(other.client_max_body_size),
-      error_pages(other.error_pages), redirect(other.redirect),
-      locations(other.locations)
+    : host("127.0.0.1"),
+      port(8080),
+      server_name("webserv"),
+      root("./www"),
+      index("index.html"),
+      client_max_body_size(0),
+      redirect(std::make_pair(-1, ""))
 {
 }
 
-int ServerConfig::_getPort()
+Location::Location()
+    : path("/"),
+      root(""),
+      index("index.html"),
+      autoindex(false),
+      client_max_body_size(0),
+      redirect(std::make_pair(-1, "")),
+      upload_path(""),
+      cgi_extension(""),
+      cgi_path(""),
+      has_redirect(false),
+      has_cgi(false)
 {
-	return this->port;
 }

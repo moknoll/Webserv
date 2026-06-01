@@ -68,7 +68,8 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 		return makeStatusResponse(HTTP_NOT_FOUND);
 
 	// if redirect -> redirect(status, location)
-	if (this->loc_->redirect.first != -1)
+	if (this->loc_->has_redirect && this->loc_->redirect.first != -1)
+		// if (this->loc_->redirect.first != -1)
 		return redirect(loc_->redirect.first, loc_->redirect.second, host);
 
 	if (!isAllowedMethod(method))
@@ -167,7 +168,10 @@ std::string HttpHandler::buildUploadPath(const HttpRequest& req)
 	{
 		std::string safe_name = sanitizeFileName(filename);
 
-		path = loc_->root;
+		if (!loc_->upload_path.empty())
+			path = loc_->upload_path;
+		else
+			path = loc_->root;
 		if (!path.empty() && path[path.size() - 1] != '/')
 			path += '/';
 		path += safe_name;

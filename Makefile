@@ -14,6 +14,7 @@ SRC			:= src/main.cpp \
 			   src/server/Client.cpp \
 			   src/ConfigParser/ConfigParser.cpp \
 			   src/ConfigParser/ServerConfig.cpp \
+			   src/ConfigParser/Tokenizer.cpp \
 			   src/http/HttpRequest.cpp \
 			   src/http/HttpResponse.cpp \
 			   src/http/HttpHandler.cpp \
@@ -27,6 +28,7 @@ OBJ			:= $(OBJDIR)/main.o \
 			   $(OBJDIR)/server/Client.o \
 			   $(OBJDIR)/ConfigParser/ConfigParser.o \
 			   $(OBJDIR)/ConfigParser/ServerConfig.o \
+			   $(OBJDIR)/ConfigParser/Tokenizer.o \
 			   $(OBJDIR)/http/HttpRequest.o \
 			   $(OBJDIR)/http/HttpResponse.o \
 			   $(OBJDIR)/http/HttpHandler.o \
