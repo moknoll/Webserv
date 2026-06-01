@@ -34,15 +34,22 @@
 
 const size_t HttpHandler::FILE_CHUNK_SIZE = 512 * 1024;
 
-HttpHandler::HttpHandler(const ServerConfig& cfg)
-    : config_(cfg), loc_(NULL), error_(0), state_(HTTP_INIT), fd_(-1)
+HttpHandler::HttpHandler(const ServerConfig& cfg) :
+        config_(cfg),
+        loc_(NULL),
+        error_(0),
+        state_(HTTP_INIT),
+        fd_(-1)
 {
 }
 
-HttpHandler::HttpHandler(const HttpHandler& other)
-    : config_(other.config_), loc_(other.loc_), error_(other.error_),
-      state_(other.state_), upload_file_path_(other.upload_file_path_),
-      fd_(other.fd_)
+HttpHandler::HttpHandler(const HttpHandler& other) :
+        config_(other.config_),
+        loc_(other.loc_),
+        error_(other.error_),
+        state_(other.state_),
+        upload_file_path_(other.upload_file_path_),
+        fd_(other.fd_)
 {
 }
 
@@ -82,8 +89,8 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 		return handleGET(req);
 	else if (method == "POST")
 		return handlePOST(req);
-	// else if (method == "DELETE")
-	// return handleDELETE(req, loc);
+	else if (method == "DELETE")
+		return handleDELETE(req);
 
 	return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 }
@@ -177,7 +184,9 @@ std::string HttpHandler::buildUploadPath(const HttpRequest& req)
 		path += safe_name;
 	}
 	else
+	{
 		path = buildPath(req.getURI());
+	}
 
 	return path;
 }
@@ -248,6 +257,30 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 	}
 
 	return HttpResponse();
+}
+
+HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
+{
+	const std::string& uri = req.getURI();
+	std::string        path = buildPath(uri);
+
+	if (ws::isDirectory(path.c_str()))
+		return makeStatusResponse(HTTP_FORBIDDEN);
+
+	switch (ws::checkFile(path.c_str()))
+	{
+		case FILE_OK:        break;
+		case ERR_IS_DIR:     return makeStatusResponse(HTTP_FORBIDDEN);
+		case ERR_PERMISSION: return makeStatusResponse(HTTP_FORBIDDEN);
+		case ERR_NOT_FOUND:  return makeStatusResponse(HTTP_NOT_FOUND);
+		default:             return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+	}
+
+	if (std::remove(path.c_str()) != 0)
+		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+	HttpResponse resp(HTTP_NO_CONTENT);
+	resp.setFullResponse();
+	return resp;
 }
 
 HttpResponse HttpHandler::makeStatusResponse(int status)
@@ -354,8 +387,12 @@ HttpHandler::findMatchUri(const std::string&             uri,
 		{
 			if (path.size() > len_best_loc)
 			{
-				best_loc = &locations[i];
-				len_best_loc = path.size();
+				if (uri.size() == path.size() || uri[path.size()] == '/'
+				    || uri[path.size() - 1] == '/')
+				{
+					best_loc = &locations[i];
+					len_best_loc = path.size();
+				}
 			}
 		}
 	}
@@ -374,7 +411,9 @@ std::string HttpHandler::buildPath(const std::string& uri) const
 	if (!sub_uri.empty() && sub_uri[0] == '/')
 		path += sub_uri.substr(1);
 	else
+	{
 		path += sub_uri;
+	}
 
 	return path;
 }

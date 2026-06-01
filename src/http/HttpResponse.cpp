@@ -111,8 +111,10 @@ void HttpResponse::setHeader(const std::string& name, const std::string& v)
 void HttpResponse::setFullResponse(const std::string& content,
                                    const std::string& extention)
 {
-	setHeader("Content-Type", getMimeType(extention));
-	setBody(content);
+	if (!extention.empty())
+		setHeader("Content-Type", getMimeType(extention));
+	if (!content.empty())
+		setBody(content);
 	setHeader("Date", getHttpTime());
 	setHeader("Server", SERVER_NAME_STR);
 }

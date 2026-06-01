@@ -13,14 +13,12 @@
 #include "BodyStream.hpp"
 #include "../lib/ws.hpp"
 #include "constants.hpp"
+#include <cstddef>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
-BodyStream::BodyStream()
-    : boundary_(""), delimeter_(""), end_delimeter_(""), buf_(""), name_(""),
-      filename_(""), state_(sb_start), data_("")
-{
-}
+BodyStream::BodyStream() : is_chunked(false), state_(sb_start) {}
 
 // BodyStream::BodyStream(const BodyStream& other) {}
 
@@ -44,7 +42,6 @@ void BodyStream::printBodyStream() const
 	std::cout << "B2:" << end_delimeter_ << '\n';
 	std::cout << "B0:" << boundary_ << '\n';
 }
-
 
 bool BodyStream::parseHeaders_(const std::string& headers)
 {
@@ -121,12 +118,46 @@ void BodyStream::parseMultiPart(std::string& raw_data)
 	}
 }
 
+void BodyStream::parseChunked(std::string& raw_data)
+{
+	state_ = sb_data;
+
+	while (true)
+	{
+		switch (state_)
+		{
+			case sb_start:  state_ = sb_header;
+			case sb_header: state_ = sb_data;
+			case sb_data:
+			{
+				std::string::size_type p = raw_data.find(CRLF);
+				if (p == std::string::npos)
+					return;
+				std::string s = raw_data.substr(0, p);
+				size_t      n = strtol(s.c_str(), NULL, 16);
+				if (n == 0)
+				{
+					state_ = sb_end;
+					return;
+				}
+				std::string::size_type bp = raw_data.find(CRLF, p + 2);
+				if (bp == std::string::npos)
+					return;
+				p += 2;
+				data_ += raw_data.substr(p, bp - p);
+				raw_data.erase(0, bp + 2);
+			}
+			case sb_end: return;
+		}
+	}
+}
+
 void BodyStream::parse(std::string& raw_data)
 {
 	if (!boundary_.empty())
 		parseMultiPart(raw_data);
-	// else (chunked)
-	// parseChunked(std::string &raw_data)
+	else if (is_chunked)
+		parseChunked(raw_data);
 	else
 	{
 		data_ = raw_data;
@@ -134,23 +165,28 @@ void BodyStream::parse(std::string& raw_data)
 	}
 }
 
-bool BodyStream::findBoundary(size_t& pos, const std::string& delim)
-{
-	std::string::size_type p = buf_.find(delim);
-
-	if (p != std::string::npos)
-	{
-		pos += 2;
-		return true;
-	}
-	return false;
-}
+// bool BodyStream::findBoundary(size_t& pos, const std::string& delim)
+// {
+// 	std::string::size_type p = buf_.find(delim);
+//
+// 	if (p != std::string::npos)
+// 	{
+// 		pos += 2;
+// 		return true;
+// 	}
+// 	return false;
+// }
 
 void BodyStream::setBoundary(const std::string& boundary)
 {
 	this->boundary_ = boundary;
 	delimeter_ = "--" + boundary_ + CRLF;
 	end_delimeter_ = "--" + boundary_ + "--";
+}
+
+void BodyStream::setChunked(bool chunked)
+{
+	is_chunked = chunked;
 }
 
 bool BodyStream::eof() const
@@ -168,11 +204,12 @@ void BodyStream::reset()
 	boundary_.clear();
 	delimeter_.clear();
 	end_delimeter_.clear();
-	buf_.clear();
+	// buf_.clear();
 	name_.clear();
 	filename_.clear();
 	state_ = sb_start;
 	data_.clear();
+	is_chunked = false;
 }
 
 const std::string& BodyStream::getFileName() const

@@ -19,19 +19,30 @@
 #include <map>
 #include <string>
 
-HttpRequest::HttpRequest()
-    : err_status_(HTTP_OK), content_length_(0), chunked(false),
-      multipart(false), recv_bytes(0), state_(sw_start), body_data()
+HttpRequest::HttpRequest() :
+        err_status_(HTTP_OK),
+        content_length_(0),
+        chunked(false),
+        multipart(false),
+        recv_bytes(0),
+        state_(sw_start),
+        body_data()
 {
 }
 
-HttpRequest::HttpRequest(const HttpRequest& other)
-    : err_status_(other.err_status_), content_length_(other.content_length_),
-      method_(other.method_), uri_(other.uri_),
-      http_version_(other.http_version_), body_(other.body_),
-      headers_(other.headers_), chunked(other.chunked),
-      boundary_(other.boundary_), recv_bytes(other.recv_bytes),
-      state_(other.state_), body_data(other.body_data)
+HttpRequest::HttpRequest(const HttpRequest& other) :
+        err_status_(other.err_status_),
+        content_length_(other.content_length_),
+        method_(other.method_),
+        uri_(other.uri_),
+        http_version_(other.http_version_),
+        body_(other.body_),
+        headers_(other.headers_),
+        chunked(other.chunked),
+        boundary_(other.boundary_),
+        recv_bytes(other.recv_bytes),
+        state_(other.state_),
+        body_data(other.body_data)
 {
 }
 
@@ -97,7 +108,10 @@ void HttpRequest::parseHeaders(const std::string& headers)
 		if (it->first == "Content-Length")
 			content_length_ = ws::stosize(it->second);
 		if (it->first == "Transfer-Encoding" && it->second == "chunked")
+		{
+			body_data.setChunked(true);
 			chunked = true;
+		}
 		if (it->first == "Content-Type"
 		    && it->second.find("multipart/form-data; boundary=") == 0)
 		{
@@ -131,7 +145,7 @@ bool HttpRequest::isValidMethod(const std::string& method)
 	    || method == "OPTIONS" || method == "TRACE" || method == "PATCH"
 	    || method == "MOVE")
 	{
-		fail(HTTP_NOT_ALLOWED);
+		fail(HTTP_NOT_IMPLEMENTED);
 		return false;
 	}
 	fail(HTTP_BAD_REQUEST);
@@ -151,8 +165,10 @@ void HttpRequest::parse(std::string& raw_data)
 			{
 				recv_bytes += raw_data.size();
 				body_data.parse(raw_data);
-				if (recv_bytes >= content_length_)
+				if (body_data.eof())
 					state_ = sw_done;
+				// if (recv_bytes >= content_length_)
+				// 	state_ = sw_done;
 				return;
 			}
 			case sw_start:
@@ -213,7 +229,7 @@ void HttpRequest::parse(std::string& raw_data)
 
 				parseHeaders(raw_data.substr(0, p + CRLF_LEN));
 				raw_data.erase(0, p + CRLF_LEN + CRLF_LEN);
-				state_ = method_ == "GET" ? sw_done : sw_almost_done;
+				state_ = method_ != "POST" ? sw_done : sw_almost_done;
 			}
 			break;
 		}

@@ -75,3 +75,6 @@ TabWidth: 4
 UseTab: ForIndentation
 IndentWidth: 4
 IndentCaseLabels: true
+BreakConstructorInitializers: AfterColon  # Перенос строки перед ":"
+PackConstructorInitializers: Never         # Каждый инициализатор на новой строке
+ConstructorInitializerIndentWidth: 8       # Отступ 4 пробела для списка

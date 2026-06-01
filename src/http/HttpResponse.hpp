@@ -31,8 +31,8 @@ class HttpResponse
 	void          setStatus(int status);
 	void          setHeader(const std::string& name, const std::string& v);
 	void          setBody(const std::string& content);
-	void          setFullResponse(const std::string& content,
-	                              const std::string& extention);
+	void          setFullResponse(const std::string& content = "",
+	                              const std::string& extention = "");
 
 	std::string   getHeader(const std::string& header_name) const;
 	std::string   buildErrorPage(int err_status) const;

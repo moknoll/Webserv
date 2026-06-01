@@ -55,6 +55,7 @@ class HttpHandler
 
 	HttpResponse               handleGET(const HttpRequest& req);
 	HttpResponse               handlePOST(const HttpRequest& req);
+	HttpResponse               handleDELETE(const HttpRequest& req);
 	HttpResponse               makeStatusResponse(int status);
 	HttpResponse               makeFileResponse(const std::string& path);
 

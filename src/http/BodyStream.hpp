@@ -33,8 +33,9 @@ class BodyStream
 	// BodyStream& operator=(const BodyStream& other);
 
 	void               setBoundary(const std::string& boundary);
-	void               parse(std::string& buf_);
-	bool               findBoundary(size_t& pos, const std::string& delim);
+	void               setChunked(bool chunked);
+	void               parse(std::string& raw_data);
+	// bool               findBoundary(size_t& pos, const std::string& delim);
 	bool               eof() const;
 	const std::string& getFileName() const;
 	const std::string& getData() const;
@@ -46,15 +47,15 @@ class BodyStream
 	std::string boundary_;
 	std::string delimeter_;
 	std::string end_delimeter_;
-	std::string buf_;
+	// std::string buf_;
 	std::string name_;
 	std::string filename_;
+	bool        is_chunked;
 
 	State       state_;
 	std::string data_;
 
 	bool        parseHeaders_(const std::string& headers);
-
 	void        parseMultiPart(std::string& raw_data);
 	void        parseChunked(std::string& raw_data);
 };
