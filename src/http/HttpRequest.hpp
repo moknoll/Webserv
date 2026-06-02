@@ -49,6 +49,7 @@ class HttpRequest
 	BodyStream        getbodyStream() const; // WIP
 	int               getRequestStatus() const;
 	size_t            getContentLenght() const;
+	std::string       getBoundary() const;
 
 	void              setStatus(int status);
 

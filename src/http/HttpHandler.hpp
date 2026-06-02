@@ -38,7 +38,6 @@ class HttpHandler
 	HttpResponse handle(const HttpRequest& req);
 	int          getState() const;
 	std::string  getFileChunk();
-	bool         hasMoreData() const;
 	void         reset();
 
   private:
@@ -51,6 +50,7 @@ class HttpHandler
 	int                        error_;
 	STATE                      state_;
 	std::string                upload_file_path_;
+	std::string                temp_file_;
 	int                        fd_;
 
 	HttpResponse               handleGET(const HttpRequest& req);
@@ -74,12 +74,19 @@ class HttpHandler
 	std::string buildPath(const std::string& uri) const;
 	bool        isAllowedMethod(const std::string& method) const;
 
-	std::string buildUploadPath(const HttpRequest& req);
+	std::string buildUploadPath(const HttpRequest& req,
+	                            const std::string& filename);
 	std::string sanitizeFileName(const std::string& filename);
 	bool        validateUploadPath(const std::string& path);
-	bool        openUploadFile(const std::string& path, HttpResponse& err_resp);
+	int         openUploadFile(const std::string& path, HttpResponse& err_resp);
 	bool        writeToFile(const std::string& data);
 	void        resetUpload();
 	void        closeFile();
+	bool        saveUploadedFileFromTemp(const HttpRequest& req,
+	                                     HttpResponse&      err_resp);
+	const char* find_bytes_(const char* ext_start,
+	                        const char* ext_end,
+	                        const char* s_start,
+	                        const char* s_end);
 };
 

@@ -116,6 +116,7 @@ void HttpRequest::parseHeaders(const std::string& headers)
 		    && it->second.find("multipart/form-data; boundary=") == 0)
 		{
 			boundary_ = extractBoundary(it->second);
+			multipart = true;
 			body_data.setBoundary(boundary_);
 		}
 	}
@@ -164,11 +165,13 @@ void HttpRequest::parse(std::string& raw_data)
 			case sw_almost_done:
 			{
 				recv_bytes += raw_data.size();
-				body_data.parse(raw_data);
-				if (body_data.eof())
+				body_ = raw_data;
+				raw_data.clear();
+				// body_data.parse(raw_data);
+				// if (body_data.eof())
+					// state_ = sw_done;
+				if (recv_bytes >= content_length_)
 					state_ = sw_done;
-				// if (recv_bytes >= content_length_)
-				// 	state_ = sw_done;
 				return;
 			}
 			case sw_start:
@@ -273,6 +276,12 @@ std::string HttpRequest::getHeader(const std::string& name) const
 		return headers_.at(name);
 
 	return "";
+}
+
+
+std::string       HttpRequest::getBoundary() const
+{
+	return this->boundary_;
 }
 
 bool HttpRequest::isAlmostDone() const
