@@ -12,7 +12,6 @@
 
 #pragma once
 
-// #include <cstdint>
 #include "BodyStream.hpp"
 #include <cstddef>
 #include <map>
@@ -36,7 +35,6 @@ class HttpRequest
 	};
 
 	HttpRequest();
-	// HttpRequest(const std::string& req_message);
 	HttpRequest(const HttpRequest& other);
 	~HttpRequest();
 
@@ -54,8 +52,8 @@ class HttpRequest
 	void              setStatus(int status);
 
 	void              parse(std::string& raw);
-	bool              isValidMethod(const std::string& method);
 	bool              isChunked() const;
+	bool              isMultipart() const;
 	bool              isComplete() const;
 	bool              isAlmostDone() const;
 
@@ -69,8 +67,8 @@ class HttpRequest
 	std::string                          http_version_;
 	std::string                          body_;
 	std::map< std::string, std::string > headers_;
-	bool                                 chunked;
-	bool                                 multipart;
+	bool                                 chunked_;
+	bool                                 multipart_;
 	std::string                          boundary_;
 	size_t                               recv_bytes;
 	State                                state_;
@@ -80,6 +78,7 @@ class HttpRequest
 	void parseBody(const std::string& raw);
 	void parseHeaderLine(const std::string& header_line);
 	void parseHeaders(const std::string& headers);
+	bool isValidMethod(const std::string& method);
 	void fail(int status);
 };
 

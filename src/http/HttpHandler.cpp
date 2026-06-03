@@ -17,7 +17,6 @@
 #include "HttpResponse.hpp"
 #include "constants.hpp"
 
-#include <algorithm>
 #include <cerrno>
 #include <cstddef>
 #include <cstdio>
@@ -32,8 +31,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-// #include <vector>
 
 const size_t HttpHandler::FILE_CHUNK_SIZE = 512 * 1024;
 
@@ -172,16 +169,15 @@ std::string HttpHandler::sanitizeFileName(const std::string& filename)
 std::string HttpHandler::buildUploadPath(const HttpRequest& req,
                                          const std::string& filename)
 {
-	std::string path;
+	std::string path = loc_->upload_path;
+
+	if (loc_->upload_path.empty())
+		path = loc_->root;
 
 	if (!filename.empty())
 	{
 		std::string safe_name = sanitizeFileName(filename);
 
-		if (!loc_->upload_path.empty())
-			path = loc_->upload_path;
-		else
-			path = loc_->root;
 		if (!path.empty() && path[path.size() - 1] != '/')
 			path += '/';
 		path += safe_name;
@@ -327,7 +323,7 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 
 	if (state_ == HTTP_INIT && !data.empty())
 	{
-		temp_file_ = "/tmp/ws_" + ws::randString();
+		temp_file_ = "./wsload_" + ws::randString();
 
 		fd_ = open(
 		    temp_file_.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
@@ -347,13 +343,26 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 
 	if (req.isComplete())
 	{
-		closeFile();
-
 		HttpResponse error_respons;
-		if (!saveUploadedFileFromTemp(req, error_respons))
+		closeFile();
+		if (req.isMultipart())
+
 		{
-			std::remove(temp_file_.c_str());
-			return error_respons;
+			if (!saveUploadedFileFromTemp(req, error_respons))
+			{
+				std::remove(temp_file_.c_str());
+				return error_respons;
+			}
+		}
+		else
+		{
+			std::string path = buildUploadPath(req, "");
+			int         fd = openUploadFile(path, error_respons);
+			if (fd == -1)
+				return error_respons;
+			close(fd);
+			if (std::rename(temp_file_.c_str(), path.c_str()) != 0)
+				return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 		}
 		std::remove(temp_file_.c_str());
 		state_ = HTTP_COMPLETE;

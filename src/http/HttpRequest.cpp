@@ -22,8 +22,8 @@
 HttpRequest::HttpRequest() :
         err_status_(HTTP_OK),
         content_length_(0),
-        chunked(false),
-        multipart(false),
+        chunked_(false),
+        multipart_(false),
         recv_bytes(0),
         state_(sw_start),
         body_data()
@@ -38,7 +38,7 @@ HttpRequest::HttpRequest(const HttpRequest& other) :
         http_version_(other.http_version_),
         body_(other.body_),
         headers_(other.headers_),
-        chunked(other.chunked),
+        chunked_(other.chunked_),
         boundary_(other.boundary_),
         recv_bytes(other.recv_bytes),
         state_(other.state_),
@@ -57,10 +57,10 @@ void HttpRequest::reset()
 	http_version_.clear();
 	body_.clear();
 	headers_.clear();
-	chunked = false;
+	chunked_ = false;
 	state_ = sw_start;
 	boundary_.clear();
-	multipart = false;
+	multipart_ = false;
 	recv_bytes = 0;
 	body_data.reset();
 }
@@ -110,13 +110,13 @@ void HttpRequest::parseHeaders(const std::string& headers)
 		if (it->first == "Transfer-Encoding" && it->second == "chunked")
 		{
 			body_data.setChunked(true);
-			chunked = true;
+			chunked_ = true;
 		}
 		if (it->first == "Content-Type"
 		    && it->second.find("multipart/form-data; boundary=") == 0)
 		{
 			boundary_ = extractBoundary(it->second);
-			multipart = true;
+			multipart_ = true;
 			body_data.setBoundary(boundary_);
 		}
 	}
@@ -169,7 +169,7 @@ void HttpRequest::parse(std::string& raw_data)
 				raw_data.clear();
 				// body_data.parse(raw_data);
 				// if (body_data.eof())
-					// state_ = sw_done;
+				// state_ = sw_done;
 				if (recv_bytes >= content_length_)
 					state_ = sw_done;
 				return;
@@ -278,8 +278,7 @@ std::string HttpRequest::getHeader(const std::string& name) const
 	return "";
 }
 
-
-std::string       HttpRequest::getBoundary() const
+std::string HttpRequest::getBoundary() const
 {
 	return this->boundary_;
 }
@@ -301,7 +300,12 @@ void HttpRequest::setStatus(int status)
 
 bool HttpRequest::isChunked() const
 {
-	return this->chunked;
+	return this->chunked_;
+}
+
+bool HttpRequest::isMultipart() const
+{
+	return this->multipart_;
 }
 
 BodyStream HttpRequest::getbodyStream() const
