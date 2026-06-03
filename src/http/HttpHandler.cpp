@@ -56,6 +56,8 @@ HttpHandler::HttpHandler(const HttpHandler& other) :
 HttpHandler::~HttpHandler()
 {
 	closeFile();
+	if (!temp_file_.empty())
+		std::remove(temp_file_.c_str());
 	if (state_ != HTTP_COMPLETE && !upload_file_path_.empty())
 		std::remove(upload_file_path_.c_str());
 }
@@ -296,14 +298,10 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 		{
 			size_t to_write = 0;
 			if (total_in_buf > end_boundary.size())
-			{
 				to_write = total_in_buf - end_boundary.size();
-			}
 
 			if (to_write > 0)
-			{
 				write(fd, buf_start, to_write);
-			}
 
 			leftover = total_in_buf - to_write;
 			std::memmove(&buffer[0], buf_start + to_write, leftover);
@@ -315,13 +313,21 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 
 HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 {
-	// if (req.getContentLenght() > loc_->client_max_body_size)
-	// return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
+	if (req.getContentLenght() > loc_->client_max_body_size)
+	{
+		state_ = HTTP_CLOSE;
+		return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
+	}
+	if (req.isChunked() && req.getReceivedBytes() > loc_->client_max_body_size)
+	{
+		state_ = HTTP_CLOSE;
+		return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
+	}
 
 	// const std::string data = req.getbodyStream().getData();
 	const std::string data = req.getbody();
 
-	if (state_ == HTTP_INIT && !data.empty())
+	if (state_ == HTTP_INIT)
 	{
 		temp_file_ = "./wsload_" + ws::randString();
 
@@ -332,21 +338,18 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 		state_ = HTTP_RECV;
 	}
 
-	if (!data.empty())
+	if (!writeToFile(data))
 	{
-		if (!writeToFile(data))
-		{
-			resetUpload();
-			return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-		}
+		resetUpload();
+		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 	}
 
 	if (req.isComplete())
 	{
-		HttpResponse error_respons;
 		closeFile();
-		if (req.isMultipart())
 
+		HttpResponse error_respons;
+		if (req.isMultipart())
 		{
 			if (!saveUploadedFileFromTemp(req, error_respons))
 			{
@@ -591,6 +594,8 @@ void HttpHandler::resetUpload()
 	closeFile();
 
 	if (!upload_file_path_.empty())
+		std::remove(upload_file_path_.c_str());
+	if (!temp_file_.empty())
 		std::remove(upload_file_path_.c_str());
 
 	state_ = HTTP_CLOSE;

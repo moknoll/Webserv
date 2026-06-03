@@ -15,6 +15,7 @@
 #include "BodyStream.hpp"
 #include "constants.hpp"
 #include <cstddef>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <string>
@@ -24,7 +25,7 @@ HttpRequest::HttpRequest() :
         content_length_(0),
         chunked_(false),
         multipart_(false),
-        recv_bytes(0),
+        recv_bytes_(0),
         state_(sw_start),
         body_data()
 {
@@ -40,7 +41,7 @@ HttpRequest::HttpRequest(const HttpRequest& other) :
         headers_(other.headers_),
         chunked_(other.chunked_),
         boundary_(other.boundary_),
-        recv_bytes(other.recv_bytes),
+        recv_bytes_(other.recv_bytes_),
         state_(other.state_),
         body_data(other.body_data)
 {
@@ -61,7 +62,7 @@ void HttpRequest::reset()
 	state_ = sw_start;
 	boundary_.clear();
 	multipart_ = false;
-	recv_bytes = 0;
+	recv_bytes_ = 0;
 	body_data.reset();
 }
 
@@ -120,6 +121,8 @@ void HttpRequest::parseHeaders(const std::string& headers)
 			body_data.setBoundary(boundary_);
 		}
 	}
+	if (headers_.find("Content-Length") != headers_.end() && chunked_)
+		fail(HTTP_BAD_REQUEST);
 }
 
 void HttpRequest::parseHeaderLine(const std::string& header_line)
@@ -153,6 +156,37 @@ bool HttpRequest::isValidMethod(const std::string& method)
 	return false;
 }
 
+void HttpRequest::parceChunked(std::string& raw_data)
+{
+	size_t      pos = 0;
+	std::string body;
+	while (true)
+	{
+		std::string::size_type p = raw_data.find(CRLF);
+		if (p == std::string::npos)
+			break;
+		std::string chunk_size = raw_data.substr(0, p);
+		size_t      n = std::strtol(chunk_size.c_str(), NULL, 16);
+
+		if (n == 0)
+		{
+			state_ = sw_done;
+			break;
+		}
+		pos = p + 2;
+		if (pos + n + 2 > raw_data.size())
+		{
+			break;
+		}
+
+		body.append(&raw_data[pos], n);
+		pos += n + 2;
+		raw_data.erase(0, pos);
+	}
+
+	body_ = body;
+}
+
 void HttpRequest::parse(std::string& raw_data)
 {
 	static size_t CRLF_LEN = 2;
@@ -164,14 +198,23 @@ void HttpRequest::parse(std::string& raw_data)
 			case sw_done: return;
 			case sw_almost_done:
 			{
-				recv_bytes += raw_data.size();
-				body_ = raw_data;
-				raw_data.clear();
+				recv_bytes_ += raw_data.size();
+				if (chunked_)
+				{
+					parceChunked(raw_data);
+				}
+				else
+				{
+					body_ = raw_data;
+					raw_data.clear();
+					if (recv_bytes_ >= content_length_)
+						state_ = sw_done;
+				}
 				// body_data.parse(raw_data);
 				// if (body_data.eof())
 				// state_ = sw_done;
-				if (recv_bytes >= content_length_)
-					state_ = sw_done;
+				// if (recv_bytes >= content_length_)
+				// state_ = sw_done;
 				return;
 			}
 			case sw_start:
@@ -268,6 +311,12 @@ int HttpRequest::getRequestStatus() const
 size_t HttpRequest::getContentLenght() const
 {
 	return content_length_;
+}
+
+size_t	HttpRequest::getReceivedBytes() const
+{
+	return this->recv_bytes_;
+
 }
 
 std::string HttpRequest::getHeader(const std::string& name) const

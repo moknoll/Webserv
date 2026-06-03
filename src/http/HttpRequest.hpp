@@ -47,6 +47,7 @@ class HttpRequest
 	BodyStream        getbodyStream() const; // WIP
 	int               getRequestStatus() const;
 	size_t            getContentLenght() const;
+	size_t            getReceivedBytes() const;
 	std::string       getBoundary() const;
 
 	void              setStatus(int status);
@@ -70,7 +71,7 @@ class HttpRequest
 	bool                                 chunked_;
 	bool                                 multipart_;
 	std::string                          boundary_;
-	size_t                               recv_bytes;
+	size_t                               recv_bytes_;
 	State                                state_;
 	BodyStream                           body_data; // WIP
 
@@ -78,6 +79,7 @@ class HttpRequest
 	void parseBody(const std::string& raw);
 	void parseHeaderLine(const std::string& header_line);
 	void parseHeaders(const std::string& headers);
+	void parceChunked(std::string& raw_data);
 	bool isValidMethod(const std::string& method);
 	void fail(int status);
 };

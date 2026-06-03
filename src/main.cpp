@@ -112,9 +112,9 @@ getConfig(const std::string& host, int port, const std::string& s_name)
 	upload_loc.path = "/upload";
 	upload_loc.root = "./www/uploads";
 	upload_loc.index = "";
-	upload_loc.allowed_methods.push_back("GET");        // = {"GET"};
-	upload_loc.allowed_methods.push_back("POST");       // = {"POST"};
-	upload_loc.client_max_body_size = 10 * 1024 * 1024; // 10MB
+	upload_loc.allowed_methods.push_back("GET");  // = {"GET"};
+	upload_loc.allowed_methods.push_back("POST"); // = {"POST"};
+	upload_loc.client_max_body_size = 2000000000; // 2GB
 	upload_loc.upload_path = "./www/uploads";
 	upload_loc.redirect = std::make_pair(-1, "");
 
