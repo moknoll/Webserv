@@ -6,7 +6,7 @@
 /*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:14:52 by mknoll            #+#    #+#             */
-/*   Updated: 2026/04/14 13:16:43 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/06/08 11:30:03 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -72,7 +72,21 @@ ServerConfig getConfig(const std::string& host, int port)
 	upload_loc.allowed_methods.push_back("GET");        // = {"GET"};
 	upload_loc.allowed_methods.push_back("POST");       // = {"POST"};
 	upload_loc.client_max_body_size = 10 * 1024 * 1024; // 10MB
+	upload_loc.autoindex = false;
 	upload_loc.redirect = std::make_pair(-1, "");
+
+	// Location: /cgi-bin
+	Location cgi_loc;
+	cgi_loc.path = "/cgi-bin";
+	cgi_loc.root = "./www/cgi-bin";
+	cgi_loc.index = "";
+	cgi_loc.allowed_methods.push_back("GET");
+	cgi_loc.allowed_methods.push_back("POST");
+	cgi_loc.cgi_extension = ".py";
+	cgi_loc.cgi_path = "/usr/bin/python3";
+	cgi_loc.autoindex = false;
+	cgi_loc.client_max_body_size = 10 * 1024 * 1024;
+	cgi_loc.redirect = std::make_pair(-1, "");
 
 	// Location: /old (redirect)
 	Location redirect_loc;
@@ -95,6 +109,7 @@ ServerConfig getConfig(const std::string& host, int port)
 	// server.locations = {root_loc, upload_loc, redirect_loc};
 	server.locations.push_back(root_loc);
 	server.locations.push_back(upload_loc);
+	server.locations.push_back(cgi_loc);
 	server.locations.push_back(redirect_loc);
 	server.locations.push_back(autoindex_loc);
 

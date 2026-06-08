@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HttpHandler.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/01 13:19:14 by nmagomad          #+#    #+#             */
-/*   Updated: 2026/05/01 13:19:16 by nmagomad         ###   ########.fr       */
+/*   Updated: 2026/06/08 12:14:39 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,7 @@
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 #include "constants.hpp"
+#include "../cgi/handleCGI.hpp"
 
 #include <cerrno>
 #include <cstddef>
@@ -72,8 +73,8 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	if (!isAllowedMethod(method, *loc))
 		return makeStatusResponse(HTTP_NOT_ALLOWED, loc);
 
-	// if (!loc->cgi_extension.empty())
-	// 		handleCGI();
+	if (!loc->cgi_extension.empty())
+			return handleCGI(req, *loc);
 
 	if (method == "GET")
 		return handleGET(req, *loc);
@@ -200,6 +201,25 @@ bool HttpHandler::openUploadFile(const std::string& path,
 	}
 
 	return true;
+}
+
+HttpResponse HttpHandler::handleCGI(const HttpRequest& req,
+									const Location&		loc)
+{
+	CgiContext ctx = buildCgiContext(req, loc);
+	ctx.env_map = buildCgiEnv(req, loc, ctx);
+	
+	if(!executeChild(ctx))
+		return makeStatusResponse(500, &loc);
+	if (!writeRequestBody(ctx))
+        return makeStatusResponse(500, &loc);
+
+    if (!readChildOutput(ctx))
+        return makeStatusResponse(500, &loc);
+
+    HttpResponse res = buildResponse(ctx);
+    cleanup(ctx);
+    return res;
 }
 
 HttpResponse HttpHandler::handlePOST(const HttpRequest& req,

@@ -3,16 +3,17 @@
 /*                                                        :::      ::::::::   */
 /*   HttpHandler.hpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/01 13:19:26 by nmagomad          #+#    #+#             */
-/*   Updated: 2026/05/01 13:19:27 by nmagomad         ###   ########.fr       */
+/*   Updated: 2026/06/08 09:33:40 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #pragma once
 
 #include "../ConfigParser/ServerConfig.hpp"
+#include "../cgi/handleCGI.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 
@@ -55,6 +56,7 @@ class HttpHandler
 
 	HttpResponse        handleGET(const HttpRequest& req, const Location& loc);
 	HttpResponse        handlePOST(const HttpRequest& req, const Location& loc);
+	HttpResponse		handleCGI(const HttpRequest& req, const Location& loc);
 	HttpResponse        makeStatusResponse(int status, const Location* loc);
 	HttpResponse makeFileResponse(const std::string& path, const Location* loc);
 
