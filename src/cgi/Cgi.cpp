@@ -1,9 +1,9 @@
-#include "handleCGI.hpp"
+#include "Cgi.hpp"
 #include <unistd.h>
 #include <string.h>
 #include "../lib/ws.hpp"
 
-CgiContext buildCgiContext(const HttpRequest &req, const Location &loc)
+CgiContext buildCgiContext()
 {
 	CgiContext ctx;
 
@@ -12,29 +12,49 @@ CgiContext buildCgiContext(const HttpRequest &req, const Location &loc)
 	ctx.stdin_pipe[1] = -1;
 	ctx.stdout_pipe[0] = -1;
 	ctx.stdout_pipe[1] = -1;
+	ctx.argv = NULL;
+	ctx.deadline = 0;
+	ctx.envp = NULL;
+	ctx.exit_status = 0;
 
 	return ctx;
 }
 
-std::map< std::string, std::string >
-buildCgiEnv(const HttpRequest &req, const Location &loc, const CgiContext &ctx)
+void buildCgiEnv(const HttpRequest &req, const Location &loc, const CgiContext &ctx)
 {
-	(void)loc;
-	std::map< std::string, std::string > env;
+	std::map<std::string, std::string> env;
+	std::string uri = req.getURI();
+	size_t pos = uri.find('?');
 
-	//finish all setups
 	env["REQUEST_METHOD"] = req.getMethod();
-	env["CONTENT_LENGTH"] = ws::to_string(req.getContentLenght());
-	env["CONTENT_TYPE"] = req.getHeader("Content-Type");
-	env["REQUEST_URI"] = req.getURI();
-	//env["QUERY_STRING"] = req.getQuery();
-	//env[""]
-	env["GATEWAY_INTERFACE"] = "CGI/1.1";
+
+	if (pos != std::string::npos)
+		env["QUERY_STRING"] = uri.substr(pos + 1);
+	else
+		env["QUERY_STRING"] = "";
+	
+	env["CONTENT_LENGTH"] = req.getContentLenght();
+	// env["CONTENT_TYPE"] = ;
+
+
+
+	std::string script_name = uri;
+	if (pos != std::string::npos)
+		script_name = uri.substr(0, pos);
+	env["SCRIPT_NAME"] = "";
+
+
+	env["PATH_INFO"] = script_name;
+	env["PATH_TRANSLATED"] = loc.cgi_path;
+	env["REMOTE_ADDR"] = "";
+	//env["SERVER_NAME"] = req.;
+	//env["SERVER_PORT"] = req.;
 	env["SERVER_PROTOCOL"] = "HTTP/1.1";
-	env["SERVER_SOFTWARE"] = "webserv";
+
+	// Required for PHP-CGI security
 	env["REDIRECT_STATUS"] = "200";
 
-	return env;
+	// Parse all HTTPs in Header and replace - with _ 
 }
 
 void buildCgiEnvp(CgiContext& ctx)

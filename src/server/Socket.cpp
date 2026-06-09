@@ -18,6 +18,15 @@ static std::string to_string(int num)
 	return str;
 }
 
+static int ft_stoi(std::string str)
+{
+	std::stringstream ss(str);
+	int res;
+
+	ss >> res;
+	return res;
+}
+
 Socket::Socket(const ServerConfig& config) : fd_(-1)
 {
 	int              yes = 1;
@@ -87,7 +96,7 @@ std::string Socket::getHost() const
 
 int Socket::getPort() const
 {
-	return atoi((this->port_).c_str());
+	return ft_stoi(this->port_);
 }
 
 int Socket::getFd() const

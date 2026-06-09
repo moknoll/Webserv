@@ -6,7 +6,7 @@
 /*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/01 13:19:14 by nmagomad          #+#    #+#             */
-/*   Updated: 2026/06/08 12:14:39 by mknoll           ###   ########.fr       */
+/*   Updated: 2026/06/09 13:35:55 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 #include "constants.hpp"
 #include "../cgi/handleCGI.hpp"
 
+#include <iostream>
 #include <cerrno>
 #include <cstddef>
 #include <cstdio>
@@ -59,6 +60,7 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	const std::string& host = req.getHeader("Host");
 	const std::string& method = req.getMethod();
 	const Location*    loc = findMatchUri(uri, config_.locations);
+	// config
 
 	if (req.getRequestStatus() != HTTP_OK)
 		return makeStatusResponse(req.getRequestStatus(), loc);
@@ -73,8 +75,9 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	if (!isAllowedMethod(method, *loc))
 		return makeStatusResponse(HTTP_NOT_ALLOWED, loc);
 
+	std::cout << loc->cgi_extension << " test" << std::endl;
 	if (!loc->cgi_extension.empty())
-			return handleCGI(req, *loc);
+			return handleCGI(req, *loc, config); 
 
 	if (method == "GET")
 		return handleGET(req, *loc);
@@ -206,20 +209,23 @@ bool HttpHandler::openUploadFile(const std::string& path,
 HttpResponse HttpHandler::handleCGI(const HttpRequest& req,
 									const Location&		loc)
 {
-	CgiContext ctx = buildCgiContext(req, loc);
-	ctx.env_map = buildCgiEnv(req, loc, ctx);
+	(void)req;
+	CgiContext ctx = buildCgiContext();
+	buildCgiEnv(req, loc, ctx);
 	
-	if(!executeChild(ctx))
-		return makeStatusResponse(500, &loc);
-	if (!writeRequestBody(ctx))
-        return makeStatusResponse(500, &loc);
+	// if(!executeChild(ctx))
+	// 	return makeStatusResponse(500, &loc);
+	// if (!writeRequestBody(ctx))
+    //     return makeStatusResponse(500, &loc);
 
-    if (!readChildOutput(ctx))
-        return makeStatusResponse(500, &loc);
+    // if (!readChildOutput(ctx))
+    //     return makeStatusResponse(500, &loc);
 
-    HttpResponse res = buildResponse(ctx);
-    cleanup(ctx);
-    return res;
+    // HttpResponse res = buildResponse(ctx);
+    // cleanup(ctx);
+
+	
+    return makeStatusResponse(504, &loc);
 }
 
 HttpResponse HttpHandler::handlePOST(const HttpRequest& req,
