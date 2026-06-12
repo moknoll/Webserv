@@ -12,11 +12,11 @@
 
 #include "HttpRequest.hpp"
 #include "../lib/ws.hpp"
-#include "BodyStream.hpp"
 #include "constants.hpp"
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <map>
 #include <string>
 
@@ -26,8 +26,7 @@ HttpRequest::HttpRequest() :
         chunked_(false),
         multipart_(false),
         recv_bytes_(0),
-        state_(sw_start),
-        body_data()
+        state_(sw_start)
 {
 }
 
@@ -42,8 +41,7 @@ HttpRequest::HttpRequest(const HttpRequest& other) :
         chunked_(other.chunked_),
         boundary_(other.boundary_),
         recv_bytes_(other.recv_bytes_),
-        state_(other.state_),
-        body_data(other.body_data)
+        state_(other.state_)
 {
 }
 
@@ -63,7 +61,6 @@ void HttpRequest::reset()
 	boundary_.clear();
 	multipart_ = false;
 	recv_bytes_ = 0;
-	body_data.reset();
 }
 
 HttpRequest& HttpRequest::operator=(const HttpRequest& other)
@@ -85,10 +82,54 @@ std::string extractBoundary(const std::string& content_type)
 	std::string::size_type p = content_type.find("boundary=");
 	if (p == std::string::npos)
 		return "";
-	return content_type.substr(p + 9);
+
+	p += 9;
+
+	std::string::size_type end = content_type.find(';', p);
+
+	std::string            boundary = content_type.substr(
+	    p, end == std::string::npos ? std::string::npos : end);
+
+	if (boundary.size() >= 2 && boundary[0] == '"'
+	    && boundary[boundary.size() - 1] == '"')
+	{
+		boundary = boundary.substr(1, boundary.size() - 2);
+	}
+
+	return boundary;
 }
 
-void HttpRequest::parseHeaders(const std::string& headers)
+void HttpRequest::processHeaderFields()
+{
+	std::map< std::string, std::string >::iterator it = headers_.begin();
+	for (; it != headers_.end(); ++it)
+	{
+		if (it->first == "Content-Length")
+			content_length_ = ws::stosize(it->second);
+
+		if (it->first == "Transfer-Encoding" && it->second == "chunked")
+		{
+			chunked_ = true;
+		}
+
+		if (it->first == "Content-Type"
+		    && it->second.find("multipart/form-data;") == 0)
+		{
+			multipart_ = true;
+			boundary_ = extractBoundary(it->second);
+			if (boundary_.empty())
+			{
+				fail(HTTP_BAD_REQUEST);
+				return;
+			}
+		}
+	}
+
+	if (headers_.find("Content-Length") != headers_.end() && chunked_)
+		fail(HTTP_BAD_REQUEST);
+}
+
+void HttpRequest::parseHeaderLines(const std::string& headers)
 {
 	size_t pos = 0;
 	while (pos < headers.size())
@@ -102,27 +143,6 @@ void HttpRequest::parseHeaders(const std::string& headers)
 		parseHeaderLine(headers.substr(pos, p - pos));
 		pos = p + 2;
 	}
-
-	std::map< std::string, std::string >::iterator it = headers_.begin();
-	for (; it != headers_.end(); ++it)
-	{
-		if (it->first == "Content-Length")
-			content_length_ = ws::stosize(it->second);
-		if (it->first == "Transfer-Encoding" && it->second == "chunked")
-		{
-			body_data.setChunked(true);
-			chunked_ = true;
-		}
-		if (it->first == "Content-Type"
-		    && it->second.find("multipart/form-data; boundary=") == 0)
-		{
-			boundary_ = extractBoundary(it->second);
-			multipart_ = true;
-			body_data.setBoundary(boundary_);
-		}
-	}
-	if (headers_.find("Content-Length") != headers_.end() && chunked_)
-		fail(HTTP_BAD_REQUEST);
 }
 
 void HttpRequest::parseHeaderLine(const std::string& header_line)
@@ -134,9 +154,6 @@ void HttpRequest::parseHeaderLine(const std::string& header_line)
 		return;
 	}
 	std::string name = header_line.substr(0, p);
-
-	p += 1;
-
 	std::string value = header_line.substr(p + 1);
 	headers_[name] = ws::strip(value);
 }
@@ -273,7 +290,8 @@ void HttpRequest::parse(std::string& raw_data)
 					return;
 				}
 
-				parseHeaders(raw_data.substr(0, p + CRLF_LEN));
+				parseHeaderLines(raw_data.substr(0, p + CRLF_LEN));
+				processHeaderFields();
 				raw_data.erase(0, p + CRLF_LEN + CRLF_LEN);
 				state_ = method_ != "POST" ? sw_done : sw_almost_done;
 			}
@@ -313,10 +331,9 @@ size_t HttpRequest::getContentLenght() const
 	return content_length_;
 }
 
-size_t	HttpRequest::getReceivedBytes() const
+size_t HttpRequest::getReceivedBytes() const
 {
 	return this->recv_bytes_;
-
 }
 
 std::string HttpRequest::getHeader(const std::string& name) const
@@ -357,7 +374,3 @@ bool HttpRequest::isMultipart() const
 	return this->multipart_;
 }
 
-BodyStream HttpRequest::getbodyStream() const
-{
-	return body_data;
-}

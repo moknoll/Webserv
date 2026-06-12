@@ -20,6 +20,7 @@
 #include <fstream>
 #include <string>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 bool ws::isFile(const std::string& path)
@@ -46,6 +47,33 @@ bool ws::isDirectory(const std::string& path)
 	}
 
 	return false;
+}
+
+PathInfo ws::checkPath(const std::string& path)
+{
+	PathInfo info;
+
+	info.exists = false;
+	info.readable = false;
+	info.writable = false;
+	info.executable = false;
+	info.type = PATH_NOT_EXISTS;
+
+	struct stat st;
+	if (stat(path.c_str(), &st) != 0)
+		return info;
+
+	info.exists = true;
+	info.readable = (access(path.c_str(), R_OK) == 0);
+	info.writable = (access(path.c_str(), W_OK) == 0);
+	info.executable = (access(path.c_str(), X_OK) == 0);
+
+	if (S_ISDIR(st.st_mode))
+		info.type = PATH_IS_DIR;
+	else if (S_ISREG(st.st_mode))
+		info.type = PATH_IS_FILE;
+
+	return info;
 }
 
 size_t ws::getFileSize(const std::string& path)

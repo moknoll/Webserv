@@ -18,6 +18,31 @@
 #include <sys/stat.h>
 #include <vector>
 
+enum FileError_e
+{
+	FILE_OK = 0,
+	ERR_NOT_FOUND,
+	ERR_PERMISSION,
+	ERR_IS_DIR,
+	ERR_UNKNOWN
+};
+
+enum PathType
+{
+	PATH_NOT_EXISTS,
+	PATH_IS_FILE,
+	PATH_IS_DIR
+};
+
+struct PathInfo
+{
+	PathType type;
+	bool     exists;
+	bool     readable;
+	bool     writable;
+	bool     executable;
+};
+
 class ws
 {
   public:
@@ -97,6 +122,8 @@ class ws
 	 *       symlinks, special files, or non-existent paths.
 	 */
 	static bool                       isDirectory(const std::string& path);
+
+	static PathInfo                   checkPath(const std::string& path);
 
 	/**
 	 * @brief Extracts and normalizes the file extension from a given file path.

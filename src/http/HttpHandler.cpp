@@ -12,7 +12,6 @@
 
 #include "HttpHandler.hpp"
 #include "../lib/ws.hpp"
-#include "BodyStream.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 #include "constants.hpp"
@@ -64,15 +63,16 @@ HttpHandler::~HttpHandler()
 
 HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
+	if (req.getRequestStatus() != HTTP_OK)
+	{
+		state_ = HTTP_CLOSE;
+		return makeStatusResponse(req.getRequestStatus());
+	}
+
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
-	const std::string& method = req.getMethod();
 
 	this->loc_ = findMatchUri(uri, config_.locations);
-
-	if (req.getRequestStatus() != HTTP_OK)
-		return makeStatusResponse(req.getRequestStatus());
-
 	if (this->loc_ == NULL)
 		return makeStatusResponse(HTTP_NOT_FOUND);
 
@@ -80,6 +80,8 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	if (this->loc_->has_redirect && this->loc_->redirect.first != -1)
 		// if (this->loc_->redirect.first != -1)
 		return redirect(loc_->redirect.first, loc_->redirect.second, host);
+
+	const std::string& method = req.getMethod();
 
 	if (!isAllowedMethod(method))
 		return makeStatusResponse(HTTP_NOT_ALLOWED);
@@ -163,48 +165,42 @@ std::string HttpHandler::sanitizeFileName(const std::string& filename)
 	}
 
 	if (safe_name.empty())
-		safe_name = "upload_" + ws::randString(5); // generate file name
+		safe_name =
+		    "upload_" + ws::randString(5); // generate file name or with time
 
 	return safe_name;
 }
 
-std::string HttpHandler::buildUploadPath(const HttpRequest& req,
-                                         const std::string& filename)
+std::string HttpHandler::buildUploadPath(const std::string& filename)
 {
 	std::string path = loc_->upload_path;
 
-	if (loc_->upload_path.empty())
-		path = loc_->root;
+	if (!path.empty() && path[path.size() - 1] != '/')
+		path += '/';
 
 	if (!filename.empty())
 	{
-		std::string safe_name = sanitizeFileName(filename);
+		path += sanitizeFileName(filename);
+	}
 
-		if (!path.empty() && path[path.size() - 1] != '/')
-			path += '/';
-		path += safe_name;
-	}
-	else
-	{
-		path = buildPath(req.getURI());
-	}
+	// if filename is empty generate name with time
 
 	return path;
 }
 
-int HttpHandler::openUploadFile(const std::string& path, HttpResponse& err_resp)
+int HttpHandler::openUploadFile(const std::string& path, HttpResponse& err_res)
 {
 	int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
 	if (fd == -1)
 	{
 		if (errno == EEXIST)
-			err_resp = makeStatusResponse(HTTP_CONFLICT);
+			err_res = makeStatusResponse(HTTP_CONFLICT);
 		else if (errno == EACCES || errno == EISDIR)
-			err_resp = makeStatusResponse(HTTP_FORBIDDEN);
+			err_res = makeStatusResponse(HTTP_FORBIDDEN);
 		else if (errno == ENOSPC)
-			err_resp = makeStatusResponse(HTTP_INSUFFICIENT_STORAGE);
+			err_res = makeStatusResponse(HTTP_INSUFFICIENT_STORAGE);
 		else
-			err_resp = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 
 		return fd;
 	}
@@ -212,10 +208,10 @@ int HttpHandler::openUploadFile(const std::string& path, HttpResponse& err_resp)
 	return fd;
 }
 
-const char* HttpHandler::find_bytes_(const char* ext_start,
-                                     const char* ext_end,
-                                     const char* s_start,
-                                     const char* s_end)
+static const char* find_bytes_(const char* ext_start,
+                               const char* ext_end,
+                               const char* s_start,
+                               const char* s_end)
 {
 	size_t s_len = s_end - s_start;
 	if (s_len == 0)
@@ -229,12 +225,15 @@ const char* HttpHandler::find_bytes_(const char* ext_start,
 }
 
 bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
-                                           HttpResponse&      err_resp)
+                                           HttpResponse&      err_res)
 {
 	std::ifstream in(temp_file_.c_str(), std::ios::binary);
 
 	if (!in.is_open())
+	{
+		err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 		return false;
+	}
 
 	std::string line;
 	std::string filename;
@@ -248,19 +247,23 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 
 		std::string::size_type e_p = line.find("\"\r", p);
 		if (e_p == std::string::npos)
+		{
+			err_res = makeStatusResponse(HTTP_BAD_REQUEST);
 			return false;
+		}
 		p += 10;
 		filename = line.substr(p, e_p - p);
 	}
 
-	std::string path = buildUploadPath(req, filename);
+	std::string path = buildUploadPath(filename);
+	std::cout << path << '\n';
 	if (!validateUploadPath(path))
 	{
-		err_resp = makeStatusResponse(HTTP_FORBIDDEN);
+		err_res = makeStatusResponse(HTTP_FORBIDDEN);
 		return false;
 	}
 
-	int fd = openUploadFile(path.c_str(), err_resp);
+	int fd = openUploadFile(path.c_str(), err_res);
 	if (fd == -1)
 		return false;
 
@@ -311,64 +314,136 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 	return true;
 }
 
-HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
+bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 {
-	if (req.getContentLenght() > loc_->client_max_body_size)
+	std::string filename = req.getHeader("X-Filename");
+	if (filename.empty())
 	{
-		state_ = HTTP_CLOSE;
-		return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
-	}
-	if (req.isChunked() && req.getReceivedBytes() > loc_->client_max_body_size)
-	{
-		state_ = HTTP_CLOSE;
-		return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
+		err_res = makeStatusResponse(HTTP_BAD_REQUEST);
+		return false;
 	}
 
-	// const std::string data = req.getbodyStream().getData();
+	std::string path = buildUploadPath(filename);
+	if (!validateUploadPath(path))
+	{
+		err_res = makeStatusResponse(HTTP_FORBIDDEN);
+		return false;
+	}
+
+	std::ifstream in(temp_file_.c_str(), std::ios::binary);
+	if (!in.is_open())
+	{
+		err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+		return false;
+	}
+
+	int fd = openUploadFile(path.c_str(), err_res);
+	if (fd == -1)
+		return false;
+
+	const size_t        buf_size = 4096;
+	std::vector< char > buffer(buf_size);
+	while (in)
+	{
+		in.read(&buffer[0], buf_size);
+		size_t bytes_read = in.gcount();
+		if (bytes_read == 0)
+			break;
+		if (write(fd, &buffer[0], bytes_read) < 0)
+		{
+			close(fd);
+			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+			return false;
+		}
+	}
+	close(fd);
+	return true;
+}
+
+bool HttpHandler::exceedsBodySizeLimit(const HttpRequest& req) const
+{
+	const size_t mbs = loc_->client_max_body_size;
+	const size_t cl = req.getContentLenght();
+	const size_t rb = req.getReceivedBytes();
+
+	return (cl > mbs || (req.isChunked() && rb > mbs));
+}
+
+bool HttpHandler::saveBodyToTempFile(const HttpRequest& req,
+                                     HttpResponse&      err_res)
+{
 	const std::string data = req.getbody();
 
 	if (state_ == HTTP_INIT)
 	{
-		temp_file_ = "./wsload_" + ws::randString();
+		temp_file_ = "/tmp/wsload_" + ws::randString();
 
 		fd_ = open(
 		    temp_file_.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
 		if (fd_ == -1)
-			return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+		{
+			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+			return false;
+		}
 		state_ = HTTP_RECV;
 	}
 
-	if (!writeToFile(data))
+	if (!data.empty())
 	{
-		resetUpload();
-		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+		ssize_t n = write(fd_, data.data(), data.size());
+		if (n == -1)
+		{
+			resetUpload();
+			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+			return false;
+		}
 	}
+
+	return true;
+}
+
+HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
+{
+	if (exceedsBodySizeLimit(req))
+	{
+		state_ = HTTP_CLOSE;
+		return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
+	}
+
+	if (loc_->upload_path.empty())
+	{
+		state_ = HTTP_CLOSE;
+		std::string path = buildPath(req.getURI());
+		PathInfo    info = ws::checkPath(path);
+		if (info.exists)
+		{
+			if (info.type == PATH_IS_DIR)
+				return makeStatusResponse(HTTP_FORBIDDEN);
+			if (info.type == PATH_IS_FILE)
+				return makeStatusResponse(HTTP_NOT_ALLOWED);
+		}
+		else
+			return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+	}
+
+	HttpResponse error_respons;
+
+	if (!saveBodyToTempFile(req, error_respons))
+		return error_respons;
 
 	if (req.isComplete())
 	{
 		closeFile();
-
-		HttpResponse error_respons;
-		if (req.isMultipart())
-		{
-			if (!saveUploadedFileFromTemp(req, error_respons))
-			{
-				std::remove(temp_file_.c_str());
-				return error_respons;
-			}
-		}
-		else
-		{
-			std::string path = buildUploadPath(req, "");
-			int         fd = openUploadFile(path, error_respons);
-			if (fd == -1)
-				return error_respons;
-			close(fd);
-			if (std::rename(temp_file_.c_str(), path.c_str()) != 0)
-				return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-		}
-		std::remove(temp_file_.c_str());
 		state_ = HTTP_COMPLETE;
+
+		bool success = req.isMultipart() ?
+		                   saveUploadedFileFromTemp(req, error_respons) :
+		                   savePlainBody(req, error_respons);
+
+		std::remove(temp_file_.c_str());
+		if (!success)
+			return error_respons;
+
 		return makeStatusResponse(HTTP_CREATED);
 	}
 
@@ -397,6 +472,29 @@ HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
 	HttpResponse resp(HTTP_NO_CONTENT);
 	resp.setFullResponse();
 	return resp;
+}
+
+HttpResponse HttpHandler::handleCGI(const HttpRequest& req)
+{
+	if (req.getMethod() == "POST" && !req.isComplete())
+	{
+		if (exceedsBodySizeLimit(req))
+		{
+			state_ = HTTP_CLOSE;
+			return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
+		}
+
+		HttpResponse error_respons;
+		if (saveBodyToTempFile(req, error_respons))
+			return error_respons;
+	}
+
+	if (req.isComplete())
+	{
+		closeFile();
+	}
+
+	return HttpResponse();
 }
 
 HttpResponse HttpHandler::makeStatusResponse(int status)

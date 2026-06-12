@@ -40,11 +40,12 @@ class HttpRequest
 
 	HttpRequest&      operator=(const HttpRequest& other);
 
+	void              parse(std::string& raw);
+
 	std::string       getURI() const;
 	std::string       getHeader(const std::string& name) const;
 	std::string       getMethod() const;
 	const std::string getbody() const;
-	BodyStream        getbodyStream() const; // WIP
 	int               getRequestStatus() const;
 	size_t            getContentLenght() const;
 	size_t            getReceivedBytes() const;
@@ -52,7 +53,6 @@ class HttpRequest
 
 	void              setStatus(int status);
 
-	void              parse(std::string& raw);
 	bool              isChunked() const;
 	bool              isMultipart() const;
 	bool              isComplete() const;
@@ -73,12 +73,13 @@ class HttpRequest
 	std::string                          boundary_;
 	size_t                               recv_bytes_;
 	State                                state_;
-	BodyStream                           body_data; // WIP
 
 	void parse_request_line(const std::string& raw);
 	void parseBody(const std::string& raw);
 	void parseHeaderLine(const std::string& header_line);
+	void parseHeaderLines(const std::string& headers);
 	void parseHeaders(const std::string& headers);
+	void processHeaderFields();
 	void parceChunked(std::string& raw_data);
 	bool isValidMethod(const std::string& method);
 	void fail(int status);

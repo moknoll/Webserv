@@ -73,22 +73,4 @@
 #define HTTP_GATEWAY_TIME_OUT                504
 #define HTTP_INSUFFICIENT_STORAGE            507
 
-typedef enum http_state_e
-{
-	HTTP_INIT_REQUEST_STATE = 0,
-	HTTP_READING_STATE,
-	HTTP_WRITING_STATE,
-	HTTP_KEEPALIVE_STATE,
-	HTTP_CLOSE
-} http_state_t;
-
-enum FileError_e
-{
-	FILE_OK = 0,
-	ERR_NOT_FOUND,
-	ERR_PERMISSION,
-	ERR_IS_DIR,
-	ERR_UNKNOWN
-};
-
 #endif /*  _HTTP_CONSTANTS_ */

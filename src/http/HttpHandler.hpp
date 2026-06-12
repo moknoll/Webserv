@@ -56,6 +56,7 @@ class HttpHandler
 	HttpResponse               handleGET(const HttpRequest& req);
 	HttpResponse               handlePOST(const HttpRequest& req);
 	HttpResponse               handleDELETE(const HttpRequest& req);
+	HttpResponse               handleCGI(const HttpRequest& req);
 	HttpResponse               makeStatusResponse(int status);
 	HttpResponse               makeFileResponse(const std::string& path);
 
@@ -74,19 +75,17 @@ class HttpHandler
 	std::string buildPath(const std::string& uri) const;
 	bool        isAllowedMethod(const std::string& method) const;
 
-	std::string buildUploadPath(const HttpRequest& req,
-	                            const std::string& filename);
+	std::string buildUploadPath(const std::string& filename);
 	std::string sanitizeFileName(const std::string& filename);
 	bool        validateUploadPath(const std::string& path);
-	int         openUploadFile(const std::string& path, HttpResponse& err_resp);
-	bool        writeToFile(const std::string& data);
-	void        resetUpload();
-	void        closeFile();
-	bool        saveUploadedFileFromTemp(const HttpRequest& req,
-	                                     HttpResponse&      err_resp);
-	const char* find_bytes_(const char* ext_start,
-	                        const char* ext_end,
-	                        const char* s_start,
-	                        const char* s_end);
+	int         openUploadFile(const std::string& path, HttpResponse& err_res);
+	bool        exceedsBodySizeLimit(const HttpRequest& req) const;
+	bool saveBodyToTempFile(const HttpRequest& req, HttpResponse& err_res);
+	bool writeToFile(const std::string& data);
+	void resetUpload();
+	void closeFile();
+	bool savePlainBody(const HttpRequest& req, HttpResponse& err_res);
+	bool saveUploadedFileFromTemp(const HttpRequest& req,
+	                              HttpResponse&      err_res);
 };
 

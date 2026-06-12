@@ -18,7 +18,6 @@ SRC			:= src/main.cpp \
 			   src/http/HttpRequest.cpp \
 			   src/http/HttpResponse.cpp \
 			   src/http/HttpHandler.cpp \
-			   src/http/BodyStream.cpp \
 			   src/logger/Logger.cpp \
 
 OBJ			:= $(OBJDIR)/main.o \
@@ -32,7 +31,6 @@ OBJ			:= $(OBJDIR)/main.o \
 			   $(OBJDIR)/http/HttpRequest.o \
 			   $(OBJDIR)/http/HttpResponse.o \
 			   $(OBJDIR)/http/HttpHandler.o \
-			   $(OBJDIR)/http/BodyStream.o \
 			   $(OBJDIR)/logger/Logger.o \
 
 LIB_NAME	:= libws.a
