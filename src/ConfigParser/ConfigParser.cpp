@@ -175,14 +175,13 @@ void ConfigParser::parseServer()
         else if (tok == "server_name")
         {
             std::string h = tokenizer.next();
-            //validateIPv4(h);
             server.host = h;
             expect(";");
         }
         else if (tok == "listen")
         {
             std::string p = tokenizer.next();
-            validateNumber(p);
+            validateIPv4(p);
             int port = std::atoi(p.c_str());
             if (port < 1 || port > 65535)
                 throw std::runtime_error("Wrong port: " + p);
@@ -240,6 +239,8 @@ void ConfigParser::parseServer()
             throw std::runtime_error("unknown directive in server: " + tok);
         }
     }
+    if (!validateRootLocation(server))
+        throw std::runtime_error("No root path location. Check and fix your .conf file");
 
     servers.push_back(server);
 }
@@ -356,8 +357,7 @@ void ConfigParser::parseLocation(ServerConfig &server)
 
     server.locations.push_back(loc);
 
-    if (!validateRootLocation(server))
-        throw std::runtime_error("No root path location. Check and fix your .conf file");
+    
 }
 
 
@@ -368,7 +368,7 @@ const std::vector<ServerConfig> &ConfigParser::getServers() const
     return servers;
 }
 
-bool validateRootLocation(ServerConfig &server) {
+bool ConfigParser::validateRootLocation(ServerConfig &server) {
     for (int i = 0; i < server.locations.size(); i++) {
         if (server.locations[i].path == "/")
             return true;
