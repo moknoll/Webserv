@@ -44,6 +44,9 @@ std::string CgiContext::buildPath(const std::string& uri,
 
 // void CgiContext::buildCgiEnv(const HttpRequest& req, const Location& loc) {}
 
+// bool executeChild(CgiContext &ctx)
+
+
 HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc)
 {
 	const std::string uri = req.getURI();

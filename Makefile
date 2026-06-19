@@ -40,15 +40,8 @@ LIB_DIR		:= src/lib/
 LIB			:= $(LIB_DIR)$(LIB_NAME)
 
 
-#################################################
-# CLIENT 		:= client.exe
-# CLIENT_DIR	:=	src/client/
-
-################################################
-
 # OBJ			:= $(patsubst src/%.cpp,$(OBJDIR)/%.o,$(SRC))
 
-# all: $(NAME) $(CLIENT)
 all: $(NAME)
 
 $(NAME): $(OBJ) $(LIB)
@@ -70,9 +63,6 @@ $(LIB):
 	# @make -C $(LIB_DIR) --no-print-directory
 	@make -C $(LIB_DIR)
 
-# $(CLIENT):
-	# @make -C $(CLIENT_DIR)
-
 clean:
 	$(RM) $(OBJ)
 	$(RMDIR) $(OBJDIR)
@@ -81,7 +71,6 @@ clean:
 fclean: clean
 	$(RM) $(NAME)
 	@make fclean -C $(LIB_DIR) --no-print-directory
-	# @make fclean -C $(CLIENT_DIR) --no-print-directory
 
 re: fclean all
 
