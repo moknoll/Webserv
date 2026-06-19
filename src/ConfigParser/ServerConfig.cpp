@@ -11,12 +11,12 @@ ServerConfig::ServerConfig()
 {
 }
 
-Location::Location()
+Location::Location(const ServerConfig &srv)
     : path("/"),
-      root(),
-      index("index.html"),
+      root(srv.root),
+      index(srv.index),
       autoindex(false),
-      client_max_body_size(0),
+      client_max_body_size(srv.client_max_body_size),
       redirect(std::make_pair(-1, "")),
       upload_path(""),
       cgi_extension(""),

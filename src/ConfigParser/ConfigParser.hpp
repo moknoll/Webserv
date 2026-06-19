@@ -34,4 +34,5 @@ public:
 
     void parse();
     const std::vector<ServerConfig> &getServers() const;
+    bool validateRootLocation(ServerConfig &server);
 };

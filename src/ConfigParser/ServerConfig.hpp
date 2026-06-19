@@ -4,6 +4,8 @@
 #include <vector>
 #include <map>
 
+struct Serverconfig;
+
 struct Location
 {
     std::string                     path;                   // "/uploads", "/cgi-bin/py"
@@ -20,6 +22,7 @@ struct Location
     bool                            has_redirect;           // 
     bool                            has_cgi;                //
     Location();
+    Location(const ServerConfig &srv);
 };
 
 struct ServerConfig
