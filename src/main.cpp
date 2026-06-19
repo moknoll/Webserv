@@ -136,12 +136,27 @@ getConfig(const std::string& host, int port, const std::string& s_name)
 	autoindex_loc.index = "";
 	autoindex_loc.allowed_methods.push_back("GET");  // = {"GET"};
 	autoindex_loc.redirect = std::make_pair(-1, ""); // 301 ->
+	//
+	//
+	Location cgi_loc;
+	cgi_loc.path = "/cgi-bin";
+	cgi_loc.root = "./www";
+	cgi_loc.autoindex = false;
+	cgi_loc.cgi_extension = "py";
+	cgi_loc.cgi_path = "/usr/bin/python3";
+	cgi_loc.has_cgi = true;
+	cgi_loc.allowed_methods.push_back("GET");  // = {"GET"};
+	cgi_loc.allowed_methods.push_back("POST");
+	cgi_loc.allowed_methods.push_back("DELETE");
+	cgi_loc.redirect = std::make_pair(-1, ""); // 301 ->
+
 
 	// server.locations = {root_loc, upload_loc, redirect_loc};
 	server.locations.push_back(root_loc);
 	server.locations.push_back(upload_loc);
 	server.locations.push_back(redirect_loc);
 	server.locations.push_back(autoindex_loc);
+	server.locations.push_back(cgi_loc);
 
 	return server;
 }

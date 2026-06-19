@@ -12,6 +12,7 @@ SRC			:= src/main.cpp \
 			   src/server/Core.cpp \
 			   src/server/Socket.cpp \
 			   src/server/Client.cpp \
+			   src/cgi/Cgi.cpp \
 			   src/ConfigParser/ConfigParser.cpp \
 			   src/ConfigParser/ServerConfig.cpp \
 			   src/ConfigParser/Tokenizer.cpp \
@@ -25,6 +26,7 @@ OBJ			:= $(OBJDIR)/main.o \
 			   $(OBJDIR)/server/Core.o \
 			   $(OBJDIR)/server/Socket.o \
 			   $(OBJDIR)/server/Client.o \
+			   $(OBJDIR)/cgi/Cgi.o \
 			   $(OBJDIR)/ConfigParser/ConfigParser.o \
 			   $(OBJDIR)/ConfigParser/ServerConfig.o \
 			   $(OBJDIR)/ConfigParser/Tokenizer.o \

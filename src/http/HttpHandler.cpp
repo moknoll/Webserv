@@ -11,6 +11,7 @@
 /* ************************************************************************** */
 
 #include "HttpHandler.hpp"
+#include "../cgi/Cgi.hpp"
 #include "../lib/ws.hpp"
 #include "../server/Client.hpp"
 #include "HttpRequest.hpp"
@@ -78,7 +79,7 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	if (this->loc_ == NULL)
 		return makeStatusResponse(HTTP_NOT_FOUND);
 
-	// if redirect -> redirect(status, location)
+	// if redirect -> redirect(status, target)
 	if (this->loc_->has_redirect && this->loc_->redirect.first != -1)
 		// if (this->loc_->redirect.first != -1)
 		return redirect(loc_->redirect.first, loc_->redirect.second, host);
@@ -88,8 +89,10 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	if (!isAllowedMethod(method))
 		return makeStatusResponse(HTTP_NOT_ALLOWED);
 
-	// if (!loc->cgi_extension.empty())
-	// 		handleCGI();
+	if (loc_->has_cgi)
+	{
+		return handleCGI(req);
+	}
 
 	if (method == "GET")
 		return handleGET(req);
@@ -491,7 +494,10 @@ HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
 
 HttpResponse HttpHandler::handleCGI(const HttpRequest& req)
 {
-	(void) req;
+	CgiContext cgi;
+
+	return cgi.handle(req, *loc_);
+
 	return HttpResponse();
 }
 
@@ -519,16 +525,16 @@ HttpResponse HttpHandler::makeStatusResponse(int status)
 }
 
 HttpResponse HttpHandler::redirect(int                status,
-                                   const std::string& location,
+                                   const std::string& target,
                                    const std::string& host)
 {
 	HttpResponse res(status);
-	std::string  l = location;
+	std::string  t = target;
 
-	if (location[0] == '/')
-		l = "http://" + host + location;
+	if (target[0] == '/')
+		t = "http://" + host + target;
 
-	res.setHeader("Location", l);
+	res.setHeader("Location", t);
 
 	res.setFullResponse(res.buildErrorPage(status), "html");
 
