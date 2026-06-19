@@ -13,7 +13,7 @@ ServerConfig::ServerConfig()
 
 Location::Location()
     : path("/"),
-      root(""),
+      root(),
       index("index.html"),
       autoindex(false),
       client_max_body_size(0),
@@ -25,3 +25,4 @@ Location::Location()
       has_cgi(false)
 {
 }
+
