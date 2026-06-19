@@ -12,7 +12,7 @@
 
 #pragma once
 
-#include "BodyStream.hpp"
+#include "../ConfigParser/ServerConfig.hpp"
 #include <cstddef>
 #include <map>
 #include <string>
@@ -40,7 +40,7 @@ class HttpRequest
 
 	HttpRequest&      operator=(const HttpRequest& other);
 
-	void              parse(std::string& raw);
+	void              parse(std::string& raw, const ServerConfig& cfg);
 
 	std::string       getURI() const;
 	std::string       getHeader(const std::string& name) const;
@@ -50,6 +50,7 @@ class HttpRequest
 	size_t            getContentLenght() const;
 	size_t            getReceivedBytes() const;
 	std::string       getBoundary() const;
+	std::string       getBodyTempFileName() const;
 
 	void              setStatus(int status);
 
@@ -73,15 +74,18 @@ class HttpRequest
 	std::string                          boundary_;
 	size_t                               recv_bytes_;
 	State                                state_;
+	std::string                          body_temp_file_;
+	int                                  fd_;
 
 	void parse_request_line(const std::string& raw);
-	void parseBody(const std::string& raw);
+	void parseBody(std::string& raw_data, const ServerConfig& cfg);
 	void parseHeaderLine(const std::string& header_line);
 	void parseHeaderLines(const std::string& headers);
 	void parseHeaders(const std::string& headers);
 	void processHeaderFields();
-	void parceChunked(std::string& raw_data);
+	void parseChunked(std::string& raw_data);
 	bool isValidMethod(const std::string& method);
 	void fail(int status);
+	bool saveBodyToTempFile(std::string& raw_data);
 };
 

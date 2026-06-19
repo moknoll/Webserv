@@ -206,7 +206,7 @@ void Core::_handleClientMessage(int clientSocketFd)
 		client->appendRecvBuffer(buffer, recv_bytes);
 		client->processRequest();
 
-		if (client->isComplete())
+		if (client->isRequestComplete())
 		{
 			setEvent(clientSocketFd, POLLOUT);
 		}
@@ -240,7 +240,7 @@ void Core::_sendResponseToClient(int clientSocketFd)
 	{
 		client->reset();
 		std::cout << "Response sent" << std::endl;
-		if (client->isKeepElive())
+		if (client->isKeepAlive())
 		{
 			setEvent(clientSocketFd, POLLIN);
 		}

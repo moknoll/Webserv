@@ -2,8 +2,14 @@
 #include <cstddef>
 #include <unistd.h>
 
-Client::Client(int fd, const ServerConfig& config)
-    : fd_(fd), request_complete_(false), keep_elive_(true), handler(config)
+Client::Client(int fd, const ServerConfig& config) :
+        config_(config),
+        fd_(fd),
+        request_complete_(false),
+        keep_alive_(true),
+        request(),
+        response(),
+        handler(config)
 {
 }
 
@@ -14,16 +20,17 @@ Client::~Client()
 
 void Client::processRequest()
 {
-	request.parse(recv_buffer_);
+	request.parse(recv_buffer_, config_);
 
-	if (request.isComplete() || request.isAlmostDone())
+	// if (request.isComplete() || request.isAlmostDone())
+	if (request.isComplete())
 	{
 		response = handler.handle(request);
-		if (response.isReady())
+		if (response.isReady()) // ???
 		{
 			request_complete_ = true;
 			if (handler.getState() == HttpHandler::HTTP_CLOSE)
-				keep_elive_ = false;
+				keep_alive_ = false;
 			send_buffer_ = response.toString();
 		}
 	}
@@ -52,6 +59,39 @@ void Client::reset()
 	request_complete_ = false;
 }
 
+static bool matchPrefix(const std::string& uri, const std::string& loc)
+{
+	if (uri.compare(0, loc.size(), loc) != 0)
+		return false;
+	if (uri.size() == loc.size())
+		return true;
+	if (loc[loc.size() - 1] == '/')
+		return true;
+
+	return uri[loc.size()] == '/';
+}
+
+const Location* Client::FindMatchingUri(const std::string&  uri,
+                                        const ServerConfig& cfg)
+{
+	const std::vector< Location >& locations = cfg.locations;
+	const Location*                best_loc = NULL;
+	size_t                         len_best_loc = 0;
+
+	for (size_t i = 0; i < locations.size(); ++i)
+	{
+		const std::string& path = locations[i].path;
+
+		if (matchPrefix(uri, path) && path.size() > len_best_loc)
+		{
+			best_loc = &locations[i];
+			len_best_loc = path.size();
+		}
+	}
+
+	return best_loc;
+}
+
 void Client::setRecvBuffer(const std::string& buffer)
 {
 	this->recv_buffer_ = buffer;
@@ -62,14 +102,14 @@ void Client::setSendBuffer(const std::string& buffer)
 	this->send_buffer_ = buffer;
 }
 
-bool Client::isComplete() const
+bool Client::isRequestComplete() const
 {
 	return request_complete_;
 }
 
-bool Client::isKeepElive() const
+bool Client::isKeepAlive() const
 {
-	return keep_elive_;
+	return keep_alive_;
 }
 
 std::string Client::getResponseBuffer() const

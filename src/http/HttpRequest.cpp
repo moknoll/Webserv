@@ -12,13 +12,16 @@
 
 #include "HttpRequest.hpp"
 #include "../lib/ws.hpp"
+#include "../server/Client.hpp"
 #include "constants.hpp"
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <iostream>
+#include <fcntl.h>
 #include <map>
 #include <string>
+#include <unistd.h>
 
 HttpRequest::HttpRequest() :
         err_status_(HTTP_OK),
@@ -26,7 +29,8 @@ HttpRequest::HttpRequest() :
         chunked_(false),
         multipart_(false),
         recv_bytes_(0),
-        state_(sw_start)
+        state_(sw_start),
+        fd_(-1)
 {
 }
 
@@ -61,6 +65,12 @@ void HttpRequest::reset()
 	boundary_.clear();
 	multipart_ = false;
 	recv_bytes_ = 0;
+	if (fd_ != -1)
+		close(fd_);
+	fd_ = -1;
+	if (!body_temp_file_.empty())
+		std::remove(body_temp_file_.c_str());
+	body_temp_file_.clear();
 }
 
 HttpRequest& HttpRequest::operator=(const HttpRequest& other)
@@ -173,7 +183,7 @@ bool HttpRequest::isValidMethod(const std::string& method)
 	return false;
 }
 
-void HttpRequest::parceChunked(std::string& raw_data)
+void HttpRequest::parseChunked(std::string& raw_data)
 {
 	size_t      pos = 0;
 	std::string body;
@@ -201,10 +211,64 @@ void HttpRequest::parceChunked(std::string& raw_data)
 		raw_data.erase(0, pos);
 	}
 
-	body_ = body;
+	// body_ = body;
+	saveBodyToTempFile(body);
 }
 
-void HttpRequest::parse(std::string& raw_data)
+bool HttpRequest::saveBodyToTempFile(std::string& raw_data)
+{
+	body_temp_file_ = "/tmp/wsload_" + ws::randString();
+
+	if (fd_ == -1)
+	{
+		fd_ = open(body_temp_file_.c_str(),
+		           O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW,
+		           0644);
+		if (fd_ == -1)
+		{
+			fail(HTTP_INTERNAL_SERVER_ERROR);
+			return false;
+		}
+	}
+
+	if (!raw_data.empty())
+	{
+		ssize_t n = write(fd_, raw_data.data(), raw_data.size());
+		if (n == -1)
+		{
+			close(fd_);
+			fd_ = -1;
+			fail(HTTP_INTERNAL_SERVER_ERROR);
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void HttpRequest::parseBody(std::string& raw_data, const ServerConfig& cfg)
+{
+	const Location* location = Client::FindMatchingUri(uri_, cfg);
+	if (location == NULL)
+	{
+		fail(HTTP_NOT_FOUND);
+		return;
+	}
+
+	if (content_length_ > location->client_max_body_size)
+	{
+		fail(HTTP_CONTENT_TOO_LARGE);
+		return;
+	}
+
+	if (chunked_)
+		parseChunked(raw_data);
+	else
+		saveBodyToTempFile(raw_data);
+	raw_data.clear();
+}
+
+void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
 {
 	static size_t CRLF_LEN = 2;
 
@@ -216,22 +280,19 @@ void HttpRequest::parse(std::string& raw_data)
 			case sw_almost_done:
 			{
 				recv_bytes_ += raw_data.size();
-				if (chunked_)
-				{
-					parceChunked(raw_data);
-				}
-				else
-				{
-					body_ = raw_data;
-					raw_data.clear();
-					if (recv_bytes_ >= content_length_)
-						state_ = sw_done;
-				}
-				// body_data.parse(raw_data);
-				// if (body_data.eof())
-				// state_ = sw_done;
-				// if (recv_bytes >= content_length_)
-				// state_ = sw_done;
+				// if (chunked_)
+				// {
+				// 	parseChunked(raw_data);
+				// }
+				// else
+				// {
+				// 	body_ = raw_data;
+				// 	raw_data.clear();
+				// }
+
+				parseBody(raw_data, cfg);
+				if (recv_bytes_ >= content_length_)
+					state_ = sw_done;
 				return;
 			}
 			case sw_start:
@@ -306,6 +367,8 @@ void HttpRequest::fail(int status)
 	state_ = sw_done;
 }
 
+// getters
+
 std::string HttpRequest::getMethod() const
 {
 	return this->method_;
@@ -342,6 +405,11 @@ std::string HttpRequest::getHeader(const std::string& name) const
 		return headers_.at(name);
 
 	return "";
+}
+
+std::string HttpRequest::getBodyTempFileName() const
+{
+	return body_temp_file_;
 }
 
 std::string HttpRequest::getBoundary() const

@@ -21,15 +21,16 @@
 class Client
 {
   private:
-	int          fd_;
-	std::string  recv_buffer_;
-	std::string  send_buffer_;
-	bool         request_complete_;
-	bool         keep_elive_;
+	const ServerConfig& config_;
+	int                 fd_;
+	std::string         recv_buffer_;
+	std::string         send_buffer_;
+	bool                request_complete_;
+	bool                keep_alive_;
 
-	HttpRequest  request;
-	HttpResponse response;
-	HttpHandler  handler;
+	HttpRequest         request;
+	HttpResponse        response;
+	HttpHandler         handler;
 
 	Client();
 	Client(const Client& other);
@@ -47,10 +48,12 @@ class Client
 
 	std::string getResponseBuffer() const; // ??????????
 	std::string getRequestBuffer() const;  // ???????????
-	bool        isComplete() const;
-	bool        isKeepElive() const;
+	bool        isRequestComplete() const;
+	bool        isKeepAlive() const;
 	int         getClientFd() const;
-
 	void        setSendBuffer(const std::string& response); // ???????
-	void        setRecvBuffer(const std::string& request);   // ??????????
+	void        setRecvBuffer(const std::string& request);  // ??????????
+
+	static const Location* FindMatchingUri(const std::string&  uri,
+	                                    const ServerConfig& cfg);
 };

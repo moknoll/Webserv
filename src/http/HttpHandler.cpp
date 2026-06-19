@@ -12,6 +12,7 @@
 
 #include "HttpHandler.hpp"
 #include "../lib/ws.hpp"
+#include "../server/Client.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 #include "constants.hpp"
@@ -55,8 +56,8 @@ HttpHandler::HttpHandler(const HttpHandler& other) :
 HttpHandler::~HttpHandler()
 {
 	closeFile();
-	if (!temp_file_.empty())
-		std::remove(temp_file_.c_str());
+	// if (!temp_file_.empty())
+	// std::remove(temp_file_.c_str());
 	if (state_ != HTTP_COMPLETE && !upload_file_path_.empty())
 		std::remove(upload_file_path_.c_str());
 }
@@ -72,7 +73,8 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
 
-	this->loc_ = findMatchUri(uri, config_.locations);
+	// this->loc_ = findMatchUri(uri, config_.locations);
+	this->loc_ = Client::FindMatchingUri(uri, config_);
 	if (this->loc_ == NULL)
 		return makeStatusResponse(HTTP_NOT_FOUND);
 
@@ -128,13 +130,13 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 	return makeFileResponse(path);
 }
 
-bool HttpHandler::writeToFile(const std::string& data)
-{
-	ssize_t n = write(fd_, data.data(), data.size());
-	if (n == -1)
-		return false;
-	return true;
-}
+// bool HttpHandler::writeToFile(const std::string& data)
+// {
+// 	ssize_t n = write(fd_, data.data(), data.size());
+// 	if (n == -1)
+// 		return false;
+// 	return true;
+// }
 
 bool HttpHandler::validateUploadPath(const std::string& path)
 {
@@ -227,7 +229,8 @@ static const char* find_bytes_(const char* ext_start,
 bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
                                            HttpResponse&      err_res)
 {
-	std::ifstream in(temp_file_.c_str(), std::ios::binary);
+	std::string   temp_file = req.getBodyTempFileName();
+	std::ifstream in(temp_file.c_str(), std::ios::binary);
 
 	if (!in.is_open())
 	{
@@ -256,7 +259,9 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 	}
 
 	std::string path = buildUploadPath(filename);
-	std::cout << path << '\n';
+	std::cout
+	    << path
+	    << '\n'; ///////////////////??????????????????????????????????????????????????
 	if (!validateUploadPath(path))
 	{
 		err_res = makeStatusResponse(HTTP_FORBIDDEN);
@@ -265,7 +270,9 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 
 	int fd = openUploadFile(path.c_str(), err_res);
 	if (fd == -1)
+	{
 		return false;
+	}
 
 	std::string         end_boundary = CRLF "--" + req.getBoundary() + "--";
 	const size_t        buf_size = 4096;
@@ -330,7 +337,8 @@ bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 		return false;
 	}
 
-	std::ifstream in(temp_file_.c_str(), std::ios::binary);
+	std::string   temp_file = req.getBodyTempFileName();
+	std::ifstream in(temp_file.c_str(), std::ios::binary);
 	if (!in.is_open())
 	{
 		err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
@@ -360,55 +368,55 @@ bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 	return true;
 }
 
-bool HttpHandler::exceedsBodySizeLimit(const HttpRequest& req) const
-{
-	const size_t mbs = loc_->client_max_body_size;
-	const size_t cl = req.getContentLenght();
-	const size_t rb = req.getReceivedBytes();
+// bool HttpHandler::exceedsBodySizeLimit(const HttpRequest& req) const
+// {
+// 	const size_t mbs = loc_->client_max_body_size;
+// 	const size_t cl = req.getContentLenght();
+// 	const size_t rb = req.getReceivedBytes();
+//
+// 	return (cl > mbs || (req.isChunked() && rb > mbs));
+// }
 
-	return (cl > mbs || (req.isChunked() && rb > mbs));
-}
-
-bool HttpHandler::saveBodyToTempFile(const HttpRequest& req,
-                                     HttpResponse&      err_res)
-{
-	const std::string data = req.getbody();
-
-	if (state_ == HTTP_INIT)
-	{
-		temp_file_ = "/tmp/wsload_" + ws::randString();
-
-		fd_ = open(
-		    temp_file_.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
-		if (fd_ == -1)
-		{
-			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-			return false;
-		}
-		state_ = HTTP_RECV;
-	}
-
-	if (!data.empty())
-	{
-		ssize_t n = write(fd_, data.data(), data.size());
-		if (n == -1)
-		{
-			resetUpload();
-			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-			return false;
-		}
-	}
-
-	return true;
-}
+// bool HttpHandler::saveBodyToTempFile(const HttpRequest& req,
+//                                      HttpResponse&      err_res)
+// {
+// 	const std::string data = req.getbody();
+//
+// 	if (state_ == HTTP_INIT)
+// 	{
+// 		temp_file_ = "/tmp/wsload_" + ws::randString();
+//
+// 		fd_ = open(
+// 		    temp_file_.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
+// 		if (fd_ == -1)
+// 		{
+// 			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+// 			return false;
+// 		}
+// 		state_ = HTTP_RECV;
+// 	}
+//
+// 	if (!data.empty())
+// 	{
+// 		ssize_t n = write(fd_, data.data(), data.size());
+// 		if (n == -1)
+// 		{
+// 			resetUpload();
+// 			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+// 			return false;
+// 		}
+// 	}
+//
+// 	return true;
+// }
 
 HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 {
-	if (exceedsBodySizeLimit(req))
-	{
-		state_ = HTTP_CLOSE;
-		return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
-	}
+	// if (exceedsBodySizeLimit(req))
+	// {
+	// 	state_ = HTTP_CLOSE;
+	// 	return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
+	// }
 
 	if (loc_->upload_path.empty())
 	{
@@ -428,24 +436,31 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 
 	HttpResponse error_respons;
 
-	if (!saveBodyToTempFile(req, error_respons))
+	bool         success = req.isMultipart() ?
+	                           saveUploadedFileFromTemp(req, error_respons) :
+	                           savePlainBody(req, error_respons);
+
+	if (!success)
 		return error_respons;
-
-	if (req.isComplete())
-	{
-		closeFile();
-		state_ = HTTP_COMPLETE;
-
-		bool success = req.isMultipart() ?
-		                   saveUploadedFileFromTemp(req, error_respons) :
-		                   savePlainBody(req, error_respons);
-
-		std::remove(temp_file_.c_str());
-		if (!success)
-			return error_respons;
-
-		return makeStatusResponse(HTTP_CREATED);
-	}
+	return makeStatusResponse(HTTP_CREATED);
+	// // if (!saveBodyToTempFile(req, error_respons))
+	// // 	return error_respons;
+	//
+	// if (req.isComplete())
+	// {
+	// 	closeFile();
+	// 	state_ = HTTP_COMPLETE;
+	//
+	// 	bool success = req.isMultipart() ?
+	// 	                   saveUploadedFileFromTemp(req, error_respons) :
+	// 	                   savePlainBody(req, error_respons);
+	//
+	// 	std::remove(temp_file_.c_str());
+	// 	if (!success)
+	// 		return error_respons;
+	//
+	// 	return makeStatusResponse(HTTP_CREATED);
+	// }
 
 	return HttpResponse();
 }
@@ -476,24 +491,7 @@ HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
 
 HttpResponse HttpHandler::handleCGI(const HttpRequest& req)
 {
-	if (req.getMethod() == "POST" && !req.isComplete())
-	{
-		if (exceedsBodySizeLimit(req))
-		{
-			state_ = HTTP_CLOSE;
-			return makeStatusResponse(HTTP_CONTENT_TOO_LARGE);
-		}
-
-		HttpResponse error_respons;
-		if (saveBodyToTempFile(req, error_respons))
-			return error_respons;
-	}
-
-	if (req.isComplete())
-	{
-		closeFile();
-	}
-
+	(void) req;
 	return HttpResponse();
 }
 
@@ -670,7 +668,7 @@ void HttpHandler::reset()
 	error_ = 0;
 	state_ = HTTP_INIT;
 	upload_file_path_.clear();
-	temp_file_.clear();
+	// temp_file_.clear();
 }
 
 int HttpHandler::getState() const
@@ -693,8 +691,8 @@ void HttpHandler::resetUpload()
 
 	if (!upload_file_path_.empty())
 		std::remove(upload_file_path_.c_str());
-	if (!temp_file_.empty())
-		std::remove(upload_file_path_.c_str());
+	// if (!temp_file_.empty())
+	// 	std::remove(upload_file_path_.c_str());
 
 	state_ = HTTP_CLOSE;
 }

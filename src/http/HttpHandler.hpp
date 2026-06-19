@@ -50,7 +50,7 @@ class HttpHandler
 	int                        error_;
 	STATE                      state_;
 	std::string                upload_file_path_;
-	std::string                temp_file_;
+	// std::string                temp_file_;
 	int                        fd_;
 
 	HttpResponse               handleGET(const HttpRequest& req);
@@ -79,8 +79,8 @@ class HttpHandler
 	std::string sanitizeFileName(const std::string& filename);
 	bool        validateUploadPath(const std::string& path);
 	int         openUploadFile(const std::string& path, HttpResponse& err_res);
-	bool        exceedsBodySizeLimit(const HttpRequest& req) const;
-	bool saveBodyToTempFile(const HttpRequest& req, HttpResponse& err_res);
+	// bool        exceedsBodySizeLimit(const HttpRequest& req) const;
+	// bool saveBodyToTempFile(const HttpRequest& req, HttpResponse& err_res);
 	bool writeToFile(const std::string& data);
 	void resetUpload();
 	void closeFile();
