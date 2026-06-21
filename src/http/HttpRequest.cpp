@@ -45,11 +45,15 @@ HttpRequest::HttpRequest(const HttpRequest& other) :
         chunked_(other.chunked_),
         boundary_(other.boundary_),
         recv_bytes_(other.recv_bytes_),
-        state_(other.state_)
+        state_(other.state_),
+        fd_(other.fd_)
 {
 }
 
-HttpRequest::~HttpRequest() {}
+HttpRequest::~HttpRequest()
+{
+	closeFile_();
+}
 
 void HttpRequest::reset()
 {
@@ -65,9 +69,7 @@ void HttpRequest::reset()
 	boundary_.clear();
 	multipart_ = false;
 	recv_bytes_ = 0;
-	if (fd_ != -1)
-		close(fd_);
-	fd_ = -1;
+	closeFile_();
 	if (!body_temp_file_.empty())
 		std::remove(body_temp_file_.c_str());
 	body_temp_file_.clear();
@@ -175,11 +177,9 @@ bool HttpRequest::isValidMethod(const std::string& method)
 	if (method == "HEAD" || method == "PUT" || method == "CONNECT"
 	    || method == "OPTIONS" || method == "TRACE" || method == "PATCH"
 	    || method == "MOVE")
-	{
 		fail(HTTP_NOT_IMPLEMENTED);
-		return false;
-	}
-	fail(HTTP_BAD_REQUEST);
+	else
+		fail(HTTP_BAD_REQUEST);
 	return false;
 }
 
@@ -261,6 +261,12 @@ void HttpRequest::parseBody(std::string& raw_data, const ServerConfig& cfg)
 		return;
 	}
 
+	if (chunked_ && recv_bytes_ > location->client_max_body_size)
+	{
+		fail(HTTP_CONTENT_TOO_LARGE);
+		return;
+	}
+
 	if (chunked_)
 		parseChunked(raw_data);
 	else
@@ -305,8 +311,7 @@ void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
 					return;
 				}
 				this->method_ = raw_data.substr(0, p);
-				p += 1;
-				raw_data.erase(0, p);
+				raw_data.erase(0, p + 1);
 				state_ = sw_uri;
 				isValidMethod(method_);
 				break;
@@ -322,8 +327,7 @@ void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
 				}
 
 				this->uri_ = raw_data.substr(0, p);
-				p += 1;
-				raw_data.erase(0, p);
+				raw_data.erase(0, p + 1);
 				state_ = sw_version;
 				break;
 			}
@@ -336,7 +340,18 @@ void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
 						fail(HTTP_BAD_REQUEST);
 					return;
 				}
+				// if (raw_data.compare(p + 2, 2, CRLF) == 0)
+				// {
+				// 	fail(HTTP_BAD_REQUEST);
+				// 	return;
+				// }
 				this->http_version_ = raw_data.substr(0, p);
+				if (raw_data.compare(p + 2, 2, CRLF) == 0)
+				{
+					state_ = sw_done;
+					return;
+				}
+
 				raw_data.erase(0, p + CRLF_LEN);
 				state_ = sw_headers;
 				break;
@@ -440,5 +455,14 @@ bool HttpRequest::isChunked() const
 bool HttpRequest::isMultipart() const
 {
 	return this->multipart_;
+}
+
+void HttpRequest::closeFile_()
+{
+	if (fd_ != -1)
+	{
+		close(fd_);
+		fd_ = -1;
+	}
 }
 

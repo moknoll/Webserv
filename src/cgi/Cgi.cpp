@@ -11,12 +11,12 @@
 
 CgiContext::CgiContext()
 {
-	pid = -1;
+	pid_ = -1;
 	stdin_pipe[0] = -1;
 	stdin_pipe[1] = -1;
 	stdout_pipe[0] = -1;
 	stdout_pipe[1] = -1;
-	exit_status = 0;
+	exit_status_ = 0;
 	deadline = 0;
 	response = HttpResponse();
 	envp = NULL;
@@ -44,8 +44,52 @@ std::string CgiContext::buildPath(const std::string& uri,
 
 // void CgiContext::buildCgiEnv(const HttpRequest& req, const Location& loc) {}
 
-// bool executeChild(CgiContext &ctx)
+bool CgiContext::executeChild()
+{
+	if (pipe(stdin_pipe) == -1)
+		return false;
+	if (pipe(stdout_pipe) == -1)
+		return false;
+	pid_t pid = fork();
+	if (pid < 0)
+		return false;
 
+	if (pid == 0)
+	{
+		dup2(stdin_pipe[0], STDIN_FILENO);
+		dup2(stdout_pipe[1], STDOUT_FILENO);
+
+		close(stdin_pipe[0]);
+		close(stdin_pipe[1]);
+		close(stdout_pipe[0]);
+		close(stdout_pipe[1]);
+
+		std::cout << "I AM\n";
+		buildCgiEnvp();
+		buildCgiArgv();
+		execve(argv[0], argv, envp);
+		_exit(127);
+	}
+	close(stdin_pipe[0]);
+	close(stdout_pipe[1]);
+
+	pid_ = pid;
+	return true;
+}
+
+void CgiContext::buildCgiEnvp() {}
+
+void CgiContext::buildCgiArgv()
+{
+	std::string          sa = "/usr/bin/python3";
+	std::string          sb = "./www/helloCGI.py";
+	std::vector< char* > argv;
+	argv.push_back(const_cast< char* >(sa.c_str()));
+	argv.push_back(const_cast< char* >(sb.c_str()));
+	argv.push_back(NULL);
+
+	this->argv = argv.data();
+}
 
 HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc)
 {
@@ -55,35 +99,9 @@ HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc)
 	std::cout << uri << '\n';
 	std::cout << path << '\n';
 
-	pipe(stdin_pipe);
-	pipe(stdout_pipe);
-
-	pid_t pid = fork();
-
-	if (pid == 0)
-	{
-		dup2(stdin_pipe[0], STDIN_FILENO);
-		dup2(stdout_pipe[1], STDOUT_FILENO);
-		close(stdin_pipe[1]); // закрываем ненужные концы
-		close(stdout_pipe[0]);
-		close(stdin_pipe[0]);
-		close(stdout_pipe[1]);
-
-		// char* argv[] = {const_cast< char* >(path.c_str()), NULL};
-		std::string          sa = "/usr/bin/python3";
-		std::string          sb = "./www/helloCGI.py";
-
-		std::vector< char* > argv;
-		argv.push_back(const_cast< char* >(sa.c_str()));
-		argv.push_back(const_cast< char* >(sb.c_str()));
-		argv.push_back(NULL);
-		execve(loc.cgi_path.c_str(), argv.data(), envp);
-		_exit(1); // если execve вернулся
-	}
-
-	close(stdin_pipe[0]);
-	close(stdout_pipe[1]);
-
+	if (!executeChild())
+		return HttpResponse(500);
+	
 	// Запись тела запроса в stdin_pipe[1]
 	write(stdin_pipe[1], req.getbody().c_str(), req.getbody().size());
 	close(stdin_pipe[1]);
@@ -98,7 +116,7 @@ HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc)
 	close(stdout_pipe[0]);
 
 	int status;
-	waitpid(pid, &status, 0);
+	waitpid(pid_, &status, 0);
 
 	HttpResponse           res(200);
 	std::string::size_type header_end = cgi_output.find("\r\n\r\n");

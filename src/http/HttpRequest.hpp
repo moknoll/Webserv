@@ -87,5 +87,6 @@ class HttpRequest
 	bool isValidMethod(const std::string& method);
 	void fail(int status);
 	bool saveBodyToTempFile(std::string& raw_data);
+	void closeFile_();
 };
 

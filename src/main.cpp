@@ -65,7 +65,7 @@ void printConfig(std::vector< ServerConfig > cfg)
 			std::cout << "LOC_has redirect: "
 			          << cfg[i].locations[j].has_redirect << '\n';
 
-			std::cout << "has_cgi: " << cfg[i].locations[j].has_cgi << '\n';
+			std::cout << "LOC_has_cgi: " << cfg[i].locations[j].has_cgi << '\n';
 		}
 
 		std::cout << "======================================================\n";

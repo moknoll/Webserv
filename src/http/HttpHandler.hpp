@@ -61,15 +61,15 @@ class HttpHandler
 	HttpResponse               makeFileResponse(const std::string& path);
 
 	std::vector< std::string > getListOfFiles(const std::string& path);
-	HttpResponse               makeDirectoryPage(const std::string& path,
-	                                             const std::string& uri);
+	HttpResponse makeDirectoryListingResponse(const std::string& path,
+	                                          const std::string& uri);
 	// WIP
 	HttpResponse
 	redirect(int status, const std::string& location, const std::string& host);
 
-	const Location*
-	            findMatchUri(const std::string&             uri,
-	                         const std::vector< Location >& locations) const;
+	// const Location*
+	//             findMatchUri(const std::string&             uri,
+	//                          const std::vector< Location >& locations) const;
 
 	// WIP
 	std::string buildPath(const std::string& uri) const;
@@ -81,11 +81,11 @@ class HttpHandler
 	int         openUploadFile(const std::string& path, HttpResponse& err_res);
 	// bool        exceedsBodySizeLimit(const HttpRequest& req) const;
 	// bool saveBodyToTempFile(const HttpRequest& req, HttpResponse& err_res);
-	bool writeToFile(const std::string& data);
-	void resetUpload();
-	void closeFile();
-	bool savePlainBody(const HttpRequest& req, HttpResponse& err_res);
-	bool saveUploadedFileFromTemp(const HttpRequest& req,
-	                              HttpResponse&      err_res);
+	// bool writeToFile(const std::string& data);
+	// void resetUpload();
+	void        closeFile();
+	bool        savePlainBody(const HttpRequest& req, HttpResponse& err_res);
+	bool        saveUploadedFileFromTemp(const HttpRequest& req,
+	                                     HttpResponse&      err_res);
 };
 

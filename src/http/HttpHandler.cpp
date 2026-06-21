@@ -71,6 +71,7 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 		return makeStatusResponse(req.getRequestStatus());
 	}
 
+
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
 
@@ -78,6 +79,7 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	this->loc_ = Client::FindMatchingUri(uri, config_);
 	if (this->loc_ == NULL)
 		return makeStatusResponse(HTTP_NOT_FOUND);
+
 
 	// if redirect -> redirect(status, target)
 	if (this->loc_->has_redirect && this->loc_->redirect.first != -1)
@@ -91,6 +93,7 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 
 	if (loc_->has_cgi)
 	{
+
 		return handleCGI(req);
 	}
 
@@ -118,14 +121,13 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 		if (uri != "/" && uri[uri.size() - 1] != '/')
 			return redirect(HTTP_MOVED_PERMANENTLY, uri + "/", host);
 
-		std::string index_file =
-		    loc_->index.empty() ? path + "index.html" : path + loc_->index;
+		std::string index_file = path + loc_->index;
 
 		if (ws::checkFile(index_file.c_str()) == FILE_OK)
 			return makeFileResponse(index_file);
 
 		if (loc_->autoindex)
-			return makeDirectoryPage(path, uri);
+			return makeDirectoryListingResponse(path, uri);
 
 		return makeStatusResponse(HTTP_FORBIDDEN);
 	}
@@ -503,20 +505,17 @@ HttpResponse HttpHandler::handleCGI(const HttpRequest& req)
 
 HttpResponse HttpHandler::makeStatusResponse(int status)
 {
-	HttpResponse res(status);
-	std::string  content;
+	HttpResponse                                 res(status);
+	std::string                                  content;
 
-	if (loc_ != NULL)
+	std::map< int, std::string >::const_iterator it =
+	    config_.error_pages.find(status);
+	if (it != config_.error_pages.end())
 	{
-		std::map< int, std::string >::const_iterator it =
-		    loc_->error_pages.find(status);
-		if (it != loc_->error_pages.end())
+		if (ws::readFile(it->second.c_str(), content))
 		{
-			if (ws::readFile(it->second.c_str(), content))
-			{
-				res.setFullResponse(content, "html");
-				return res;
-			}
+			res.setFullResponse(content, "html");
+			return res;
 		}
 	}
 
@@ -585,33 +584,33 @@ std::string HttpHandler::getFileChunk()
 	return buffer;
 }
 
-const Location*
-HttpHandler::findMatchUri(const std::string&             uri,
-                          const std::vector< Location >& locations) const
-{
-	const Location* best_loc = NULL;
-	size_t          len_best_loc = 0;
-
-	for (size_t i = 0; i < locations.size(); ++i)
-	{
-		const std::string& path = locations[i].path;
-
-		if (uri.find(path) == 0)
-		{
-			if (path.size() > len_best_loc)
-			{
-				if (uri.size() == path.size() || uri[path.size()] == '/'
-				    || uri[path.size() - 1] == '/')
-				{
-					best_loc = &locations[i];
-					len_best_loc = path.size();
-				}
-			}
-		}
-	}
-
-	return best_loc;
-}
+// const Location*
+// HttpHandler::findMatchUri(const std::string&             uri,
+//                           const std::vector< Location >& locations) const
+// {
+// 	const Location* best_loc = NULL;
+// 	size_t          len_best_loc = 0;
+//
+// 	for (size_t i = 0; i < locations.size(); ++i)
+// 	{
+// 		const std::string& path = locations[i].path;
+//
+// 		if (uri.find(path) == 0)
+// 		{
+// 			if (path.size() > len_best_loc)
+// 			{
+// 				if (uri.size() == path.size() || uri[path.size()] == '/'
+// 				    || uri[path.size() - 1] == '/')
+// 				{
+// 					best_loc = &locations[i];
+// 					len_best_loc = path.size();
+// 				}
+// 			}
+// 		}
+// 	}
+//
+// 	return best_loc;
+// }
 
 std::string HttpHandler::buildPath(const std::string& uri) const
 {
@@ -631,8 +630,8 @@ std::string HttpHandler::buildPath(const std::string& uri) const
 	return path;
 }
 
-HttpResponse HttpHandler::makeDirectoryPage(const std::string& path,
-                                            const std::string& uri)
+HttpResponse HttpHandler::makeDirectoryListingResponse(const std::string& path,
+                                                       const std::string& uri)
 {
 	DIR* dir = opendir(path.c_str());
 	if (dir == NULL)
@@ -650,6 +649,8 @@ HttpResponse HttpHandler::makeDirectoryPage(const std::string& path,
 			name += '/';
 		files.push_back(name);
 	}
+
+	closedir(dir);
 
 	HttpResponse res(HTTP_OK);
 	std::string  content = res.buildDirectoryPage(files, path, uri);
@@ -691,15 +692,15 @@ void HttpHandler::closeFile()
 	}
 }
 
-void HttpHandler::resetUpload()
-{
-	closeFile();
-
-	if (!upload_file_path_.empty())
-		std::remove(upload_file_path_.c_str());
-	// if (!temp_file_.empty())
-	// 	std::remove(upload_file_path_.c_str());
-
-	state_ = HTTP_CLOSE;
-}
+// void HttpHandler::resetUpload()
+// {
+// 	closeFile();
+//
+// 	if (!upload_file_path_.empty())
+// 		std::remove(upload_file_path_.c_str());
+// 	// if (!temp_file_.empty())
+// 	// 	std::remove(upload_file_path_.c_str());
+//
+// 	state_ = HTTP_CLOSE;
+// }
 
