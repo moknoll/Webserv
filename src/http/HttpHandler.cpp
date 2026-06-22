@@ -71,7 +71,6 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 		return makeStatusResponse(req.getRequestStatus());
 	}
 
-
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
 
@@ -79,7 +78,6 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	this->loc_ = Client::FindMatchingUri(uri, config_);
 	if (this->loc_ == NULL)
 		return makeStatusResponse(HTTP_NOT_FOUND);
-
 
 	// if redirect -> redirect(status, target)
 	if (this->loc_->has_redirect && this->loc_->redirect.first != -1)
@@ -93,7 +91,6 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 
 	if (loc_->has_cgi)
 	{
-
 		return handleCGI(req);
 	}
 
@@ -112,7 +109,9 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 	if (this->loc_ == NULL)
 		return HttpResponse(HTTP_INTERNAL_SERVER_ERROR);
 
-	const std::string& uri = req.getURI();
+	const std::string& raw_uri = req.getURI();
+	std::string::size_type p = raw_uri.find('?');
+	const std::string& uri = raw_uri.substr(0,p);
 	const std::string& host = req.getHeader("Host");
 	std::string        path = buildPath(uri);
 

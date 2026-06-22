@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
+#include <iostream>
 #include <map>
 #include <string>
 #include <unistd.h>
@@ -53,6 +54,8 @@ HttpRequest::HttpRequest(const HttpRequest& other) :
 HttpRequest::~HttpRequest()
 {
 	closeFile_();
+	if (!body_temp_file_.empty())
+		std::remove(body_temp_file_.c_str());
 }
 
 void HttpRequest::reset()
@@ -285,20 +288,19 @@ void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
 			case sw_done: return;
 			case sw_almost_done:
 			{
+				size_t size = raw_data.size();
+				if (!chunked_ && recv_bytes_ + size > content_length_)
+				{
+					size_t bytes_to_keep = content_length_ - recv_bytes_;
+					raw_data.erase(bytes_to_keep);
+				}
 				recv_bytes_ += raw_data.size();
-				// if (chunked_)
-				// {
-				// 	parseChunked(raw_data);
-				// }
-				// else
-				// {
-				// 	body_ = raw_data;
-				// 	raw_data.clear();
-				// }
-
 				parseBody(raw_data, cfg);
 				if (recv_bytes_ >= content_length_)
+				{
+					closeFile_();
 					state_ = sw_done;
+				}
 				return;
 			}
 			case sw_start:
@@ -427,6 +429,10 @@ std::string HttpRequest::getBodyTempFileName() const
 	return body_temp_file_;
 }
 
+std::map< std::string, std::string > HttpRequest::getHeaders() const
+{
+	return headers_;
+}
 std::string HttpRequest::getBoundary() const
 {
 	return this->boundary_;

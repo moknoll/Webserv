@@ -11,10 +11,10 @@ first_name = form.getvalue('first_name')
 
 # get cookies
 import os
-import Cookie
-cookie = Cookie.SimpleCookie()
+from http import cookies
+cookie = cookies.SimpleCookie()
 cookie_string = os.environ.get('HTTP_COOKIE')
-cookie.load(cookie_string)
+cookies.load(cookie_string)
 
 
 # Check if the cookie exists
@@ -23,8 +23,8 @@ body = "aa"
 method = os.environ.get('REQUEST_METHOD', None)
 if method == "POST" and  not ' ' in first_name:
     cookie['user'] = first_name
-    print "Set-Cookie: user=%s\r" % (first_name)
-if cookie.has_key('user'):
+    print("Set-Cookie: user=%s\r" % (first_name))
+if cookies.has_key('user'):
     first_name = cookie['user'].value
 
 

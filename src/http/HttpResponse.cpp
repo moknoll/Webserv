@@ -167,7 +167,6 @@ std::string HttpResponse::buildEntry(const std::string& path,
 		size = "-";
 	else
 		size = ws::to_string(ws::getFileSize(path + name));
-	std::cout << "SIZE: " << size << std::endl;
 	return "<a href=" + name + ">" + formatEntry(name, time, size) + "\n";
 }
 

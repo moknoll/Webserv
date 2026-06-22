@@ -45,21 +45,22 @@ class HttpRequest
 	std::string       getURI() const;
 	std::string       getHeader(const std::string& name) const;
 	std::string       getMethod() const;
-	const std::string getbody() const;
+	const std::string getbody() const; // ?
 	int               getRequestStatus() const;
 	size_t            getContentLenght() const;
 	size_t            getReceivedBytes() const;
 	std::string       getBoundary() const;
 	std::string       getBodyTempFileName() const;
+	std::map< std::string, std::string > getHeaders() const;
 
-	void              setStatus(int status);
+	void                                 setStatus(int status);
 
-	bool              isChunked() const;
-	bool              isMultipart() const;
-	bool              isComplete() const;
-	bool              isAlmostDone() const;
+	bool                                 isChunked() const;
+	bool                                 isMultipart() const;
+	bool                                 isComplete() const;
+	bool                                 isAlmostDone() const;
 
-	void              reset();
+	void                                 reset();
 
   private:
 	int                                  err_status_;

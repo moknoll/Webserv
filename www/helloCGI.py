@@ -36,10 +36,17 @@ body = """"
 	<div align="center">
 	<img src="/lang.gif" alt="Hello CGI">
 	</div>
-	
+    <p>
+	<div align="center">
+    <form method="POST" action="/cgi-bin/env-view.py">
+        <input type="text" name="username" value="test">
+        <input type="submit">
+    </form>
+	</div>
+    </p>
 	<footer>
-    <p>Webserv</p>
-</footer>
+        <p>Webserv</p>
+    </footer>
 </body>
 
 </html>

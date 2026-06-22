@@ -1,6 +1,7 @@
 #include "Cgi.hpp"
 #include "../lib/ws.hpp"
 #include <cstddef>
+#include <fcntl.h>
 #include <iostream>
 #include <string.h>
 #include <string>
@@ -8,6 +9,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
+
+const size_t CgiContext::MAX_CGI_BUFFER = 10 * 1024 * 1024;
 
 CgiContext::CgiContext()
 {
@@ -19,8 +22,6 @@ CgiContext::CgiContext()
 	exit_status_ = 0;
 	deadline = 0;
 	response = HttpResponse();
-	envp = NULL;
-	argv = NULL;
 }
 
 std::string CgiContext::buildPath(const std::string& uri,
@@ -35,14 +36,55 @@ std::string CgiContext::buildPath(const std::string& uri,
 	if (!sub_uri.empty() && sub_uri[0] == '/')
 		path += sub_uri.substr(1);
 	else
-	{
 		path += sub_uri;
-	}
 
 	return path;
 }
 
-// void CgiContext::buildCgiEnv(const HttpRequest& req, const Location& loc) {}
+void CgiContext::buildCgiEnvp(const HttpRequest& req)
+{
+	env.push_back("REQUEST_METHOD=" + req.getMethod());
+
+	std::map< std::string, std::string >           h = req.getHeaders();
+
+	std::map< std::string, std::string >::iterator it = h.begin();
+	for (; it != h.end(); ++it)
+	{
+		if (it->first == "Content-Type")
+			env.push_back("CONTENT_TYPE=" + it->second);
+		else if (it->first == "Content-Length")
+			env.push_back("CONTENT_LENGTH=" + it->second);
+		else if (it->first == "Host")
+			env.push_back("SERVER_PROTOCOL=" + it->second);
+		else
+			env.push_back("HTTP_" + it->first + it->second);
+	}
+
+	for (size_t i = 0; i < env.size(); ++i)
+		envp_.push_back(const_cast< char* >(env[i].c_str()));
+	envp_.push_back(NULL);
+}
+
+void CgiContext::buildCgiArgv(const HttpRequest& req, const Location& loc)
+{
+	std::string            uri = req.getURI();
+	std::string::size_type p = uri.find('?');
+	std::string            path = buildPath(uri.substr(0, p), loc);
+
+	PathInfo               path_info = ws::checkPath(path);
+	PathInfo               cgi_path_info = ws::checkPath(loc.cgi_path);
+	if (!path_info.exists && !path_info.readable && !path_info.executable)
+		return;
+	if (!cgi_path_info.exists && !cgi_path_info.readable
+	    && !cgi_path_info.executable)
+		return;
+
+	args.push_back(loc.cgi_path);
+	args.push_back(path);
+	for (size_t i = 0; i < args.size(); ++i)
+		argv_.push_back(const_cast< char* >(args[i].c_str()));
+	argv_.push_back(NULL);
+}
 
 bool CgiContext::executeChild()
 {
@@ -50,11 +92,11 @@ bool CgiContext::executeChild()
 		return false;
 	if (pipe(stdout_pipe) == -1)
 		return false;
-	pid_t pid = fork();
-	if (pid < 0)
+	pid_ = fork();
+	if (pid_ < 0)
 		return false;
 
-	if (pid == 0)
+	if (pid_ == 0)
 	{
 		dup2(stdin_pipe[0], STDIN_FILENO);
 		dup2(stdout_pipe[1], STDOUT_FILENO);
@@ -64,67 +106,55 @@ bool CgiContext::executeChild()
 		close(stdout_pipe[0]);
 		close(stdout_pipe[1]);
 
-		std::cout << "I AM\n";
-		buildCgiEnvp();
-		buildCgiArgv();
-		execve(argv[0], argv, envp);
+		execve(argv_[0], &argv_[0], &envp_[0]);
 		_exit(127);
 	}
 	close(stdin_pipe[0]);
 	close(stdout_pipe[1]);
 
-	pid_ = pid;
 	return true;
 }
 
-void CgiContext::buildCgiEnvp() {}
-
-void CgiContext::buildCgiArgv()
+bool CgiContext::writeRequestBody(const HttpRequest& req)
 {
-	std::string          sa = "/usr/bin/python3";
-	std::string          sb = "./www/helloCGI.py";
-	std::vector< char* > argv;
-	argv.push_back(const_cast< char* >(sa.c_str()));
-	argv.push_back(const_cast< char* >(sb.c_str()));
-	argv.push_back(NULL);
+	std::string body_temp_file = req.getBodyTempFileName();
+	int         fd = open(body_temp_file.c_str(), O_RDONLY);
+	if (fd == -1)
+		return false;
 
-	this->argv = argv.data();
-}
-
-HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc)
-{
-	const std::string uri = req.getURI();
-	const std::string path = buildPath(uri, loc);
-
-	std::cout << uri << '\n';
-	std::cout << path << '\n';
-
-	if (!executeChild())
-		return HttpResponse(500);
-	
-	// Запись тела запроса в stdin_pipe[1]
-	write(stdin_pipe[1], req.getbody().c_str(), req.getbody().size());
+	char    buf[4096];
+	ssize_t r;
+	while ((r = read(fd, buf, sizeof(buf))) > 0)
+		write(stdin_pipe[1], buf, r);
 	close(stdin_pipe[1]);
 
-	// Чтение ответа
-	std::string cgi_output;
-	char        buf[4096];
-	ssize_t     r;
+	return true;
+}
+
+bool CgiContext::readChildOutput()
+{
+	char    buf[4096];
+	ssize_t r;
 	while ((r = read(stdout_pipe[0], buf, sizeof(buf))) > 0)
-		cgi_output.append(buf, r);
+	{
+		if (r + cgi_output_.size() > MAX_CGI_BUFFER)
+			return false;
+		cgi_output_.append(buf, r);
+	}
 
 	close(stdout_pipe[0]);
+	return true;
+}
 
-	int status;
-	waitpid(pid_, &status, 0);
-
+HttpResponse CgiContext::buildResponse()
+{
 	HttpResponse           res(200);
-	std::string::size_type header_end = cgi_output.find("\r\n\r\n");
+	std::string::size_type header_end = cgi_output_.find("\r\n\r\n");
 	size_t                 body_start = header_end + 4;
 
-	res.setBody(cgi_output.substr(body_start));
+	res.setBody(cgi_output_.substr(body_start));
 
-	std::stringstream ss(cgi_output);
+	std::stringstream ss(cgi_output_);
 	std::string       line;
 	while (std::getline(ss, line))
 	{
@@ -137,6 +167,24 @@ HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc)
 			continue;
 		res.setHeader(line.substr(0, p), line.substr(p + 1));
 	}
-
 	return res;
+}
+
+HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc)
+{
+	buildCgiEnvp(req);
+	buildCgiArgv(req, loc);
+
+	if (!executeChild())
+		return HttpResponse(500);
+
+	if (req.getMethod() == "POST" && !writeRequestBody(req))
+		return HttpResponse(500);
+
+	readChildOutput();
+
+	int status = 0;
+	waitpid(pid_, &status, 0);
+
+	return buildResponse();
 }

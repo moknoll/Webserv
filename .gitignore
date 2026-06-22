@@ -6,3 +6,4 @@ client.exe
 data.json
 *libws.a
 tmp*.cpp
+./www/.venv
