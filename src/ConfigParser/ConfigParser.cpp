@@ -162,6 +162,17 @@ void ConfigParser::validatePath(const std::string& p)
 		throw std::runtime_error("path has to start from '/','.': " + p);
 }
 
+void ConfigParser::validateRedirectPath(const std::string &p)
+{
+    // Empty path is always invalid
+    if (p.empty())
+        throw std::runtime_error("Path cannot be empty");
+    if (p[0] != '/' && p[0] != '.' && 
+        p.rfind("http://", 0) == 0 && p.rfind("https://", 0) == 0)
+            throw std::runtime_error("path has to start from '/','.'");
+        
+}
+
 void ConfigParser::validateExtension(const std::string& ext)
 {
 	if (ext.empty() || ext[0] != '.')
@@ -357,7 +368,7 @@ void ConfigParser::parseLocation(ServerConfig& server)
 			validateRedirectCode(code);
 
 			std::string path = tokenizer.next();
-			validatePath(path);
+			validateRedirectPath(path);
 
 			server.redirect = std::make_pair(code, path);
 			expect(";");

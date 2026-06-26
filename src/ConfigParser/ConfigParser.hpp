@@ -19,6 +19,7 @@ class ConfigParser
 	void                        validateRedirectCode(int code);
 	void                        validateErrorCode(int code);
 	void                        validatePath(const std::string& p);
+	void 						validateRedirectPath(const std::string &p);
 	void                        validateExtension(const std::string& ext);
 	bool                        validateRootLocation(ServerConfig& server);
 	void                        validateInterfacePort(std::string& s);
