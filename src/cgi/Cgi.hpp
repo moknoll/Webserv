@@ -15,7 +15,7 @@ class CgiContext
   public:
 	CgiContext();
 
-	HttpResponse handle(const HttpRequest& req, const Location& loc);
+	HttpResponse handle(const HttpRequest& req, const Location& loc, const ServerConfig& cfg);
 
   private:
 	static const size_t                  MAX_CGI_BUFFER;
@@ -26,29 +26,21 @@ class CgiContext
 	int                                  exit_status_;
 	time_t                               deadline;
 	HttpResponse                         response;
-
 	std::vector< char* >                 envp_;
 	std::vector< char* >                 argv_;
-	std::vector< std::string >           env;
+	std::map<std::string, std::string>   env;
 	std::vector< std::string >           args;
-
 	std::string                          cgi_output_;
 
-	std::string  resolveScriptPath(const Location&    loc,
-	                               const std::string& uri) const;
-
-	void         buildCgiEnv(const HttpRequest& req, const Location& loc);
 
 	std::string  buildPath(const std::string& uri, const Location& loc) const;
-	void         buildCgiEnvp(const HttpRequest& req);
+	void         buildCgiEnvp(const HttpRequest& req, const ServerConfig& cfg, const Location& loc);
 	void         buildCgiArgv(const HttpRequest& req, const Location& loc);
+	void		 buildHttpHeaders(const HttpRequest& req);
+	void		 buildEnv(const HttpRequest& req, const std::string& script_path, const ServerConfig& cfg);
+
 	bool         executeChild();
 	bool         readChildOutput();
 	bool         writeRequestBody(const HttpRequest& req);
 	HttpResponse buildResponse();
 };
-
-CgiContext buildCgiContext();
-void       buildCgiEnv(const HttpRequest& req, const Location& loc);
-bool       executeChild(CgiContext& ctx);
-void       cleanup(CgiContext& ctx);

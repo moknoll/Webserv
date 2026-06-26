@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
+#include "../http/constants.hpp"
 
 const size_t CgiContext::MAX_CGI_BUFFER = 10 * 1024 * 1024;
 
@@ -29,7 +30,6 @@ std::string CgiContext::buildPath(const std::string& uri,
 {
 	std::string sub_uri = uri.substr(loc.path.length());
 	std::string path = loc.root;
-
 	if (!path.empty() && path[path.length() - 1] != '/')
 		path += '/';
 
@@ -37,32 +37,89 @@ std::string CgiContext::buildPath(const std::string& uri,
 		path += sub_uri.substr(1);
 	else
 		path += sub_uri;
-
+	std::cout << path << std::endl;
 	return path;
 }
 
-void CgiContext::buildCgiEnvp(const HttpRequest& req)
+static std::string normalizeHeader(std::string name)
 {
-	env.push_back("REQUEST_METHOD=" + req.getMethod());
+    for (size_t i = 0; i < name.size(); i++)
+    {
+        if (name[i] == '-')
+            name[i] = '_';
+        else
+            name[i] = std::toupper(static_cast<unsigned char>(name[i]));
+    }
+    return name;
+}
 
-	std::map< std::string, std::string >           h = req.getHeaders();
-
-	std::map< std::string, std::string >::iterator it = h.begin();
-	for (; it != h.end(); ++it)
+void CgiContext::buildHttpHeaders(const HttpRequest& req)
+{
+	const std::map<std::string, std::string>& headers = req.getHeaders();
+	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
 	{
-		if (it->first == "Content-Type")
-			env.push_back("CONTENT_TYPE=" + it->second);
-		else if (it->first == "Content-Length")
-			env.push_back("CONTENT_LENGTH=" + it->second);
-		else if (it->first == "Host")
-			env.push_back("SERVER_PROTOCOL=" + it->second);
+		if (it->first == "Content-Length" || it->first == "Content-Type")
+			continue;
+		std::string header_name = "HTTP_" + normalizeHeader(it->first);
+		env[header_name] = it->second;
+	}
+}
+
+void CgiContext::buildEnv(const HttpRequest& req, const std::string& script_path, const ServerConfig& cfg)
+{
+	std::string uri = req.getURI();
+	size_t py = uri.find(".py");
+	size_t q = uri.find("?");
+	
+	if (req.getMethod() == "POST")
+	{
+		env["CONTENT_LENGTH"] = ws::to_string(req.getContentLenght());
+		env["CONTENT_TYPE"] = req.getHeader("Content-Type");
+	}	
+	env["REQUEST_METHOD"] = req.getMethod();
+
+	env["SERVER_NAME"] = cfg.server_name;
+	env["SERVER_PORT"] = ws::to_string(cfg.port);
+	env["SERVER_PROTOCOL"] = "HTTP/1.1";
+	env["SERVER_SOFTWARE"] = SERVER_NAME_STR;
+	env["GATEWAY_INTERFACE"] = "CGI/1.1";
+
+	std::cout << "test" << std::endl;
+	if (py != std::string::npos)
+	{
+		env["SCRIPT_NAME"] = script_path.substr(0, py);
+		env["PATH_INFO"] = script_path.substr(py);
+
+		if(!env["PATH_INFO"].empty())
+			env["PATH_TRANSLATED"] = cfg.root + env["PATH_INFO"];
 		else
-			env.push_back("HTTP_" + it->first + it->second);
+			env["PATH_TRANSLATED"] = "";
 	}
 
-	for (size_t i = 0; i < env.size(); ++i)
-		envp_.push_back(const_cast< char* >(env[i].c_str()));
+	if (q != std::string::npos)
+		env["QUERY_STRING"] = uri.substr(q + 1);
+	else 
+		env["QUERY_STRING"] = "";
+}
+
+void CgiContext::buildCgiEnvp(const HttpRequest& req, const ServerConfig& cfg, const Location& loc)
+{
+	env.clear();
+	envp_.clear();
+	std::string script = buildPath(req.getURI(), loc);
+
+	buildEnv(req, script, cfg);
+	buildHttpHeaders(req);
+	
+	for (std::map<std::string, std::string>::iterator it = env.begin(); it != env.end(); ++it)
+	{
+		std::string env_var = it->first + "=" + it->second;
+		env_map[it->first] = env_var;
+		envp_.push_back(const_cast<char*>(env_map[it->first].c_str()));
+	}
 	envp_.push_back(NULL);
+	for (size_t i = 0; i < envp_.size(); ++i)
+		std::cout << "envp_[" << i << "] = " << envp_[i] << std::endl;
 }
 
 void CgiContext::buildCgiArgv(const HttpRequest& req, const Location& loc)
@@ -85,6 +142,8 @@ void CgiContext::buildCgiArgv(const HttpRequest& req, const Location& loc)
 		argv_.push_back(const_cast< char* >(args[i].c_str()));
 	argv_.push_back(NULL);
 }
+
+//--------------------------------------------------------------------------
 
 bool CgiContext::executeChild()
 {
@@ -170,9 +229,9 @@ HttpResponse CgiContext::buildResponse()
 	return res;
 }
 
-HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc)
+HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc, const ServerConfig& cfg)
 {
-	buildCgiEnvp(req);
+	buildCgiEnvp(req, cfg, loc);
 	buildCgiArgv(req, loc);
 
 	if (!executeChild())
@@ -182,7 +241,6 @@ HttpResponse CgiContext::handle(const HttpRequest& req, const Location& loc)
 		return HttpResponse(500);
 
 	readChildOutput();
-
 	int status = 0;
 	waitpid(pid_, &status, 0);
 

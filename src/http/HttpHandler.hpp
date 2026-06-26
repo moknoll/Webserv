@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HttpHandler.hpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/01 13:19:26 by nmagomad          #+#    #+#             */
-/*   Updated: 2026/05/01 13:19:27 by nmagomad         ###   ########.fr       */
+/*   Updated: 2026/06/26 14:34:54 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,6 +37,7 @@ class HttpHandler
 
 	HttpResponse handle(const HttpRequest& req);
 	int          getState() const;
+	
 	std::string  getFileChunk();
 	void         reset();
 

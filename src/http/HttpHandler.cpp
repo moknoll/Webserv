@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HttpHandler.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/01 13:19:14 by nmagomad          #+#    #+#             */
-/*   Updated: 2026/05/01 13:19:16 by nmagomad         ###   ########.fr       */
+/*   Updated: 2026/06/26 16:34:03 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -497,9 +497,9 @@ HttpResponse HttpHandler::handleCGI(const HttpRequest& req)
 {
 	CgiContext cgi;
 
-	return cgi.handle(req, *loc_);
+	return cgi.handle(req, *loc_, this->config_);
 
-	return HttpResponse();
+	//return HttpResponse();
 }
 
 HttpResponse HttpHandler::makeStatusResponse(int status)
@@ -681,6 +681,8 @@ int HttpHandler::getState() const
 {
 	return state_;
 }
+
+
 
 void HttpHandler::closeFile()
 {
