@@ -1,12 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   core.hpp                                           :+:      :+:    :+:   */
+/*   Core.hpp                                           :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: moritzknoll <moritzknoll@student.42.fr>    +#+  +:+       +#+        */
+/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/26 12:12:35 by mknoll            #+#    #+#             */
-/*   Updated: 2026/05/06 13:26:52 by moritzknoll      ###   ########.fr       */
+/*   Updated: 2026/06/27 11:25:00 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -43,3 +43,27 @@ class Core
 	void    run(); // main loop for accepting and handling clients
 	Server* findServerByFd(int serverFd);
 };
+
+enum FdRoleType
+{
+    FD_SERVER = 0,
+    FD_CLIENT,
+    FD_CGI_STDIN,
+    FD_CGI_STDOUT
+};
+
+struct FdRole
+{
+    FdRoleType type;
+    int client_fd; // zu welchem Client gehört die Pipe
+};
+
+std::map<int, FdRole> _fdRoles;
+
+void _registerFd(int fd, short events, FdRoleType type, int clientFd);
+void _unregisterFd(int fd);
+void _updateFdEvents(int fd, short events);
+
+void _registerCgiFds(int clientFd);
+void _handleCgiFdEvent(int fd, short revents);
+void _cleanupCgiForClient(int clientFd);
