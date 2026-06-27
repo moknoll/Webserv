@@ -25,7 +25,6 @@ class Client
 	int                 fd_;
 	std::string         recv_buffer_;
 	std::string         send_buffer_;
-	bool                request_complete_;
 	bool                keep_alive_;
 
 	HttpRequest         request;
@@ -55,5 +54,5 @@ class Client
 	void        setRecvBuffer(const std::string& request);  // ??????????
 
 	static const Location* FindMatchingUri(const std::string&  uri,
-	                                    const ServerConfig& cfg);
+	                                       const ServerConfig& cfg);
 };

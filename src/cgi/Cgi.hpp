@@ -15,7 +15,8 @@ class CgiContext
   public:
 	CgiContext();
 
-	HttpResponse handle(const HttpRequest& req, const Location& loc);
+	int          executeCGI(const HttpRequest& req, const Location& loc);
+	HttpResponse getResponse() const;
 
   private:
 	static const size_t                  MAX_CGI_BUFFER;
@@ -25,7 +26,7 @@ class CgiContext
 	std::map< std::string, std::string > env_map;
 	int                                  exit_status_;
 	time_t                               deadline;
-	HttpResponse                         response;
+	HttpResponse                         response_;
 
 	std::vector< char* >                 envp_;
 	std::vector< char* >                 argv_;
@@ -34,21 +35,22 @@ class CgiContext
 
 	std::string                          cgi_output_;
 
-	std::string  resolveScriptPath(const Location&    loc,
-	                               const std::string& uri) const;
+	std::string resolveScriptPath(const Location&    loc,
+	                              const std::string& uri) const;
 
-	void         buildCgiEnv(const HttpRequest& req, const Location& loc);
+	void        buildCgiEnv(const HttpRequest& req, const Location& loc);
 
-	std::string  buildPath(const std::string& uri, const Location& loc) const;
-	void         buildCgiEnvp(const HttpRequest& req);
-	void         buildCgiArgv(const HttpRequest& req, const Location& loc);
-	bool         executeChild();
-	bool         readChildOutput();
-	bool         writeRequestBody(const HttpRequest& req);
-	HttpResponse buildResponse();
+	std::string buildPath(const std::string& uri, const Location& loc) const;
+	int         buildCgiEnvp(const HttpRequest& req);
+	int         buildCgiArgv(const HttpRequest& req, const Location& loc);
+	bool        executeChild();
+	bool        readChildOutput();
+	bool        writeRequestBody(const HttpRequest& req);
+
+	int         buildResponse();
+	int         waitChildProc(unsigned int timeout);
 };
 
 CgiContext buildCgiContext();
 void       buildCgiEnv(const HttpRequest& req, const Location& loc);
-bool       executeChild(CgiContext& ctx);
 void       cleanup(CgiContext& ctx);

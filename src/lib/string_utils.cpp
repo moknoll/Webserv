@@ -73,13 +73,28 @@ size_t ws::stosize(const std::string& s)
 	return n;
 }
 
-void ws::toLowerCase(std::string& s)
+std::string ws::toLowerCase(const std::string& s)
 {
+	std::string out;
+
 	for (size_t i = 0; i < s.size(); ++i)
 	{
 		unsigned char c = static_cast< unsigned char >(s[i]);
-		s[i] = std::tolower(c);
+		out += std::tolower(c);
 	}
+	return out;
+}
+
+std::string ws::toUpperCase(const std::string& s)
+{
+	std::string out;
+
+	for (size_t i = 0; i < s.size(); ++i)
+	{
+		unsigned char c = static_cast< unsigned char >(s[i]);
+		out += std::toupper(c);
+	}
+	return out;
 }
 
 std::string ws::randString(size_t len)

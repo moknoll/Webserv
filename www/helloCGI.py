@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
-body = """"
+import sys
+import time
 
-<!DOCTYPE html>
+body = """<!DOCTYPE html>
 <html>
 <head>
 	<title>Hello CGI</title>
@@ -49,13 +50,12 @@ body = """"
     </footer>
 </body>
 
-</html>
+</html>"""
 
-
-"""
+# time.sleep(20);
 
 print("Content-type:text/html\r")
-print("Content-length: %d\r" % len(body))
+print(f"Content-length: {len(body)}\r")
 print("\r")
-print(body)
+sys.stdout.write(body);
 

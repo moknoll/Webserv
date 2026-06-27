@@ -94,7 +94,10 @@ class ws
 	static size_t                     stosize(const std::string& s);
 
 	// convert string to tolower case string
-	static void                       toLowerCase(std::string& s);
+	static std::string                toLowerCase(const std::string& s);
+
+	// convert string to Upper case string
+	static std::string                toUpperCase(const std::string& s);
 
 	/**
 	 * @brief Retrieves the size of a file in bytes.

@@ -5,7 +5,6 @@
 Client::Client(int fd, const ServerConfig& config) :
         config_(config),
         fd_(fd),
-        request_complete_(false),
         keep_alive_(true),
         request(),
         response(),
@@ -28,7 +27,6 @@ void Client::processRequest()
 		response = handler.handle(request);
 		if (response.isReady()) // ???
 		{
-			request_complete_ = true;
 			if (handler.getState() == HttpHandler::HTTP_CLOSE)
 				keep_alive_ = false;
 			send_buffer_ = response.toString();
@@ -56,7 +54,6 @@ void Client::reset()
 	response.reset();
 	recv_buffer_.clear();
 	send_buffer_.clear();
-	request_complete_ = false;
 }
 
 static bool matchPrefix(const std::string& uri, const std::string& loc)
@@ -104,7 +101,7 @@ void Client::setSendBuffer(const std::string& buffer)
 
 bool Client::isRequestComplete() const
 {
-	return request_complete_;
+	return request.isComplete();
 }
 
 bool Client::isKeepAlive() const

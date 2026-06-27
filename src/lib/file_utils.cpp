@@ -101,8 +101,7 @@ const std::string ws::getFileExtension(const std::string& path)
 
 	std::string extension = path.substr(lastDot + 1);
 
-	ws::toLowerCase(extension);
-	return extension;
+	return ws::toLowerCase(extension);
 }
 
 bool ws::readFile(const char* path, std::string& file_content)
