@@ -82,14 +82,17 @@ int CgiContext::buildCgiArgv(const HttpRequest& req, const Location& loc)
 
 	PathInfo               path_info = ws::checkPath(path);
 	PathInfo               cgi_path_info = ws::checkPath(loc.cgi_path);
-	if (!path_info.exists && !path_info.readable)
+	if ((!path_info.exists && !path_info.readable) || path_info.type == PATH_IS_DIR)
 	{ 
 		return HTTP_NOT_FOUND;
 	}
-	if (!cgi_path_info.exists && !cgi_path_info.readable
-	    && !cgi_path_info.executable)
-		return HTTP_INTERNAL_SERVER_ERROR;
-
+	
+	if (!cgi_path_info.exists && !cgi_path_info.readable)
+		{
+			return HTTP_INTERNAL_SERVER_ERROR;
+		}
+	if (!path_info.executable)
+		return HTTP_FORBIDDEN;
 	args.push_back(loc.cgi_path);
 	args.push_back(path);
 	// args.push_back(path);
@@ -97,7 +100,7 @@ int CgiContext::buildCgiArgv(const HttpRequest& req, const Location& loc)
 		argv_.push_back(const_cast< char* >(args[i].c_str()));
 	argv_.push_back(NULL);
 	for (size_t i = 0; i < argv_.size(); ++i)
-		std::cout << this->argv_[i] << std::endl;
+		std::cout << "args:" << this->argv_[i] << std::endl;
 	return HTTP_OK;
 }
 
@@ -250,10 +253,11 @@ int CgiContext::executeCGI(const HttpRequest& req, const Location& loc)
 	ret = buildCgiArgv(req, loc);
 	if (ret != HTTP_OK)
 		return ret;
-
 	if (!executeChild())
+	{
+		std::cout << "here" << std::endl;
 		return HTTP_INTERNAL_SERVER_ERROR;
-
+	}
 	fcntl(stdout_pipe[0], F_SETFL, O_NONBLOCK);
 	if (req.getMethod() == "POST")
 		fcntl(stdin_pipe[1], F_SETFL, O_NONBLOCK);

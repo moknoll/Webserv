@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HttpHandler.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: nmagomad <nmagomad@student.42.fr>          +#+  +:+       +#+        */
+/*   By: mknoll <mknoll@student.42.fr>              +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/01 13:19:14 by nmagomad          #+#    #+#             */
-/*   Updated: 2026/05/01 13:19:16 by nmagomad         ###   ########.fr       */
+/*   Updated: 2026/06/29 15:56:39 by mknoll           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -89,8 +89,9 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 {
 	if (this->loc_ == NULL)
+	{	
 		return HttpResponse(HTTP_INTERNAL_SERVER_ERROR);
-
+	}
 	const std::string&     raw_uri = req.getURI();
 	std::string::size_type p = raw_uri.find('?');
 	const std::string&     uri = raw_uri.substr(0, p);

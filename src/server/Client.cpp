@@ -51,6 +51,7 @@ void Client::processRequest()
 			send_buffer_ = makeStatusResponse(status).toString();
 			state_ = HTTP_SEND;
 			keep_alive_ = false;
+			return;
 		}
 		state_ = CGI_STATE;
 	}
