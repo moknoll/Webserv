@@ -18,11 +18,15 @@
 // #include "Sockets.hpp"
 
 #include <cstddef>
+#include <ctime>
 #include <fcntl.h>
 #include <iostream>
 #include <map>
 #include <netdb.h>
+#include <sys/poll.h>
 #include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #include <vector>
 
 Core::Core(const std::vector< ServerConfig >& configs)
@@ -36,7 +40,7 @@ Core::Core(const std::vector< ServerConfig >& configs)
 		pfd.fd = s->getSocketFd();
 		std::cout << "sock_fd:" << s->getSocketFd() << std::endl;
 		pfd.events = POLLIN;
-		_pollSockets.push_back(pfd);
+		poll_fds_.push_back(pfd);
 	}
 }
 
@@ -79,48 +83,38 @@ void Core::run()
 {
 	while (true)
 	{
-		int ret = poll(_pollSockets.data(), _pollSockets.size(), 3000);
+		int ret = poll(poll_fds_.data(), poll_fds_.size(), 3000);
 		if (ret == -1)
 			throw std::runtime_error("Poll failed");
 
-		for (size_t i = 0; i < _pollSockets.size(); i++)
+		for (size_t i = 0; i < poll_fds_.size(); i++)
 		{
-			if (_pollSockets[i].revents & POLLIN)
+			// if ((_pollSockets[i].revents & POLLERR)
+			//     || _pollSockets[i].revents & POLLHUP)
+			// clean soccketss
+
+			if (poll_fds_[i].revents & POLLIN)
 			{
-				Server* server = findServerByFd(_pollSockets[i].fd);
+				Server* server = findServerByFd(poll_fds_[i].fd);
 				if (server != NULL)
 					_acceptNewClient(*server);
 				else
-					_handleClientMessage(_pollSockets[i].fd);
+				{
+					Client* client = FindClient(poll_fds_[i].fd);
+					if (client == NULL)
+						continue;
+
+					if (client->getHttpState() == Client::CGI_STATE)
+						readCGioutput(*client);
+					else
+						_handleClientMessage(poll_fds_[i].fd);
+				}
 			}
-			else if (_pollSockets[i].revents & POLLOUT)
-				_sendResponseToClient(_pollSockets[i].fd);
+			else if (poll_fds_[i].revents & POLLOUT)
+				_sendResponseToClient(poll_fds_[i].fd);
 		}
+		checkCGIProcesses();
 	}
-}
-
-/**
- * @brief Checks if the HTTP request in the buffer is complete.
- *
- * Determines whether a received HTTP request has been fully received and is
- * ready for processing. Currently a placeholder that always returns true.
- *
- * @param request Reference to the request string buffer to validate
- * @return true if the request is complete, false otherwise
- */
-bool Core::_isCompleteRequest(std::string& request)
-{
-	(void) request;
-
-	// // For GET check content length
-	// size_t contentLength = request.find("Content-Length:");
-	// if(contentLength == std::string::npos)
-	// 	return true;
-
-	// // For POST
-
-	// // For Delete
-	return true;
 }
 
 /**
@@ -143,88 +137,65 @@ void Core::_acceptNewClient(const Server& server)
 	if (newClientFd == SOCKET_ERROR)
 		return;
 
-	// // Debug: Show which config was assigned to the new client
-	// std::ostringstream oss;
-	// oss << "New Client FD: " << newClientFd
-	// 	<< " | Accepted from Server Socket FD: " << serverSocketFd
-	// 	<< " | Assigned Config Port: " << config->port
-	// 	<< " | Config Host: " << config->host
-	// 	<< " | Config Root: " << config->root;
-	// LOG_DEBUG(oss.str());
-
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
 
 	struct pollfd pfd;
 	pfd.fd = newClientFd;
 	pfd.events = POLLIN;
-	_pollSockets.push_back(pfd);
+	poll_fds_.push_back(pfd);
 
 	ServerConfig cfg = server.getConfig();
-	_clients[newClientFd] = new Client(newClientFd, server.getConfig());
+	Client*      client = new Client(newClientFd, server.getConfig());
+	_clients[newClientFd] = client;
+	Vclients_.push_back(client);
 
 	std::cout << "New Client connected: " << newClientFd << std::endl;
 	LOG_DEBUG("New client connected");
 }
 
-void Core::setEvent(int clientsocketFD, int state)
-{
-	// Change Poll event to writing
-	for (size_t i = 0; i < _pollSockets.size(); i++)
-	{
-		if (_pollSockets[i].fd == clientsocketFD)
-		{
-			_pollSockets[i].events = state;
-			break;
-		}
-	}
-}
-
-/**
- * @brief Reads incoming data from a client socket and prepares a response.
- *
- * @param clientSocketFd File descriptor of the connected client socket
- * @return void
- */
 void Core::_handleClientMessage(int clientSocketFd)
 {
 	if (_clients.find(clientSocketFd) == _clients.end())
 		return;
-	Client* client = _clients.at(clientSocketFd);
+	Client* client = FindClient(clientSocketFd);
 
 	if (client == NULL)
 		return;
 
-	char    buffer[RECV_BUFFER];
-	ssize_t recv_bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
+	int c_state = client->getHttpState();
 
-	if (recv_bytes <= 0)
+	if (c_state == Client::HTTP_INIT || Client::HTTP_RECV == c_state)
 	{
-		_cleanupClient(clientSocketFd);
-	}
-	else
-	{
-		client->appendRecvBuffer(buffer, recv_bytes);
-		client->processRequest();
+		char    buffer[RECV_BUFFER];
+		ssize_t recv_bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
 
-		if (client->isRequestComplete())
+		if (recv_bytes <= 0)
 		{
-			setEvent(clientSocketFd, POLLOUT);
+			_cleanupClient(clientSocketFd);
 		}
+
+		client->parseRequest(buffer, recv_bytes);
+		if (!client->isRequestComplete())
+			return;
+		client->processRequest();
+	}
+
+	if (client->getHttpState() == Client::CGI_STATE)
+	{
+		int fd_out = client->getFdCGI_out();
+		int fd_in = client->getFdCGI_in();
+		if (fd_out != -1)
+			addFdtoPoll_(fd_out, POLLIN);
+		if (fd_in != -1)
+			addFdtoPoll_(fd_in, POLLOUT);
+	}
+
+	if (client->getHttpState() == Client::HTTP_SEND)
+	{
+		setEvent_(clientSocketFd, POLLOUT);
 	}
 }
 
-/**
- * @brief Sends the prepared response to a connected client and resets client
- * state.
- *
- * Notes:
- * - Currently treats any non-negative send() result as success and does not
- *   handle partial writes or EAGAIN/EWOULDBLOCK retries.
- * - No error logging is performed on send() failure; callers should ensure
- *   the client is cleaned up elsewhere if needed.
- *
- * @param clientSocketFd File descriptor of the connected client socket.
- */
 void Core::_sendResponseToClient(int clientSocketFd)
 {
 	if (_clients.find(clientSocketFd) == _clients.end())
@@ -242,7 +213,7 @@ void Core::_sendResponseToClient(int clientSocketFd)
 		std::cout << "Response sent" << std::endl;
 		if (client->isKeepAlive())
 		{
-			setEvent(clientSocketFd, POLLIN);
+			setEvent_(clientSocketFd, POLLIN);
 		}
 		else
 		{
@@ -276,15 +247,111 @@ void Core::_cleanupClient(int clientSocketFd)
 		delete client;
 	}
 
-	for (size_t i = 0; i < _pollSockets.size(); i++)
-	{
-		if (_pollSockets[i].fd == clientSocketFd)
-		{
-			_pollSockets.erase(_pollSockets.begin() + i);
-			break;
-		}
-	}
+	removePollFd(clientSocketFd);
+
 	_clients.erase(clientSocketFd);
 
 	LOG_DEBUG("Client disconnected");
+}
+
+Client* Core::FindClient(int fd) const
+{
+	for (size_t i = 0; i < Vclients_.size(); ++i)
+	{
+		if (Vclients_[i]->getClientFd() == fd || Vclients_[i]->getFdCGI_out()
+		    || Vclients_[i]->getFdCGI_in())
+			return Vclients_[i];
+	}
+	return NULL;
+}
+
+void Core::addFdtoPoll_(int fd, int event)
+{
+	struct pollfd pfd;
+	pfd.fd = fd;
+	pfd.events = event;
+	poll_fds_.push_back(pfd);
+}
+
+void Core::setEvent_(int clientsocketFD, int state)
+{
+	// Change Poll event to writing
+	for (size_t i = 0; i < poll_fds_.size(); i++)
+	{
+		if (poll_fds_[i].fd == clientsocketFD)
+		{
+			poll_fds_[i].events = state;
+			break;
+		}
+	}
+}
+
+void Core::readCGioutput(Client& client)
+{
+	if (client.getHttpState() != Client::CGI_STATE)
+		return;
+	int fd = client.getFdCGI_out();
+
+	LOG_DEBUG("Try read from CGI PIPE output");
+
+	char    buf[RECV_BUFFER];
+	ssize_t r = read(fd, buf, sizeof(buf));
+
+	if (r > 0)
+	{
+		client.cgi.appendCgiOutput(buf, r);
+	}
+}
+
+void Core::checkCGIProcesses()
+{
+	for (size_t i = 0; i < Vclients_.size(); ++i)
+	{
+		Client* client = Vclients_[i];
+		if (client == NULL)
+			continue;
+		if (client->getHttpState() == Client::CGI_STATE)
+		{
+			if (client->CGIProcessFinished())
+			{
+				LOG_DEBUG("CGI FInished");
+				removePollFd(client->getFdCGI_in());
+				removePollFd(client->getFdCGI_out());
+				setEvent_(client->getClientFd(), POLLOUT);
+			}
+		}
+	}
+}
+
+// void CGiTimeOut()
+// {
+// 	time_t now = std::time(NULL);
+//
+// 	maxTimeout = 60;
+// 	for client form clients:
+// 	{
+// 		client is CGI.
+// 		{
+// 			now - startCGi > maxTimeout;
+// 			kill cgi;
+// 		}
+// 		now - lastrequestfrom client > maxTimeout;
+// 		cleanClient;
+// 	}
+// }
+//
+
+void Core::removePollFd(int fd)
+{
+	if (fd == -1)
+		return;
+
+	for (size_t i = 0; i < poll_fds_.size(); i++)
+	{
+		if (poll_fds_[i].fd == fd)
+		{
+			poll_fds_.erase(poll_fds_.begin() + i);
+			break;
+		}
+	}
 }

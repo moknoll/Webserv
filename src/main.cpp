@@ -79,12 +79,13 @@ int checkArguments(int argc, char* argv[])
 		std::cout << "Usage: ./websrerv <config_file>" << std::endl;
 		return 0;
 	}
-	if (std::string(argv[1]) != "config.conf")
-	{
-		std::cout << "Error: Config file must be named 'config.conf'"
-		          << std::endl;
-		return 0;
-	}
+	(void)argv;
+	// if (std::string(argv[1]) != "config.conf")
+	// {
+	// 	std::cout << "Error: Config file must be named 'config.conf'"
+	// 	          << std::endl;
+	// 	return 0;
+	// }
 	return 1;
 }
 

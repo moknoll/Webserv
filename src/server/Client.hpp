@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include "../cgi/Cgi.hpp"
 #include "../http/HttpHandler.hpp"
 #include "../http/HttpRequest.hpp"
 #include "../http/HttpResponse.hpp"
@@ -20,30 +21,29 @@
 
 class Client
 {
-  private:
-	const ServerConfig& config_;
-	int                 fd_;
-	std::string         recv_buffer_;
-	std::string         send_buffer_;
-	bool                keep_alive_;
-
-	HttpRequest         request;
-	HttpResponse        response;
-	HttpHandler         handler;
-
-	Client();
-	Client(const Client& other);
-	Client& operator=(const Client& other);
-
   public:
 	Client(int fd, const ServerConfig& config);
 	~Client();
+
+	enum STATE
+	{
+		HTTP_INIT = 0,
+		HTTP_RECV,
+		CGI_STATE,
+		HTTP_SEND,
+		HTTP_CLOSE
+	};
+
+	CgiContext  cgi;
 
 	void        reset();
 
 	void        processRequest(); // buildResponse()
 	std::string serialize();
-	void        appendRecvBuffer(const char* buffer, size_t size);
+	void        parseRequest(const char* buffer, size_t size);
+	void        buildCGIResponse();
+	
+	bool         CGIProcessFinished();
 
 	std::string getResponseBuffer() const; // ??????????
 	std::string getRequestBuffer() const;  // ???????????
@@ -53,6 +53,29 @@ class Client
 	void        setSendBuffer(const std::string& response); // ???????
 	void        setRecvBuffer(const std::string& request);  // ??????????
 
+	int         getFdCGI_in() const;
+	int         getFdCGI_out() const;
+	int         getHttpState() const;
+
 	static const Location* FindMatchingUri(const std::string&  uri,
 	                                       const ServerConfig& cfg);
+
+  private:
+	const ServerConfig& config_;
+	int                 fd_;
+	std::string         recv_buffer_;
+	std::string         send_buffer_;
+	bool                keep_alive_;
+	STATE               state_;
+
+	HttpRequest         request;
+	HttpResponse        response;
+	HttpHandler         handler;
+
+	Client();
+	Client(const Client& other);
+	Client&      operator=(const Client& other);
+
+	HttpResponse makeStatusResponse(int status);
+
 };

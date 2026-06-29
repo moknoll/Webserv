@@ -27,6 +27,7 @@ CgiContext::CgiContext()
 	exit_status_ = 0;
 	deadline = 0;
 	response_ = HttpResponse(HTTP_OK);
+	cgi_output_.reserve(1024 * 1024);
 }
 
 std::string CgiContext::buildPath(const std::string& uri,
@@ -91,6 +92,7 @@ int CgiContext::buildCgiArgv(const HttpRequest& req, const Location& loc)
 
 	args.push_back(loc.cgi_path);
 	args.push_back(path);
+	// args.push_back(path);
 	for (size_t i = 0; i < args.size(); ++i)
 		argv_.push_back(const_cast< char* >(args[i].c_str()));
 	argv_.push_back(NULL);
@@ -118,7 +120,7 @@ bool CgiContext::executeChild()
 		close(stdout_pipe[1]);
 
 		execve(argv_[0], &argv_[0], &envp_[0]);
-		_exit(127);
+		std::exit(127);
 	}
 	close(stdin_pipe[0]);
 	close(stdout_pipe[1]);
@@ -126,36 +128,36 @@ bool CgiContext::executeChild()
 	return true;
 }
 
-bool CgiContext::writeRequestBody(const HttpRequest& req)
-{
-	std::string body_temp_file = req.getBodyTempFileName();
-	int         fd = open(body_temp_file.c_str(), O_RDONLY);
-	if (fd == -1)
-		return false;
-
-	char    buf[4096];
-	ssize_t r;
-	while ((r = read(fd, buf, sizeof(buf))) > 0)
-		write(stdin_pipe[1], buf, r);
-	close(stdin_pipe[1]);
-
-	return true;
-}
-
-bool CgiContext::readChildOutput()
-{
-	char    buf[4096];
-	ssize_t r;
-	while ((r = read(stdout_pipe[0], buf, sizeof(buf))) > 0)
-	{
-		if (r + cgi_output_.size() > MAX_CGI_BUFFER)
-			return false;
-		cgi_output_.append(buf, r);
-	}
-
-	close(stdout_pipe[0]);
-	return true;
-}
+// bool CgiContext::writeRequestBody(const HttpRequest& req)
+// {
+// 	std::string body_temp_file = req.getBodyTempFileName();
+// 	int         fd = open(body_temp_file.c_str(), O_RDONLY);
+// 	if (fd == -1)
+// 		return false;
+//
+// 	char    buf[4096];
+// 	ssize_t r;
+// 	while ((r = read(fd, buf, sizeof(buf))) > 0)
+// 		write(stdin_pipe[1], buf, r);
+// 	close(stdin_pipe[1]);
+//
+// 	return true;
+// }
+//
+// bool CgiContext::readChildOutput()
+// {
+// 	char    buf[4096];
+// 	ssize_t r;
+// 	while ((r = read(stdout_pipe[0], buf, sizeof(buf))) > 0)
+// 	{
+// 		if (r + cgi_output_.size() > MAX_CGI_BUFFER)
+// 			return false;
+// 		cgi_output_.append(buf, r);
+// 	}
+//
+// 	close(stdout_pipe[0]);
+// 	return true;
+// }
 
 int CgiContext::buildResponse()
 {
@@ -235,41 +237,6 @@ int CgiContext::buildResponse()
 	return HTTP_OK;
 }
 
-int CgiContext::waitChildProc(unsigned int timeout)
-{
-	int         status;
-	std::time_t deadline = std::time(NULL) + timeout;
-
-	// fcntl(stdout_pipe[0], F_SETFL, O_NONBLOCK);
-
-	char        buf[4096];
-
-	while (std::time(NULL) < deadline)
-	{
-		ssize_t r = read(stdout_pipe[0], buf, sizeof(buf));
-		std::cout << "tryed to read\n";
-		std::cout << std::time(NULL) - deadline;
-		if (r + cgi_output_.size() > MAX_CGI_BUFFER)
-			return false;
-		if (r > 0)
-		{
-			cgi_output_.append(buf, r);
-			std::cout << cgi_output_;
-		}
-
-		pid_t ret = waitpid(pid_, &status, WNOHANG);
-		if (ret == pid_)
-			return status;
-		if (ret == -1)
-			return -1;
-	}
-	std::cout << "TO kill process\n";
-	kill(pid_, SIGKILL);
-
-	waitpid(pid_, &status, 0);
-	return status;
-}
-
 int CgiContext::executeCGI(const HttpRequest& req, const Location& loc)
 {
 	int ret = HTTP_OK;
@@ -285,24 +252,33 @@ int CgiContext::executeCGI(const HttpRequest& req, const Location& loc)
 	if (!executeChild())
 		return HTTP_INTERNAL_SERVER_ERROR;
 
-	if (req.getMethod() == "POST" && !writeRequestBody(req))
-		return HTTP_INTERNAL_SERVER_ERROR;
+	fcntl(stdout_pipe[0], F_SETFL, O_NONBLOCK);
+	if (req.getMethod() == "POST")
+		fcntl(stdin_pipe[1], F_SETFL, O_NONBLOCK);
+	else
+	{
+		close(stdin_pipe[1]);
+		stdin_pipe[1] = -1;
+	}
+
+	// if (req.getMethod() == "POST" && !writeRequestBody(req))
+	// 	return HTTP_INTERNAL_SERVER_ERROR;
 
 	// if (!readChildOutput())
 	// 	return HTTP_INTERNAL_SERVER_ERROR;
 
-	int status = waitChildProc(5);
-
-	if (WIFEXITED(status))
-		;
-	else if (WIFSIGNALED(status))
-		return HTTP_GATEWAY_TIME_OUT;
-	else
-		return HTTP_INTERNAL_SERVER_ERROR;
-
-	exit_status_ = buildResponse();
-	if (exit_status_ != HTTP_OK)
-		return exit_status_;
+	// int status = waitChildProc(5);
+	//
+	// if (WIFEXITED(status))
+	// 	;
+	// else if (WIFSIGNALED(status))
+	// 	return HTTP_GATEWAY_TIME_OUT;
+	// else
+	// 	return HTTP_INTERNAL_SERVER_ERROR;
+	//
+	// exit_status_ = buildResponse();
+	// if (exit_status_ != HTTP_OK)
+	// 	return exit_status_;
 
 	return HTTP_OK;
 }
@@ -311,3 +287,30 @@ HttpResponse CgiContext::getResponse() const
 {
 	return response_;
 }
+
+int CgiContext::getFdCGI_out() const
+{
+	return stdout_pipe[0];
+}
+
+int CgiContext::getFdCGI_in() const
+{
+	return stdin_pipe[1];
+}
+
+int CgiContext::getStatus() const
+{
+	return exit_status_;
+}
+
+int CgiContext::getCgiPid() const
+{
+	return pid_;
+}
+
+void CgiContext::appendCgiOutput(const char* buf, size_t size)
+{
+	cgi_output_.append(buf, size);
+	std::cout << cgi_output_;
+}
+

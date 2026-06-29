@@ -113,6 +113,7 @@ bool ws::readFile(const char* path, std::string& file_content)
 
 	file_content.assign((std::istreambuf_iterator< char >(file)),
 	                    std::istreambuf_iterator< char >());
+	file.close();
 	return true;
 }
 

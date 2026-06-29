@@ -11,7 +11,6 @@
 /* ************************************************************************** */
 
 #include "HttpHandler.hpp"
-#include "../cgi/Cgi.hpp"
 #include "../lib/ws.hpp"
 #include "../server/Client.hpp"
 #include "HttpRequest.hpp"
@@ -39,7 +38,6 @@ HttpHandler::HttpHandler(const ServerConfig& cfg) :
         config_(cfg),
         loc_(NULL),
         error_(0),
-        state_(HTTP_INIT),
         fd_(-1)
 {
 }
@@ -48,7 +46,6 @@ HttpHandler::HttpHandler(const HttpHandler& other) :
         config_(other.config_),
         loc_(other.loc_),
         error_(other.error_),
-        state_(other.state_),
         upload_file_path_(other.upload_file_path_),
         fd_(other.fd_)
 {
@@ -61,12 +58,6 @@ HttpHandler::~HttpHandler()
 
 HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
-	if (req.getRequestStatus() != HTTP_OK)
-	{
-		state_ = HTTP_CLOSE;
-		return makeStatusResponse(req.getRequestStatus());
-	}
-
 	const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
 
@@ -84,11 +75,6 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 
 	if (!isAllowedMethod(method))
 		return makeStatusResponse(HTTP_NOT_ALLOWED);
-
-	if (loc_->has_cgi)
-	{
-		return handleCGI(req);
-	}
 
 	if (method == "GET")
 		return handleGET(req);
@@ -403,7 +389,6 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 {
 	if (loc_->upload_path.empty())
 	{
-		state_ = HTTP_CLOSE;
 		std::string path = buildPath(req.getURI());
 		PathInfo    info = ws::checkPath(path);
 		if (info.exists)
@@ -470,17 +455,6 @@ HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
 	HttpResponse resp(HTTP_NO_CONTENT);
 	resp.setFullResponse();
 	return resp;
-}
-
-HttpResponse HttpHandler::handleCGI(const HttpRequest& req)
-{
-	CgiContext cgi;
-
-	int        status = cgi.executeCGI(req, *loc_);
-	if (status != HTTP_OK)
-		return makeStatusResponse(status);
-
-	return cgi.getResponse();
 }
 
 HttpResponse HttpHandler::makeStatusResponse(int status)
@@ -625,14 +599,7 @@ void HttpHandler::reset()
 	loc_ = NULL;
 	closeFile();
 	error_ = 0;
-	state_ = HTTP_INIT;
 	upload_file_path_.clear();
-	// temp_file_.clear();
-}
-
-int HttpHandler::getState() const
-{
-	return state_;
 }
 
 void HttpHandler::closeFile()

@@ -15,8 +15,17 @@ class CgiContext
   public:
 	CgiContext();
 
-	int          executeCGI(const HttpRequest& req, const Location& loc);
 	HttpResponse getResponse() const;
+	int          executeCGI(const HttpRequest& req, const Location& loc);
+	int          getFdCGI_out() const;
+	int          getFdCGI_in() const;
+	int          getStatus() const;
+	int          getCgiPid() const;
+	void         appendCgiOutput(const char* buf, size_t size);
+	int          buildResponse();
+	int          waitChildProc();
+
+	std::string  cgi_output_;
 
   private:
 	static const size_t                  MAX_CGI_BUFFER;
@@ -33,8 +42,6 @@ class CgiContext
 	std::vector< std::string >           env;
 	std::vector< std::string >           args;
 
-	std::string                          cgi_output_;
-
 	std::string resolveScriptPath(const Location&    loc,
 	                              const std::string& uri) const;
 
@@ -44,11 +51,7 @@ class CgiContext
 	int         buildCgiEnvp(const HttpRequest& req);
 	int         buildCgiArgv(const HttpRequest& req, const Location& loc);
 	bool        executeChild();
-	bool        readChildOutput();
 	bool        writeRequestBody(const HttpRequest& req);
-
-	int         buildResponse();
-	int         waitChildProc(unsigned int timeout);
 };
 
 CgiContext buildCgiContext();

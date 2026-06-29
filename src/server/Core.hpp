@@ -24,15 +24,26 @@ class Core
 {
   private:
 	std::vector< Server* >       _servers;
-	std::vector< struct pollfd > _pollSockets;
+	std::vector< struct pollfd > poll_fds_;
 	std::map< int, Client* >     _clients;
+	std::vector< Client* >       Vclients_;
 
 	void                         _acceptNewClient(const Server& server);
 	void                         _handleClientMessage(int clientSocketFd);
 	void                         _sendResponseToClient(int clientSocketFd);
 	void                         _cleanupClient(int clientSocketFd);
-	bool                         _isCompleteRequest(std::string& request); //??
-	void                         setEvent(int clientsocketFD, int state);
+
+	void                         setEvent_(int clientsocketFD, int state);
+	void                         addFdtoPoll_(int fd, int event);
+
+	Client*                      FindClient(int fd) const;
+
+	void                         readCGioutput(Client& client);
+
+	void                         checkCGIProcesses();
+
+	// void                         cleanPollFds();
+	void                         removePollFd(int fd);
 
 	Core();
 
