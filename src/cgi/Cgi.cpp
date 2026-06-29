@@ -83,7 +83,7 @@ int CgiContext::buildCgiArgv(const HttpRequest& req, const Location& loc)
 	PathInfo               path_info = ws::checkPath(path);
 	PathInfo               cgi_path_info = ws::checkPath(loc.cgi_path);
 	if (!path_info.exists && !path_info.readable)
-	{
+	{ 
 		return HTTP_NOT_FOUND;
 	}
 	if (!cgi_path_info.exists && !cgi_path_info.readable
@@ -96,6 +96,8 @@ int CgiContext::buildCgiArgv(const HttpRequest& req, const Location& loc)
 	for (size_t i = 0; i < args.size(); ++i)
 		argv_.push_back(const_cast< char* >(args[i].c_str()));
 	argv_.push_back(NULL);
+	for (size_t i = 0; i < argv_.size(); ++i)
+		std::cout << this->argv_[i] << std::endl;
 	return HTTP_OK;
 }
 
