@@ -396,7 +396,13 @@ void HttpRequest::resolveURI()
 
 void HttpRequest::buildPath_()
 {
-	std::string sub_uri = uri_.substr(location_->path.length());
+	std::string sub_uri;
+	std::string::size_type	p = uri_.find('?');
+	if (p != std::string::npos)
+		sub_uri = uri_.substr(location_->path.length(), p);
+	else
+		sub_uri = uri_.substr(location_->path.length());
+
 	std::string path = location_->root;
 
 	if (!path.empty() && path[path.length() - 1] != '/')

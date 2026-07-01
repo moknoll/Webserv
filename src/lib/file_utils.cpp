@@ -110,6 +110,13 @@ bool ws::readFile(const char* path, std::string& file_content)
 
 	if (!file.is_open())
 		return false;
+	size_t size = ws::getFileSize(path);
+	if (size > 100 * 1024 * 1024) // if file > 100M we dont load to buffer
+	{
+		file.close();
+		return false;
+	}
+	return false;
 
 	file_content.assign((std::istreambuf_iterator< char >(file)),
 	                    std::istreambuf_iterator< char >());

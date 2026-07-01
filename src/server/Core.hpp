@@ -20,43 +20,49 @@
 
 #define RECV_BUFFER 8192
 
-enum FdType
-{
-	FD_CLIENT = 0,
-	FD_PIPE_IN,
-	FD_PIPE_OUT
-};
-
-struct FdInfo
-{
-	Client* client;
-	FdType  type;
-};
-
 class Core
 {
   private:
-	std::vector< Server* >       _servers;
+	enum FdType
+	{
+		FD_SERVER = 0,
+		FD_CLIENT,
+		FD_PIPE_IN,
+		FD_PIPE_OUT
+	};
+
+	struct FdInfo
+	{
+		union
+		{
+			Server* server;
+			Client* client;
+		};
+		FdType type;
+	};
+
+	// std::vector< Server* >       _servers;
 	std::vector< struct pollfd > poll_fds_;
-	std::map< int, FdInfo >      _clients;
+	std::map< int, FdInfo >      fd_infos_;
 
-	void                         _acceptNewClient(const Server& server);
-	void                         _handleClientMessage(int clientSocketFd);
-	void                         _sendResponseToClient(int clientSocketFd);
-	void                         _cleanupClient(int clientSocketFd);
+	void                         acceptNewClient_(const Server& server);
+	void    handleClientMessage_(Client* client, int client_fd);
+	void    sendResponseToClient_(int client_fd);
+	void    cleanupClient_(int client_fd);
+	void    handlePOLLIN(pollfd& pfd);
+	void    handlePOLLOUT(pollfd& pfd);
 
-	void                         setEvent_(int clientsocketFD, int state);
-	void                         addFdtoPoll_(int fd, int event);
+	void    setEvent_(int client_fd, int state);
+	void    addFdtoPoll_(int fd, int event);
 
-	Client*                      FindClient(int fd) const;
+	void    readCGioutput(Client& client);
+	void    writeCGIinput(Client& client);
 
-	void                         readCGioutput(Client& client);
-	void                         writeCGIinput(Client& client);
-
-	void                         checkCGIProcesses();
+	FdInfo* getFdInfo(int fd);
+	void    checkCGIProcesses();
 
 	// void                         cleanPollFds();
-	void                         removePollFd(int fd);
+	void    removePollFd(int fd);
 
 	Core();
 
@@ -64,6 +70,6 @@ class Core
 	Core(const std::vector< ServerConfig >& configs);
 	~Core();
 
-	void    run(); // main loop for accepting and handling clients
-	Server* findServerByFd(int serverFd);
+	void run(); // main loop for accepting and handling clients
+	            // Server* findServerByFd(int serverFd);
 };

@@ -1,5 +1,5 @@
 #include "Client.hpp"
-#include "../cgi/Cgi.hpp"
+#include "../cgi/cgi.hpp"
 #include "../http/constants.hpp"
 #include "../lib/ws.hpp"
 
@@ -39,29 +39,30 @@ void Client::processRequest()
 		state_ = HTTP_SEND;
 
 		send_buffer_ =
-		    makeStatusResponse(request.getRequestStatus()).toString();
+		    handler.makeStatusResponse(request.getRequestStatus()).toString();
 		return;
 	}
 	const Location* loc = request.getLocation();
 	if (loc == NULL)
 	{
-
-		keep_alive_ =false;
+		keep_alive_ = false;
 		state_ = HTTP_SEND;
-		send_buffer_ = makeStatusResponse(HTTP_NOT_FOUND).toString(); 
-		return; 
+		send_buffer_ = handler.makeStatusResponse(HTTP_NOT_FOUND).toString();
+		return;
 	}
 
 	if (loc->has_cgi)
 	{
-		CgiContext cgi;
+		// CgiContext cgi;
 
-		int        status = cgi.executeCGI(request, *loc);
-		cgi_pipe_in = cgi.getFdCGI_in();
-		cgi_pipe_out = cgi.getFdCGI_out();
-		cgi_pid = cgi.getCgiPid();
+		executeCGI(request, cgi, config_);
+		cgi_pipe_in = cgi.stdin_pipe;
+		cgi_pipe_out = cgi.stdout_pipe;
+
+		cgi_pid = cgi.pid;
 		cgi_output_buf.clear();
 		cgi_input_buf_.clear();
+
 		if (cgi_pipe_in == -1)
 			request_body_fd_ = -1;
 		else
@@ -71,19 +72,23 @@ void Client::processRequest()
 			if (request_body_fd_ == -1)
 			{
 				send_buffer_ =
-				    makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR).toString();
+				    handler.makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR)
+				        .toString();
 				state_ = HTTP_SEND;
 				keep_alive_ = false;
 				return;
 			}
 		}
-		if (status != HTTP_OK)
+
+		if (cgi.exit_status)
 		{
-			send_buffer_ = makeStatusResponse(status).toString();
+			send_buffer_ =
+			    handler.makeStatusResponse(cgi.exit_status).toString();
 			state_ = HTTP_SEND;
 			keep_alive_ = false;
 			return;
 		}
+
 		state_ = CGI_STATE;
 	}
 	else
@@ -109,20 +114,6 @@ std::string Client::serialize()
 
 void Client::buildCGIResponse()
 {
-	std::cout << "OUTPUT\n" << cgi_output_buf;
-	// HttpResponse res;
-	// int          status = cgi.buildResponse();
-	// if (status != HTTP_OK)
-	// 	send_buffer_ = makeStatusResponse(status).toString();
-	// else
-	// 	send_buffer_ = cgi.getResponse().toString();
-	//
-	// if (cgi_output_buf.empty())
-	// {
-	// 	send_buffer_ = makeStatusResponse(HTTP_BAD_GATEWAY).toString();
-	// 	return;
-	// }
-
 	std::string            raw_headers;
 	std::string            body;
 	int                    status = 200;
@@ -138,7 +129,8 @@ void Client::buildCGIResponse()
 		sep = cgi_output_buf.find("\n\n");
 		if (sep == std::string::npos)
 		{
-			send_buffer_ = makeStatusResponse(HTTP_BAD_GATEWAY).toString();
+			send_buffer_ =
+			    handler.makeStatusResponse(HTTP_BAD_GATEWAY).toString();
 			return;
 		}
 
@@ -162,7 +154,8 @@ void Client::buildCGIResponse()
 		size_t c = line.find(':');
 		if (c == std::string::npos)
 		{
-			send_buffer_ = makeStatusResponse(HTTP_BAD_GATEWAY).toString();
+			send_buffer_ =
+			    handler.makeStatusResponse(HTTP_BAD_GATEWAY).toString();
 			return;
 		}
 
@@ -197,7 +190,7 @@ void Client::buildCGIResponse()
 	    || (have_content_length && content_length != body.size()))
 
 	{
-		send_buffer_ = makeStatusResponse(HTTP_BAD_GATEWAY).toString();
+		send_buffer_ = handler.makeStatusResponse(HTTP_BAD_GATEWAY).toString();
 		return;
 	}
 
@@ -251,11 +244,13 @@ bool Client::CGIProcessFinished()
 			else
 			{
 				send_buffer_ =
-				    makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR).toString();
+				    handler.makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR)
+				        .toString();
 			}
 		}
 		else if (WIFSIGNALED(status))
-			send_buffer_ = makeStatusResponse(HTTP_GATEWAY_TIME_OUT).toString();
+			send_buffer_ =
+			    handler.makeStatusResponse(HTTP_GATEWAY_TIME_OUT).toString();
 		cgi_pid = -1;
 		close(cgi_pipe_in);
 		close(cgi_pipe_out);
@@ -265,7 +260,7 @@ bool Client::CGIProcessFinished()
 	else
 	{
 		send_buffer_ =
-		    makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR).toString();
+		    handler.makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR).toString();
 	}
 	state_ = HTTP_SEND;
 	return true;
@@ -322,26 +317,6 @@ bool Client::writeRequestBody()
 		return true;
 	}
 	return false;
-}
-
-HttpResponse Client::makeStatusResponse(int status)
-{
-	HttpResponse                                 res(status);
-	std::string                                  content;
-
-	std::map< int, std::string >::const_iterator it =
-	    config_.error_pages.find(status);
-	if (it != config_.error_pages.end())
-	{
-		if (ws::readFile(it->second.c_str(), content))
-		{
-			res.setFullResponse(content, "html");
-			return res;
-		}
-	}
-
-	res.setFullResponse(res.buildErrorPage(status), "html");
-	return res;
 }
 
 void Client::setRecvBuffer(const std::string& buffer)

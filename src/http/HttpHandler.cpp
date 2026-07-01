@@ -12,7 +12,6 @@
 
 #include "HttpHandler.hpp"
 #include "../lib/ws.hpp"
-#include "../server/Client.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 #include "constants.hpp"

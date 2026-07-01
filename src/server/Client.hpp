@@ -12,12 +12,11 @@
 
 #pragma once
 
-#include "../cgi/Cgi.hpp"
+#include "../cgi/cgi.hpp"
 #include "../http/HttpHandler.hpp"
 #include "../http/HttpRequest.hpp"
 #include "../http/HttpResponse.hpp"
 #include <cstddef>
-#include <stack>
 #include <string>
 
 class Client
@@ -34,7 +33,7 @@ class Client
 		HTTP_CLOSE
 	};
 
-	// CgiContext  cgi;
+	CgiContext  cgi;
 	int         cgi_pipe_in;
 	int         cgi_pipe_out;
 	int         cgi_pid;
@@ -81,7 +80,5 @@ class Client
 
 	Client();
 	Client(const Client& other);
-	Client&      operator=(const Client& other);
-
-	HttpResponse makeStatusResponse(int status);
+	Client& operator=(const Client& other);
 };

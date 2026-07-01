@@ -22,21 +22,12 @@
 class HttpHandler
 {
   public:
-	// enum STATE
-	// {
-	// 	HTTP_INIT = 0,
-	// 	HTTP_RECV,
-	// 	SEND_STATE,
-	// 	HTTP_COMPLETE,
-	// 	HTTP_CLOSE
-	// };
-
 	HttpHandler(const ServerConfig& cfg);
 	HttpHandler(const HttpHandler& other);
 	~HttpHandler();
 
 	HttpResponse handle(const HttpRequest& req);
-	// int          getState() const;
+	HttpResponse makeStatusResponse(int status);
 	std::string  getFileChunk();
 	void         reset();
 
@@ -48,7 +39,6 @@ class HttpHandler
 	const ServerConfig&        config_;
 	const Location*            loc_;
 	int                        error_;
-	// STATE                      state_;
 	std::string                upload_file_path_;
 	// std::string                temp_file_;
 	int                        fd_;
@@ -56,7 +46,6 @@ class HttpHandler
 	HttpResponse               handleGET(const HttpRequest& req);
 	HttpResponse               handlePOST(const HttpRequest& req);
 	HttpResponse               handleDELETE(const HttpRequest& req);
-	HttpResponse               makeStatusResponse(int status);
 	HttpResponse               makeFileResponse(const std::string& path);
 
 	std::vector< std::string > getListOfFiles(const std::string& path);

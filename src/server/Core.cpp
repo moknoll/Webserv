@@ -44,13 +44,18 @@ Core::Core(const std::vector< ServerConfig >& configs)
 	for (size_t i = 0; i < configs.size(); i++)
 	{
 		Server* s = new Server(configs[i]);
-		_servers.push_back(s);
+		int     fd = s->getSocketFd();
 
-		struct pollfd pfd;
-		pfd.fd = s->getSocketFd();
-		std::cout << "sock_fd:" << s->getSocketFd() << std::endl;
-		pfd.events = POLLIN;
-		poll_fds_.push_back(pfd);
+		addFdtoPoll_(fd, POLLIN);
+		fd_infos_[fd].server = s;
+		fd_infos_[fd].type = FD_SERVER;
+
+		// struct pollfd pfd;
+		// pfd.fd = s->getSocketFd();
+		// std::cout << "sock_fd:" << s->getSocketFd() << std::endl;
+		// pfd.events = POLLIN;
+		// poll_fds_.push_back(pfd);
+		std::cout << "sock_fd:" << fd << std::endl;
 	}
 }
 
@@ -63,28 +68,30 @@ Core::~Core()
 	// }
 	// Check later on how to close?
 	//
-	std::vector< Server* >::iterator it_serv = _servers.begin();
-	for (; it_serv != _servers.end(); ++it_serv)
-		delete *it_serv;
+	// std::vector< Server* >::iterator it_serv = _servers.begin();
+	// for (; it_serv != _servers.end(); ++it_serv)
+	// 	delete *it_serv;
 
 	// std::map< int, Client* >::iterator it_client = _clients.begin();
-	std::map< int, FdInfo >::iterator it_client = _clients.begin();
-	for (; it_client != _clients.end(); ++it_client)
+	std::map< int, FdInfo >::iterator it_info = fd_infos_.begin();
+	for (; it_info != fd_infos_.end(); ++it_info)
 	{
-		delete it_client->second.client;
-		// delete it_client->second;
+		if (it_info->first == FD_SERVER)
+			delete it_info->second.server;
+		else if (it_info->first == FD_CLIENT)
+			delete it_info->second.client;
 	}
 }
 
-Server* Core::findServerByFd(int serverFd)
-{
-	for (size_t i = 0; i < _servers.size(); i++)
-	{
-		if (_servers[i]->getSocketFd() == serverFd)
-			return _servers[i];
-	}
-	return NULL;
-}
+// Server* Core::findServerByFd(int serverFd)
+// {
+// 	for (size_t i = 0; i < _servers.size(); i++)
+// 	{
+// 		if (_servers[i]->getSocketFd() == serverFd)
+// 			return _servers[i];
+// 	}
+// 	return NULL;
+// }
 
 /**
  * @brief Runs the main event loop for the server.
@@ -101,57 +108,15 @@ void Core::run()
 
 		for (size_t i = 0; i < poll_fds_.size(); i++)
 		{
-			// if ((_pollSockets[i].revents & POLLERR)
-			//     || _pollSockets[i].revents & POLLHUP)
-			// clean soccketss
+			pollfd& pfd = poll_fds_[i];
 
-			// track_now(poll_fds_[i]);
 			if (poll_fds_[i].revents & POLLIN)
 			{
-				Server* server = findServerByFd(poll_fds_[i].fd);
-				if (server != NULL)
-					_acceptNewClient(*server);
-				else
-				{
-					if (_clients.find(poll_fds_[i].fd) == _clients.end())
-						continue;
-					FdInfo fd_info = _clients.at(poll_fds_[i].fd);
-
-					if (fd_info.client == NULL)
-						continue;
-
-					if (fd_info.type == FD_PIPE_OUT)
-					{
-						std::cout << "POLLIN: " << poll_fds_[i].fd
-						          << "type: FD_PIPE_OUT\n";
-						readCGioutput(*fd_info.client);
-					}
-					else if (fd_info.type == FD_CLIENT)
-					{
-						std::cout << "POLLIN: " << poll_fds_[i].fd
-						          << "type: Client\n";
-
-						_handleClientMessage(poll_fds_[i].fd);
-					}
-				}
+				handlePOLLIN(pfd);
 			}
 			else if (poll_fds_[i].revents & POLLOUT)
 			{
-				if (_clients.find(poll_fds_[i].fd) == _clients.end())
-					continue;
-				FdInfo fd_info = _clients.at(poll_fds_[i].fd);
-
-				if (fd_info.client == NULL)
-					continue;
-
-				if (fd_info.type == FD_PIPE_IN)
-				{
-					std::cout << "POLLOUT: " << poll_fds_[i].fd
-					          << "type: FD_PIPE_IN\n";
-					writeCGIinput(*fd_info.client);
-				}
-				else if (fd_info.type == FD_CLIENT)
-					_sendResponseToClient(poll_fds_[i].fd);
+				handlePOLLOUT(pfd);
 			}
 		}
 		checkCGIProcesses();
@@ -165,7 +130,7 @@ void Core::run()
  *                       accept a new client from.
  * @return void
  */
-void Core::_acceptNewClient(const Server& server)
+void Core::acceptNewClient_(const Server& server)
 {
 	int                server_fd = server.getSocketFd();
 
@@ -179,41 +144,32 @@ void Core::_acceptNewClient(const Server& server)
 		return;
 
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
-
 	addFdtoPoll_(newClientFd, POLLIN);
-	// struct pollfd pfd;
-	// pfd.fd = newClientFd;
-	// pfd.events = POLLIN;
-	// poll_fds_.push_back(pfd);
 
-	ServerConfig cfg = server.getConfig();
-	Client*      client = new Client(newClientFd, server.getConfig());
-	_clients[newClientFd].client = client;
-	_clients[newClientFd].type = FD_CLIENT;
+	// ServerConfig cfg = server.getConfig();
+	Client* client = new Client(newClientFd, server.getConfig());
+	fd_infos_[newClientFd].client = client;
+	fd_infos_[newClientFd].type = FD_CLIENT;
 	std::cout << "size of poll fds: " << poll_fds_.size() << '\n';
+	std::cout << "size of fd_infos_: " << fd_infos_.size() << '\n';
 
 	std::cout << "New Client connected: " << newClientFd << std::endl;
 	LOG_DEBUG("New client connected");
 }
 
-void Core::_handleClientMessage(int clientSocketFd)
+void Core::handleClientMessage_(Client* client, int client_fd)
 {
-	if (_clients.find(clientSocketFd) == _clients.end())
-		return;
-	// Client* client = FindClient(clientSocketFd);
-	Client* client = _clients.at(clientSocketFd).client;
-
 	if (client == NULL)
 		return;
 
 	if (client->getHttpState() == Client::HTTP_RECV)
 	{
 		char    buffer[RECV_BUFFER];
-		ssize_t recv_bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
+		ssize_t recv_bytes = recv(client_fd, buffer, sizeof(buffer), 0);
 
 		if (recv_bytes <= 0)
 		{
-			_cleanupClient(clientSocketFd);
+			cleanupClient_(client_fd);
 			return;
 		}
 
@@ -230,29 +186,25 @@ void Core::_handleClientMessage(int clientSocketFd)
 		addFdtoPoll_(client->cgi_pipe_in, POLLOUT);
 		if (client->getFdCGI_out() != -1)
 		{
-			_clients[client->cgi_pipe_out].client = client;
-			_clients[client->cgi_pipe_out].type = FD_PIPE_OUT;
+			fd_infos_[client->cgi_pipe_out].client = client;
+			fd_infos_[client->cgi_pipe_out].type = FD_PIPE_OUT;
 		}
 
 		if (client->getFdCGI_in() != -1)
 		{
-			_clients[client->cgi_pipe_in].client = client;
-			_clients[client->cgi_pipe_in].type = FD_PIPE_IN;
+			fd_infos_[client->cgi_pipe_in].client = client;
+			fd_infos_[client->cgi_pipe_in].type = FD_PIPE_IN;
 		}
 	}
-	// else
-	// if (client->getHttpState() == Client::HTTP_SEND)
-	// { setEvent_(clientSocketFd, POLLOUT);
-	// }
-	setEvent_(clientSocketFd, POLLOUT);
+	setEvent_(client_fd, POLLOUT);
 }
 
-void Core::_sendResponseToClient(int clientSocketFd)
+void Core::sendResponseToClient_(int client_fd)
 {
-	if (_clients.find(clientSocketFd) == _clients.end())
+	if (fd_infos_.find(client_fd) == fd_infos_.end())
 		return;
 
-	Client* client = _clients.at(clientSocketFd).client;
+	Client* client = fd_infos_.at(client_fd).client;
 	// Client* client = FindClient(clientSocketFd);
 	if (client == NULL)
 		return;
@@ -268,19 +220,19 @@ void Core::_sendResponseToClient(int clientSocketFd)
 		if (client->isKeepAlive())
 		{
 			// LOG_DEBUG("isKeepAlive");
-			setEvent_(clientSocketFd, POLLIN);
+			setEvent_(client_fd, POLLIN);
 		}
 		else
 		{
-			_cleanupClient(clientSocketFd);
+			cleanupClient_(client_fd);
 		}
 		return;
 	}
 
-	ssize_t sent_bytes = send(clientSocketFd, buffer.c_str(), buffer.size(), 0);
+	ssize_t sent_bytes = send(client_fd, buffer.c_str(), buffer.size(), 0);
 	if (sent_bytes == -1)
 	{
-		_cleanupClient(clientSocketFd);
+		cleanupClient_(client_fd);
 		return;
 	}
 
@@ -289,22 +241,17 @@ void Core::_sendResponseToClient(int clientSocketFd)
 	client->setSendBuffer(buffer);
 }
 
-/**
- * @brief Clean up and remove a disconnected client.
- *
- * @param clientSocketFd File descriptor of the client to clean up
- */
-void Core::_cleanupClient(int clientSocketFd)
+void Core::cleanupClient_(int client_fd)
 {
-	if (_clients.find(clientSocketFd) != _clients.end())
+	if (fd_infos_.find(client_fd) != fd_infos_.end())
 	{
-		Client* client = _clients.at(clientSocketFd).client;
+		Client* client = fd_infos_.at(client_fd).client;
 		delete client;
 	}
 
-	removePollFd(clientSocketFd);
+	removePollFd(client_fd);
 
-	_clients.erase(clientSocketFd);
+	fd_infos_.erase(client_fd);
 
 	LOG_DEBUG("Client disconnected");
 }
@@ -320,12 +267,12 @@ void Core::addFdtoPoll_(int fd, int event)
 	poll_fds_.push_back(pfd);
 }
 
-void Core::setEvent_(int clientsocketFD, int state)
+void Core::setEvent_(int client_fd, int state)
 {
 	// Change Poll event to writing
 	for (size_t i = 0; i < poll_fds_.size(); i++)
 	{
-		if (poll_fds_[i].fd == clientsocketFD)
+		if (poll_fds_[i].fd == client_fd)
 		{
 			poll_fds_[i].events = state;
 			break;
@@ -359,7 +306,7 @@ void Core::writeCGIinput(Client& client)
 	if (client.writeRequestBody())
 	{
 		removePollFd(client.cgi_pipe_in);
-		_clients.erase(client.cgi_pipe_in);
+		fd_infos_.erase(client.cgi_pipe_in);
 		close(client.cgi_pipe_in);
 		client.cgi_pipe_in = -1;
 	}
@@ -368,8 +315,8 @@ void Core::writeCGIinput(Client& client)
 void Core::checkCGIProcesses()
 {
 	// std::map< int, Client* >::iterator it = _clients.begin();
-	std::map< int, FdInfo >::iterator it = _clients.begin();
-	for (; it != _clients.end(); ++it)
+	std::map< int, FdInfo >::iterator it = fd_infos_.begin();
+	for (; it != fd_infos_.end(); ++it)
 	{
 		Client* client = it->second.client;
 		if (client == NULL)
@@ -381,8 +328,8 @@ void Core::checkCGIProcesses()
 				LOG_DEBUG("CGI FInished");
 				removePollFd(client->cgi_pipe_in);
 				removePollFd(client->cgi_pipe_out);
-				_clients.erase(client->cgi_pipe_in);
-				_clients.erase(client->cgi_pipe_out);
+				fd_infos_.erase(client->cgi_pipe_in);
+				fd_infos_.erase(client->cgi_pipe_out);
 				setEvent_(client->getClientFd(), POLLOUT);
 			}
 		}
@@ -420,4 +367,48 @@ void Core::removePollFd(int fd)
 			break;
 		}
 	}
+}
+
+void Core::handlePOLLIN(pollfd& pfd)
+{
+	FdInfo* info = getFdInfo(pfd.fd);
+
+	if (!info || !info->client)
+		return;
+
+	switch (info->type)
+	{
+		case FD_SERVER:   acceptNewClient_(*info->server); break;
+		case FD_PIPE_OUT: readCGioutput(*info->client); break;
+		case FD_CLIENT:   handleClientMessage_(info->client, pfd.fd); break;
+		default:          break;
+	}
+}
+
+void Core::handlePOLLOUT(pollfd& pfd)
+{
+	FdInfo* info = getFdInfo(pfd.fd);
+
+	if (!info || !info->client)
+		return;
+
+	switch (info->type)
+	{
+		case FD_PIPE_IN: writeCGIinput(*info->client); break;
+		case FD_CLIENT:
+			sendResponseToClient_(pfd.fd);
+			break;
+			break;
+		default: break;
+	}
+}
+
+Core::FdInfo* Core::getFdInfo(int fd)
+{
+	std::map< int, FdInfo >::iterator it = fd_infos_.find(fd);
+
+	if (it == fd_infos_.end())
+		return NULL;
+
+	return &(it->second);
 }
