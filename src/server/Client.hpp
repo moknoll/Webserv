@@ -17,6 +17,7 @@
 #include "../http/HttpRequest.hpp"
 #include "../http/HttpResponse.hpp"
 #include <cstddef>
+#include <stack>
 #include <string>
 
 class Client
@@ -27,23 +28,28 @@ class Client
 
 	enum STATE
 	{
-		HTTP_INIT = 0,
-		HTTP_RECV,
+		HTTP_RECV = 0,
 		CGI_STATE,
 		HTTP_SEND,
 		HTTP_CLOSE
 	};
 
-	CgiContext  cgi;
+	// CgiContext  cgi;
+	int         cgi_pipe_in;
+	int         cgi_pipe_out;
+	int         cgi_pid;
+	std::string cgi_output_buf;
+	std::string cgi_input_buf_;
+	int         request_body_fd_;
+	bool        writeRequestBody();
+	void        buildCGIResponse();
+	bool        CGIProcessFinished();
 
 	void        reset();
 
 	void        processRequest(); // buildResponse()
 	std::string serialize();
 	void        parseRequest(const char* buffer, size_t size);
-	void        buildCGIResponse();
-	
-	bool         CGIProcessFinished();
 
 	std::string getResponseBuffer() const; // ??????????
 	std::string getRequestBuffer() const;  // ???????????
@@ -52,6 +58,7 @@ class Client
 	int         getClientFd() const;
 	void        setSendBuffer(const std::string& response); // ???????
 	void        setRecvBuffer(const std::string& request);  // ??????????
+	void        setState(enum STATE state);
 
 	int         getFdCGI_in() const;
 	int         getFdCGI_out() const;
@@ -77,5 +84,4 @@ class Client
 	Client&      operator=(const Client& other);
 
 	HttpResponse makeStatusResponse(int status);
-
 };

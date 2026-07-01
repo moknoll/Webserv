@@ -20,13 +20,25 @@
 
 #define RECV_BUFFER 8192
 
+enum FdType
+{
+	FD_CLIENT = 0,
+	FD_PIPE_IN,
+	FD_PIPE_OUT
+};
+
+struct FdInfo
+{
+	Client* client;
+	FdType  type;
+};
+
 class Core
 {
   private:
 	std::vector< Server* >       _servers;
 	std::vector< struct pollfd > poll_fds_;
-	std::map< int, Client* >     _clients;
-	std::vector< Client* >       Vclients_;
+	std::map< int, FdInfo >      _clients;
 
 	void                         _acceptNewClient(const Server& server);
 	void                         _handleClientMessage(int clientSocketFd);
@@ -39,6 +51,7 @@ class Core
 	Client*                      FindClient(int fd) const;
 
 	void                         readCGioutput(Client& client);
+	void                         writeCGIinput(Client& client);
 
 	void                         checkCGIProcesses();
 

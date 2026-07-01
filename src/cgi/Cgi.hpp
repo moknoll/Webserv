@@ -22,10 +22,11 @@ class CgiContext
 	int          getStatus() const;
 	int          getCgiPid() const;
 	void         appendCgiOutput(const char* buf, size_t size);
+	bool         writeRequestBody();
 	int          buildResponse();
 	int          waitChildProc();
 
-	std::string  cgi_output_;
+	std::string  cgi_output_buf_;
 
   private:
 	static const size_t                  MAX_CGI_BUFFER;
@@ -34,8 +35,10 @@ class CgiContext
 	int                                  stdout_pipe[2];
 	std::map< std::string, std::string > env_map;
 	int                                  exit_status_;
-	time_t                               deadline;
+	time_t                               start_time_;
 	HttpResponse                         response_;
+	int                                  request_body_fd_;
+	std::string                          cgi_input_buf_;
 
 	std::vector< char* >                 envp_;
 	std::vector< char* >                 argv_;
@@ -51,7 +54,9 @@ class CgiContext
 	int         buildCgiEnvp(const HttpRequest& req);
 	int         buildCgiArgv(const HttpRequest& req, const Location& loc);
 	bool        executeChild();
-	bool        writeRequestBody(const HttpRequest& req);
+
+	void        closeFile();
+	void        ClosePipes();
 };
 
 CgiContext buildCgiContext();

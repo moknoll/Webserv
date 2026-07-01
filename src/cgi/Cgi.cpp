@@ -25,9 +25,11 @@ CgiContext::CgiContext()
 	stdout_pipe[0] = -1;
 	stdout_pipe[1] = -1;
 	exit_status_ = 0;
-	deadline = 0;
+	start_time_ = 0;
 	response_ = HttpResponse(HTTP_OK);
-	cgi_output_.reserve(1024 * 1024);
+	cgi_output_buf_.reserve(1024 * 1024);
+	request_body_fd_ = -1;
+	cgi_input_buf_.resize(512 * 1024, '\0');
 }
 
 std::string CgiContext::buildPath(const std::string& uri,
@@ -65,12 +67,13 @@ int CgiContext::buildCgiEnvp(const HttpRequest& req)
 			env.push_back("SERVER_PROTOCOL=" + it->second);
 		else
 			env.push_back("HTTP_" + it->first + it->second);
+
+		for (size_t i = 0; i < env.size(); ++i)
+			envp_.push_back(const_cast< char* >(env[i].c_str()));
+		envp_.push_back(NULL);
+
+		return HTTP_OK;
 	}
-
-	for (size_t i = 0; i < env.size(); ++i)
-		envp_.push_back(const_cast< char* >(env[i].c_str()));
-	envp_.push_back(NULL);
-
 	return HTTP_OK;
 }
 
@@ -104,10 +107,21 @@ bool CgiContext::executeChild()
 	if (pipe(stdin_pipe) == -1)
 		return false;
 	if (pipe(stdout_pipe) == -1)
+	{
+		close(stdin_pipe[0]);
+		close(stdin_pipe[1]);
 		return false;
+	}
 	pid_ = fork();
 	if (pid_ < 0)
+	{
+		close(stdin_pipe[0]);
+		close(stdin_pipe[1]);
+		close(stdout_pipe[0]);
+		close(stdout_pipe[1]);
+
 		return false;
+	}
 
 	if (pid_ == 0)
 	{
@@ -128,40 +142,9 @@ bool CgiContext::executeChild()
 	return true;
 }
 
-// bool CgiContext::writeRequestBody(const HttpRequest& req)
-// {
-// 	std::string body_temp_file = req.getBodyTempFileName();
-// 	int         fd = open(body_temp_file.c_str(), O_RDONLY);
-// 	if (fd == -1)
-// 		return false;
-//
-// 	char    buf[4096];
-// 	ssize_t r;
-// 	while ((r = read(fd, buf, sizeof(buf))) > 0)
-// 		write(stdin_pipe[1], buf, r);
-// 	close(stdin_pipe[1]);
-//
-// 	return true;
-// }
-//
-// bool CgiContext::readChildOutput()
-// {
-// 	char    buf[4096];
-// 	ssize_t r;
-// 	while ((r = read(stdout_pipe[0], buf, sizeof(buf))) > 0)
-// 	{
-// 		if (r + cgi_output_.size() > MAX_CGI_BUFFER)
-// 			return false;
-// 		cgi_output_.append(buf, r);
-// 	}
-//
-// 	close(stdout_pipe[0]);
-// 	return true;
-// }
-
 int CgiContext::buildResponse()
 {
-	if (cgi_output_.empty())
+	if (cgi_output_buf_.empty())
 	{
 		return HTTP_BAD_GATEWAY;
 	}
@@ -169,20 +152,20 @@ int CgiContext::buildResponse()
 	std::string            raw_headers;
 	std::string            body;
 
-	std::string::size_type sep = cgi_output_.find("\r\n\r\n");
+	std::string::size_type sep = cgi_output_buf_.find("\r\n\r\n");
 	if (sep != std::string::npos)
 	{
-		raw_headers = cgi_output_.substr(0, sep);
-		body = cgi_output_.substr(sep + 4);
+		raw_headers = cgi_output_buf_.substr(0, sep);
+		body = cgi_output_buf_.substr(sep + 4);
 	}
 	else
 	{
-		sep = cgi_output_.find("\n\n");
+		sep = cgi_output_buf_.find("\n\n");
 		if (sep == std::string::npos)
 			return HTTP_BAD_GATEWAY;
 
-		raw_headers = cgi_output_.substr(0, sep);
-		body = cgi_output_.substr(sep + 2);
+		raw_headers = cgi_output_buf_.substr(0, sep);
+		body = cgi_output_buf_.substr(sep + 2);
 	}
 
 	std::stringstream ss(raw_headers);
@@ -254,31 +237,14 @@ int CgiContext::executeCGI(const HttpRequest& req, const Location& loc)
 
 	fcntl(stdout_pipe[0], F_SETFL, O_NONBLOCK);
 	if (req.getMethod() == "POST")
+	{
 		fcntl(stdin_pipe[1], F_SETFL, O_NONBLOCK);
+	}
 	else
 	{
 		close(stdin_pipe[1]);
 		stdin_pipe[1] = -1;
 	}
-
-	// if (req.getMethod() == "POST" && !writeRequestBody(req))
-	// 	return HTTP_INTERNAL_SERVER_ERROR;
-
-	// if (!readChildOutput())
-	// 	return HTTP_INTERNAL_SERVER_ERROR;
-
-	// int status = waitChildProc(5);
-	//
-	// if (WIFEXITED(status))
-	// 	;
-	// else if (WIFSIGNALED(status))
-	// 	return HTTP_GATEWAY_TIME_OUT;
-	// else
-	// 	return HTTP_INTERNAL_SERVER_ERROR;
-	//
-	// exit_status_ = buildResponse();
-	// if (exit_status_ != HTTP_OK)
-	// 	return exit_status_;
 
 	return HTTP_OK;
 }
@@ -308,9 +274,79 @@ int CgiContext::getCgiPid() const
 	return pid_;
 }
 
-void CgiContext::appendCgiOutput(const char* buf, size_t size)
+bool CgiContext::writeRequestBody()
 {
-	cgi_output_.append(buf, size);
-	std::cout << cgi_output_;
+	static const size_t FILE_CHUNK_SIZE = 512 * 1024;
+
+	if (cgi_input_buf_.empty() && request_body_fd_ != -1)
+	{
+		ssize_t n = read(request_body_fd_, &cgi_input_buf_[0], FILE_CHUNK_SIZE);
+		if (n <= 0)
+		{
+			closeFile();
+		}
+
+		if (n > 0 && static_cast< size_t >(n) < FILE_CHUNK_SIZE)
+		{
+			cgi_input_buf_.resize(static_cast< size_t >(n));
+			closeFile();
+		}
+	}
+
+	if (cgi_input_buf_.empty())
+		return true;
+
+	std::cout << cgi_input_buf_ << '\n';
+	ssize_t r =
+	    write(stdin_pipe[1], cgi_input_buf_.data(), cgi_input_buf_.size());
+	if (r <= 0)
+	{
+		return true;
+	}
+
+	size_t sent = static_cast< size_t >(r);
+	cgi_input_buf_.erase(0, sent);
+
+	return false;
 }
 
+void CgiContext::appendCgiOutput(const char* buf, size_t size)
+{
+	cgi_output_buf_.append(buf, size);
+}
+
+// void CgiContext::reset()
+// {
+// 	pid_ = -1;
+// 	if (stdin_pipe[0] != -1)
+// 	{
+// 		close(stdin_pipe[0]);
+// 		stdin_pipe[0] = -1;
+// 	}
+//
+// 	int                                  stdin_pipe[1] = -1;
+// 	int                                  stdout_pipe[2];
+// 	std::map< std::string, std::string > env_map;
+// 	int                                  exit_status_;
+// 	time_t                               start_time_;
+// 	HttpResponse                         response_;
+// 	int                                  request_body_fd_;
+// 	std::string                          cgi_input_buf_;
+//
+// 	std::vector< char* >                 envp_;
+// 	std::vector< char* >                 argv_;
+// 	std::vector< std::string >           env;
+// 	std::vector< std::string >           args;
+// }
+
+void CgiContext::closeFile()
+{
+	if (request_body_fd_ != -1)
+		close(request_body_fd_);
+	request_body_fd_ = -1;
+}
+
+// void CgiContext::ClosePipes() {
+// 	if (c
+//
+// }

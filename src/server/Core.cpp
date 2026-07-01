@@ -29,6 +29,16 @@
 #include <unistd.h>
 #include <vector>
 
+void track_now(struct pollfd fd)
+{
+	if (fd.events & POLLIN)
+		std::cout << "Tracking POLLIN\n";
+	else if (fd.events & POLLOUT)
+		std::cout << "Tracking POLLOUT\n";
+	else if ((fd.events & (POLLIN | POLLOUT)) == (POLLIN | POLLOUT))
+		std::cout << "Tracking POLLIN and POLLOUT\n";
+}
+
 Core::Core(const std::vector< ServerConfig >& configs)
 {
 	for (size_t i = 0; i < configs.size(); i++)
@@ -57,10 +67,12 @@ Core::~Core()
 	for (; it_serv != _servers.end(); ++it_serv)
 		delete *it_serv;
 
-	std::map< int, Client* >::iterator it_client = _clients.begin();
+	// std::map< int, Client* >::iterator it_client = _clients.begin();
+	std::map< int, FdInfo >::iterator it_client = _clients.begin();
 	for (; it_client != _clients.end(); ++it_client)
 	{
-		delete it_client->second;
+		delete it_client->second.client;
+		// delete it_client->second;
 	}
 }
 
@@ -93,6 +105,7 @@ void Core::run()
 			//     || _pollSockets[i].revents & POLLHUP)
 			// clean soccketss
 
+			// track_now(poll_fds_[i]);
 			if (poll_fds_[i].revents & POLLIN)
 			{
 				Server* server = findServerByFd(poll_fds_[i].fd);
@@ -100,18 +113,46 @@ void Core::run()
 					_acceptNewClient(*server);
 				else
 				{
-					Client* client = FindClient(poll_fds_[i].fd);
-					if (client == NULL)
+					if (_clients.find(poll_fds_[i].fd) == _clients.end())
+						continue;
+					FdInfo fd_info = _clients.at(poll_fds_[i].fd);
+
+					if (fd_info.client == NULL)
 						continue;
 
-					if (client->getHttpState() == Client::CGI_STATE)
-						readCGioutput(*client);
-					else
+					if (fd_info.type == FD_PIPE_OUT)
+					{
+						std::cout << "POLLIN: " << poll_fds_[i].fd
+						          << "type: FD_PIPE_OUT\n";
+						readCGioutput(*fd_info.client);
+					}
+					else if (fd_info.type == FD_CLIENT)
+					{
+						std::cout << "POLLIN: " << poll_fds_[i].fd
+						          << "type: Client\n";
+
 						_handleClientMessage(poll_fds_[i].fd);
+					}
 				}
 			}
 			else if (poll_fds_[i].revents & POLLOUT)
-				_sendResponseToClient(poll_fds_[i].fd);
+			{
+				if (_clients.find(poll_fds_[i].fd) == _clients.end())
+					continue;
+				FdInfo fd_info = _clients.at(poll_fds_[i].fd);
+
+				if (fd_info.client == NULL)
+					continue;
+
+				if (fd_info.type == FD_PIPE_IN)
+				{
+					std::cout << "POLLOUT: " << poll_fds_[i].fd
+					          << "type: FD_PIPE_IN\n";
+					writeCGIinput(*fd_info.client);
+				}
+				else if (fd_info.type == FD_CLIENT)
+					_sendResponseToClient(poll_fds_[i].fd);
+			}
 		}
 		checkCGIProcesses();
 	}
@@ -139,15 +180,17 @@ void Core::_acceptNewClient(const Server& server)
 
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
 
-	struct pollfd pfd;
-	pfd.fd = newClientFd;
-	pfd.events = POLLIN;
-	poll_fds_.push_back(pfd);
+	addFdtoPoll_(newClientFd, POLLIN);
+	// struct pollfd pfd;
+	// pfd.fd = newClientFd;
+	// pfd.events = POLLIN;
+	// poll_fds_.push_back(pfd);
 
 	ServerConfig cfg = server.getConfig();
 	Client*      client = new Client(newClientFd, server.getConfig());
-	_clients[newClientFd] = client;
-	Vclients_.push_back(client);
+	_clients[newClientFd].client = client;
+	_clients[newClientFd].type = FD_CLIENT;
+	std::cout << "size of poll fds: " << poll_fds_.size() << '\n';
 
 	std::cout << "New Client connected: " << newClientFd << std::endl;
 	LOG_DEBUG("New client connected");
@@ -157,14 +200,13 @@ void Core::_handleClientMessage(int clientSocketFd)
 {
 	if (_clients.find(clientSocketFd) == _clients.end())
 		return;
-	Client* client = FindClient(clientSocketFd);
+	// Client* client = FindClient(clientSocketFd);
+	Client* client = _clients.at(clientSocketFd).client;
 
 	if (client == NULL)
 		return;
 
-	int c_state = client->getHttpState();
-
-	if (c_state == Client::HTTP_INIT || Client::HTTP_RECV == c_state)
+	if (client->getHttpState() == Client::HTTP_RECV)
 	{
 		char    buffer[RECV_BUFFER];
 		ssize_t recv_bytes = recv(clientSocketFd, buffer, sizeof(buffer), 0);
@@ -172,28 +214,37 @@ void Core::_handleClientMessage(int clientSocketFd)
 		if (recv_bytes <= 0)
 		{
 			_cleanupClient(clientSocketFd);
+			return;
 		}
 
 		client->parseRequest(buffer, recv_bytes);
 		if (!client->isRequestComplete())
 			return;
+
 		client->processRequest();
 	}
 
 	if (client->getHttpState() == Client::CGI_STATE)
 	{
-		int fd_out = client->getFdCGI_out();
-		int fd_in = client->getFdCGI_in();
-		if (fd_out != -1)
-			addFdtoPoll_(fd_out, POLLIN);
-		if (fd_in != -1)
-			addFdtoPoll_(fd_in, POLLOUT);
-	}
+		addFdtoPoll_(client->cgi_pipe_out, POLLIN);
+		addFdtoPoll_(client->cgi_pipe_in, POLLOUT);
+		if (client->getFdCGI_out() != -1)
+		{
+			_clients[client->cgi_pipe_out].client = client;
+			_clients[client->cgi_pipe_out].type = FD_PIPE_OUT;
+		}
 
-	if (client->getHttpState() == Client::HTTP_SEND)
-	{
-		setEvent_(clientSocketFd, POLLOUT);
+		if (client->getFdCGI_in() != -1)
+		{
+			_clients[client->cgi_pipe_in].client = client;
+			_clients[client->cgi_pipe_in].type = FD_PIPE_IN;
+		}
 	}
+	// else
+	// if (client->getHttpState() == Client::HTTP_SEND)
+	// { setEvent_(clientSocketFd, POLLOUT);
+	// }
+	setEvent_(clientSocketFd, POLLOUT);
 }
 
 void Core::_sendResponseToClient(int clientSocketFd)
@@ -201,18 +252,22 @@ void Core::_sendResponseToClient(int clientSocketFd)
 	if (_clients.find(clientSocketFd) == _clients.end())
 		return;
 
-	Client* client = _clients.at(clientSocketFd);
+	Client* client = _clients.at(clientSocketFd).client;
+	// Client* client = FindClient(clientSocketFd);
 	if (client == NULL)
 		return;
 
+	if (client->getHttpState() != Client::HTTP_SEND)
+		return;
 	std::string buffer = client->serialize();
 
 	if (buffer.empty())
 	{
 		client->reset();
-		std::cout << "Response sent" << std::endl;
+		LOG_DEBUG("Response sent");
 		if (client->isKeepAlive())
 		{
+			// LOG_DEBUG("isKeepAlive");
 			setEvent_(clientSocketFd, POLLIN);
 		}
 		else
@@ -243,7 +298,7 @@ void Core::_cleanupClient(int clientSocketFd)
 {
 	if (_clients.find(clientSocketFd) != _clients.end())
 	{
-		Client* client = _clients.at(clientSocketFd);
+		Client* client = _clients.at(clientSocketFd).client;
 		delete client;
 	}
 
@@ -254,19 +309,11 @@ void Core::_cleanupClient(int clientSocketFd)
 	LOG_DEBUG("Client disconnected");
 }
 
-Client* Core::FindClient(int fd) const
-{
-	for (size_t i = 0; i < Vclients_.size(); ++i)
-	{
-		if (Vclients_[i]->getClientFd() == fd || Vclients_[i]->getFdCGI_out()
-		    || Vclients_[i]->getFdCGI_in())
-			return Vclients_[i];
-	}
-	return NULL;
-}
-
 void Core::addFdtoPoll_(int fd, int event)
 {
+	if (fd == -1)
+		return;
+
 	struct pollfd pfd;
 	pfd.fd = fd;
 	pfd.events = event;
@@ -290,7 +337,7 @@ void Core::readCGioutput(Client& client)
 {
 	if (client.getHttpState() != Client::CGI_STATE)
 		return;
-	int fd = client.getFdCGI_out();
+	int fd = client.cgi_pipe_out;
 
 	LOG_DEBUG("Try read from CGI PIPE output");
 
@@ -299,15 +346,32 @@ void Core::readCGioutput(Client& client)
 
 	if (r > 0)
 	{
-		client.cgi.appendCgiOutput(buf, r);
+		// client.cgi.appendCgiOutput(buf, r);
+		client.cgi_output_buf.append(buf, r);
+	}
+}
+
+void Core::writeCGIinput(Client& client)
+{
+	if (client.cgi_pipe_in == -1)
+		return;
+	LOG_DEBUG("Write to CGI input");
+	if (client.writeRequestBody())
+	{
+		removePollFd(client.cgi_pipe_in);
+		_clients.erase(client.cgi_pipe_in);
+		close(client.cgi_pipe_in);
+		client.cgi_pipe_in = -1;
 	}
 }
 
 void Core::checkCGIProcesses()
 {
-	for (size_t i = 0; i < Vclients_.size(); ++i)
+	// std::map< int, Client* >::iterator it = _clients.begin();
+	std::map< int, FdInfo >::iterator it = _clients.begin();
+	for (; it != _clients.end(); ++it)
 	{
-		Client* client = Vclients_[i];
+		Client* client = it->second.client;
 		if (client == NULL)
 			continue;
 		if (client->getHttpState() == Client::CGI_STATE)
@@ -315,8 +379,10 @@ void Core::checkCGIProcesses()
 			if (client->CGIProcessFinished())
 			{
 				LOG_DEBUG("CGI FInished");
-				removePollFd(client->getFdCGI_in());
-				removePollFd(client->getFdCGI_out());
+				removePollFd(client->cgi_pipe_in);
+				removePollFd(client->cgi_pipe_out);
+				_clients.erase(client->cgi_pipe_in);
+				_clients.erase(client->cgi_pipe_out);
 				setEvent_(client->getClientFd(), POLLOUT);
 			}
 		}
