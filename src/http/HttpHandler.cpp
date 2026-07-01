@@ -58,17 +58,14 @@ HttpHandler::~HttpHandler()
 
 HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
-	const std::string& uri = req.getURI();
+	// const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
 
-	// this->loc_ = findMatchUri(uri, config_.locations);
-	this->loc_ = Client::FindMatchingUri(uri, config_);
+	this->loc_ = req.getLocation();
 	if (this->loc_ == NULL)
 		return makeStatusResponse(HTTP_NOT_FOUND);
 
-	// if redirect -> redirect(status, target)
-	if (this->loc_->has_redirect && this->loc_->redirect.first != -1)
-		// if (this->loc_->redirect.first != -1)
+	if (this->loc_->has_redirect)
 		return redirect(loc_->redirect.first, loc_->redirect.second, host);
 
 	const std::string& method = req.getMethod();
@@ -95,7 +92,7 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 	std::string::size_type p = raw_uri.find('?');
 	const std::string&     uri = raw_uri.substr(0, p);
 	const std::string&     host = req.getHeader("Host");
-	std::string            path = buildPath(uri);
+	std::string            path = req.getPath();
 
 	if (ws::isDirectory(path))
 	{
@@ -389,7 +386,7 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 {
 	if (loc_->upload_path.empty())
 	{
-		std::string path = buildPath(req.getURI());
+		std::string path = req.getPath();
 		PathInfo    info = ws::checkPath(path);
 		if (info.exists)
 		{
@@ -435,8 +432,7 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 
 HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
 {
-	const std::string& uri = req.getURI();
-	std::string        path = buildPath(uri);
+	const std::string path = req.getPath();
 
 	if (ws::isDirectory(path.c_str()))
 		return makeStatusResponse(HTTP_FORBIDDEN);
@@ -538,23 +534,23 @@ std::string HttpHandler::getFileChunk()
 	return buffer;
 }
 
-std::string HttpHandler::buildPath(const std::string& uri) const
-{
-	std::string sub_uri = uri.substr(loc_->path.length());
-	std::string path = loc_->root;
-
-	if (!path.empty() && path[path.length() - 1] != '/')
-		path += '/';
-
-	if (!sub_uri.empty() && sub_uri[0] == '/')
-		path += sub_uri.substr(1);
-	else
-	{
-		path += sub_uri;
-	}
-
-	return path;
-}
+// std::string HttpHandler::buildPath(const std::string& uri) const
+// {
+// 	std::string sub_uri = uri.substr(loc_->path.length());
+// 	std::string path = loc_->root;
+//
+// 	if (!path.empty() && path[path.length() - 1] != '/')
+// 		path += '/';
+//
+// 	if (!sub_uri.empty() && sub_uri[0] == '/')
+// 		path += sub_uri.substr(1);
+// 	else
+// 	{
+// 		path += sub_uri;
+// 	}
+//
+// 	return path;
+// }
 
 HttpResponse HttpHandler::makeDirectoryListingResponse(const std::string& path,
                                                        const std::string& uri)

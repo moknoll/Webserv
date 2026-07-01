@@ -34,18 +34,20 @@ class HttpRequest
 		sw_done
 	};
 
-	HttpRequest();
+	HttpRequest(const ServerConfig& cfg);
 	HttpRequest(const HttpRequest& other);
 	~HttpRequest();
 
 	HttpRequest&      operator=(const HttpRequest& other);
 
-	void              parse(std::string& raw, const ServerConfig& cfg);
+	void              parse(std::string& raw);
 
 	std::string       getURI() const;
 	std::string       getHeader(const std::string& name) const;
 	std::string       getMethod() const;
 	const std::string getbody() const; // ?
+	const Location*   getLocation() const;
+	std::string       getPath() const;
 	int               getRequestStatus() const;
 	size_t            getContentLenght() const;
 	size_t            getReceivedBytes() const;
@@ -63,10 +65,13 @@ class HttpRequest
 	void                                 reset();
 
   private:
+	const ServerConfig&                  config_;
 	int                                  err_status_;
 	size_t                               content_length_;
 	std::string                          method_;
 	std::string                          uri_;
+	std::string                          path_;
+	const Location*                      location_;
 	std::string                          http_version_;
 	std::string                          body_;
 	std::map< std::string, std::string > headers_;
@@ -78,16 +83,18 @@ class HttpRequest
 	std::string                          body_temp_file_;
 	int                                  fd_;
 
-	void parse_request_line(const std::string& raw);
-	void parseBody(std::string& raw_data, const ServerConfig& cfg);
-	void parseHeaderLine(const std::string& header_line);
-	void parseHeaderLines(const std::string& headers);
-	void parseHeaders(const std::string& headers);
-	void processHeaderFields();
-	void parseChunked(std::string& raw_data);
-	bool isValidMethod(const std::string& method);
-	void fail(int status);
-	bool saveBodyToTempFile(std::string& raw_data);
-	void closeFile_();
+	void            parseBody(std::string& raw_data);
+	void            parseHeaderLine(const std::string& header_line);
+	void            parseHeaderLines(const std::string& headers);
+	void            parseHeaders(const std::string& headers);
+	void            processHeaderFields();
+	void            parseChunked(std::string& raw_data);
+	bool            isValidMethod(const std::string& method);
+	void            fail(int status);
+	bool            saveBodyToTempFile(std::string& raw_data);
+	void            resolveURI();
+	void            buildPath_();
+	const Location* FindMatchingUri_() const;
+	void            closeFile_();
 };
 

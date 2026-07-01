@@ -71,7 +71,7 @@ class HttpHandler
 	//                          const std::vector< Location >& locations) const;
 
 	// WIP
-	std::string buildPath(const std::string& uri) const;
+	// std::string buildPath(const std::string& uri) const;
 	bool        isAllowedMethod(const std::string& method) const;
 
 	std::string buildUploadPath(const std::string& filename);

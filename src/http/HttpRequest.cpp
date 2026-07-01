@@ -24,7 +24,8 @@
 #include <string>
 #include <unistd.h>
 
-HttpRequest::HttpRequest() :
+HttpRequest::HttpRequest(const ServerConfig& cfg) :
+        config_(cfg),
         err_status_(HTTP_OK),
         content_length_(0),
         chunked_(false),
@@ -36,6 +37,7 @@ HttpRequest::HttpRequest() :
 }
 
 HttpRequest::HttpRequest(const HttpRequest& other) :
+        config_(other.config_),
         err_status_(other.err_status_),
         content_length_(other.content_length_),
         method_(other.method_),
@@ -249,22 +251,21 @@ bool HttpRequest::saveBodyToTempFile(std::string& raw_data)
 	return true;
 }
 
-void HttpRequest::parseBody(std::string& raw_data, const ServerConfig& cfg)
+void HttpRequest::parseBody(std::string& raw_data)
 {
-	const Location* location = Client::FindMatchingUri(uri_, cfg);
-	if (location == NULL)
+	if (location_ == NULL)
 	{
 		fail(HTTP_NOT_FOUND);
 		return;
 	}
 
-	if (content_length_ > location->client_max_body_size)
+	if (content_length_ > location_->client_max_body_size)
 	{
 		fail(HTTP_CONTENT_TOO_LARGE);
 		return;
 	}
 
-	if (chunked_ && recv_bytes_ > location->client_max_body_size)
+	if (chunked_ && recv_bytes_ > location_->client_max_body_size)
 	{
 		fail(HTTP_CONTENT_TOO_LARGE);
 		return;
@@ -277,7 +278,7 @@ void HttpRequest::parseBody(std::string& raw_data, const ServerConfig& cfg)
 	raw_data.clear();
 }
 
-void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
+void HttpRequest::parse(std::string& raw_data)
 {
 	static size_t CRLF_LEN = 2;
 
@@ -295,7 +296,7 @@ void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
 					raw_data.erase(bytes_to_keep);
 				}
 				recv_bytes_ += raw_data.size();
-				parseBody(raw_data, cfg);
+				parseBody(raw_data);
 				if (recv_bytes_ >= content_length_)
 				{
 					closeFile_();
@@ -331,6 +332,7 @@ void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
 				this->uri_ = raw_data.substr(0, p);
 				raw_data.erase(0, p + 1);
 				state_ = sw_version;
+				resolveURI();
 				break;
 			}
 			case sw_version:
@@ -342,11 +344,7 @@ void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
 						fail(HTTP_BAD_REQUEST);
 					return;
 				}
-				// if (raw_data.compare(p + 2, 2, CRLF) == 0)
-				// {
-				// 	fail(HTTP_BAD_REQUEST);
-				// 	return;
-				// }
+
 				this->http_version_ = raw_data.substr(0, p);
 				if (raw_data.compare(p + 2, 2, CRLF) == 0)
 				{
@@ -378,13 +376,75 @@ void HttpRequest::parse(std::string& raw_data, const ServerConfig& cfg)
 	}
 }
 
-void HttpRequest::fail(int status)
+void HttpRequest::resolveURI()
 {
-	err_status_ = status;
-	state_ = sw_done;
+	if (uri_.empty() || uri_[0] != '/')
+	{
+		fail(HTTP_BAD_REQUEST);
+		return;
+	}
+
+	location_ = FindMatchingUri_();
+	if (location_ == NULL)
+	{
+		fail(HTTP_NOT_FOUND);
+		return;
+	}
+
+	buildPath_();
 }
 
-// getters
+void HttpRequest::buildPath_()
+{
+	std::string sub_uri = uri_.substr(location_->path.length());
+	std::string path = location_->root;
+
+	if (!path.empty() && path[path.length() - 1] != '/')
+		path += '/';
+
+	if (!sub_uri.empty() && sub_uri[0] == '/')
+		path += sub_uri.substr(1);
+	else
+	{
+		path += sub_uri;
+	}
+
+	path_ = path;
+}
+
+static bool matchPrefix(const std::string& uri, const std::string& loc)
+{
+	if (uri.compare(0, loc.size(), loc) != 0)
+		return false;
+	if (uri.size() == loc.size())
+		return true;
+	if (loc[loc.size() - 1] == '/')
+		return true;
+
+	return uri[loc.size()] == '/';
+}
+
+const Location* HttpRequest::FindMatchingUri_() const
+{
+	const std::vector< Location >& locations = config_.locations;
+	const Location*                best_loc = NULL;
+	size_t                         len_best_loc = 0;
+
+	for (size_t i = 0; i < locations.size(); ++i)
+	{
+		const std::string& path = locations[i].path;
+
+		if (matchPrefix(uri_, path) && path.size() > len_best_loc)
+		{
+			best_loc = &locations[i];
+			len_best_loc = path.size();
+		}
+	}
+
+	return best_loc;
+}
+
+// Getters
 
 std::string HttpRequest::getMethod() const
 {
@@ -438,6 +498,16 @@ std::string HttpRequest::getBoundary() const
 	return this->boundary_;
 }
 
+std::string HttpRequest::getPath() const
+{
+	return path_;
+}
+
+const Location* HttpRequest::getLocation() const
+{
+	return location_;
+}
+
 bool HttpRequest::isAlmostDone() const
 {
 	return state_ == sw_almost_done;
@@ -461,6 +531,12 @@ bool HttpRequest::isChunked() const
 bool HttpRequest::isMultipart() const
 {
 	return this->multipart_;
+}
+
+void HttpRequest::fail(int status)
+{
+	err_status_ = status;
+	state_ = sw_done;
 }
 
 void HttpRequest::closeFile_()

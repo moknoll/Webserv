@@ -67,13 +67,11 @@ int CgiContext::buildCgiEnvp(const HttpRequest& req)
 			env.push_back("SERVER_PROTOCOL=" + it->second);
 		else
 			env.push_back("HTTP_" + it->first + it->second);
-
-		for (size_t i = 0; i < env.size(); ++i)
-			envp_.push_back(const_cast< char* >(env[i].c_str()));
-		envp_.push_back(NULL);
-
-		return HTTP_OK;
 	}
+	for (size_t i = 0; i < env.size(); ++i)
+		envp_.push_back(const_cast< char* >(env[i].c_str()));
+	envp_.push_back(NULL);
+
 	return HTTP_OK;
 }
 
@@ -232,6 +230,7 @@ int CgiContext::executeCGI(const HttpRequest& req, const Location& loc)
 	if (ret != HTTP_OK)
 		return ret;
 
+	std::cout << "I AM HERE\n";
 	if (!executeChild())
 		return HTTP_INTERNAL_SERVER_ERROR;
 

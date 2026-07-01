@@ -21,12 +21,14 @@ struct CgiContext
 	std::vector< std::string > env;
 	std::vector< char* >       envp;
 	std::vector< char* >       argv;
-	std::string                cgi_output;
+	std::string                cgi_output_buf;
+	std::string                cgi_input_buf;
 
 	CgiContext();
 };
 
 CgiContext buildCgiContext();
+exeect()
 bool       buildCgiEnvp(CgiContext& ctx);
 bool       buildCgiArgv(CgiContext& ctx);
 bool

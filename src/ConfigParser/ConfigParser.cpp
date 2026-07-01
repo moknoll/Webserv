@@ -162,6 +162,16 @@ void ConfigParser::validatePath(const std::string& p)
 		throw std::runtime_error("path has to start from '/','.': " + p);
 }
 
+void ConfigParser::validateRedirectPath(const std::string& p)
+{
+	// Empty path is always invalid
+	if (p.empty())
+		throw std::runtime_error("Path cannot be empty");
+	if (p[0] != '/' && p[0] != '.' && p.rfind("http://", 0) == 0
+	    && p.rfind("https://", 0) == 0)
+		throw std::runtime_error("path has to start from '/','.'");
+}
+
 void ConfigParser::validateExtension(const std::string& ext)
 {
 	if (ext.empty() || ext[0] != '.')
@@ -322,8 +332,8 @@ void ConfigParser::parseLocation(ServerConfig& server)
 		else if (tok == "client_max_body_size")
 		{
 			std::string s = tokenizer.next();
-			validateNumber(s);
-			loc.client_max_body_size = std::atoi(s.c_str());
+			loc.client_max_body_size = parseSize(s.c_str());
+
 			expect(";");
 		}
 		else if (tok == "allowed_methods")
@@ -357,9 +367,10 @@ void ConfigParser::parseLocation(ServerConfig& server)
 			validateRedirectCode(code);
 
 			std::string path = tokenizer.next();
-			validatePath(path);
+			validateRedirectPath(path);
 
-			server.redirect = std::make_pair(code, path);
+			loc.redirect = std::make_pair(code, path);
+			loc.has_redirect = true;
 			expect(";");
 		}
 		else if (tok == "upload_path")

@@ -13,7 +13,6 @@
 #include <unistd.h>
 
 Client::Client(int fd, const ServerConfig& config) :
-        // cgi(),
         cgi_pipe_in(-1),
         cgi_pipe_out(-1),
         cgi_pid(-1),
@@ -21,7 +20,7 @@ Client::Client(int fd, const ServerConfig& config) :
         fd_(fd),
         keep_alive_(true),
         state_(HTTP_RECV),
-        request(),
+        request(config),
         response(),
         handler(config)
 {
@@ -43,9 +42,15 @@ void Client::processRequest()
 		    makeStatusResponse(request.getRequestStatus()).toString();
 		return;
 	}
-	const Location* loc = FindMatchingUri(request.getURI(), config_);
+	const Location* loc = request.getLocation();
 	if (loc == NULL)
-		return; // HTTP_NOT_FOUND
+	{
+
+		keep_alive_ =false;
+		state_ = HTTP_SEND;
+		send_buffer_ = makeStatusResponse(HTTP_NOT_FOUND).toString(); 
+		return; 
+	}
 
 	if (loc->has_cgi)
 	{
@@ -204,7 +209,7 @@ void Client::buildCGIResponse()
 void Client::parseRequest(const char* buffer, size_t size)
 {
 	recv_buffer_.append(buffer, size);
-	request.parse(recv_buffer_, config_);
+	request.parse(recv_buffer_);
 }
 
 void Client::reset()
@@ -317,39 +322,6 @@ bool Client::writeRequestBody()
 		return true;
 	}
 	return false;
-}
-
-static bool matchPrefix(const std::string& uri, const std::string& loc)
-{
-	if (uri.compare(0, loc.size(), loc) != 0)
-		return false;
-	if (uri.size() == loc.size())
-		return true;
-	if (loc[loc.size() - 1] == '/')
-		return true;
-
-	return uri[loc.size()] == '/';
-}
-
-const Location* Client::FindMatchingUri(const std::string&  uri,
-                                        const ServerConfig& cfg)
-{
-	const std::vector< Location >& locations = cfg.locations;
-	const Location*                best_loc = NULL;
-	size_t                         len_best_loc = 0;
-
-	for (size_t i = 0; i < locations.size(); ++i)
-	{
-		const std::string& path = locations[i].path;
-
-		if (matchPrefix(uri, path) && path.size() > len_best_loc)
-		{
-			best_loc = &locations[i];
-			len_best_loc = path.size();
-		}
-	}
-
-	return best_loc;
 }
 
 HttpResponse Client::makeStatusResponse(int status)
