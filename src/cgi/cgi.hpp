@@ -27,10 +27,10 @@ struct CgiContext
 };
 
 CgiContext buildCgiContext();
-bool       buildCgiEnvp(CgiContext& ctx);
-bool       buildCgiArgv(CgiContext& ctx);
-bool
-buildCgiEnv(const HttpRequest& req, const Location& loc, const CgiContext& ctx);
+std::vector<std::string> buildCgiEnvp(const HttpRequest& req, CgiContext& ctx, ServerConfig &cfg);
+std::vector < char *>buildCgiArgv(const HttpRequest& req, CgiContext& ctx);
+//bool
+//buildCgiEnv(const HttpRequest& req, const Location& loc, const CgiContext& ctx);
 bool         executeChild(CgiContext& ctx);
 bool         writeRequestBody(CgiContext& ctx);
 bool         readChildOutput(CgiContext& ctx);
