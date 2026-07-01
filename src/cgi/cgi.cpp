@@ -23,22 +23,6 @@ CgiContext::CgiContext()
 	cgi_output.reserve(1024 * 1024);
 }
 
-std::string buildPath(const std::string& uri, const Location& loc)
-{
-	std::string sub_uri = uri.substr(loc.path.length());
-	std::string path = loc.root;
-
-	if (!path.empty() && path[path.length() - 1] != '/')
-		path += '/';
-
-	if (!sub_uri.empty() && sub_uri[0] == '/')
-		path += sub_uri.substr(1);
-	else
-		path += sub_uri;
-
-	return path;
-}
-
 static std::string normalizeHeader(std::string name)
 {
 	for(int i = 0; i < name.size(); i++)
@@ -88,8 +72,8 @@ std::map< std::string, std::string> buildEnv(const HttpRequest &req, const Serve
 
 	if(ext != std::string::npos)
 	{
-//		env["SCRIPT_NAME"] = script_path.substr(0, ext);
-		//env["PATH_INFO"] = script_path,subst(ext);
+		env["SCRIPT_NAME"] = req.getPath().substr(0, ext);
+		env["PATH_INFO"] = req.getPath().substr(ext);
 
 		if(!env["PATH_INFO"].empty())
 			env["PATH_TRANSLATED"] = cfg.root + env["PATH_INFO"];
@@ -131,23 +115,23 @@ std::vector < char *>buildCgiArgv(const HttpRequest& req, CgiContext& ctx)
 {
 	std::string            uri = req.getURI();
 	std::string::size_type p = uri.find('?');
-	//std::string            path = buildPath(uri.substr(0, p), loc);
-	//PathInfo               path_info = ws::checkPath(path);
-	//PathInfo               cgi_path_info = ws::checkPath(loc.cgi_path);
+	std::string            path = req.getPath();
+	PathInfo               path_info = ws::checkPath(path);
+	PathInfo               cgi_path_info = ws::checkPath(req.getLocation().cgi_path);
 	std::vector < char *>  argv;
-	//if (!path_info.exists && !path_info.readable)
-	//{
-	//	ctx.exit_status = HTTP_NOT_FOUND;
-	//}
-	//if (!cgi_path_info.exists && !cgi_path_info.readable
-	 //   && !cgi_path_info.executable)
-	//{
-	//	ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;;
-//	}
+	if (!path_info.exists && !path_info.readable)
+	{
+		ctx.exit_status = HTTP_NOT_FOUND;
+	}
+	if (!cgi_path_info.exists && !cgi_path_info.readable
+	    && !cgi_path_info.executable)
+	{
+		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;;
+	}
 
-//	argv.push_back(const_cast< char* >(loc.cgi_path.c_str()));
-//	argv.push_back(const_cast< char* >(path.c_str()));
-//	argv.push_back(NULL);
+	argv.push_back(const_cast< char* >(req.getLocation().cgi_path.c_str()));
+	argv.push_back(const_cast< char* >(path.c_str()));
+	argv.push_back(NULL);
 	ctx.exit_status = HTTP_OK;
 	return argv;
 }
