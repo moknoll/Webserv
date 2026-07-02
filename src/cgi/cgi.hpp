@@ -10,13 +10,12 @@
 
 struct CgiContext
 {
-	// static const size_t  MAX_CGI_BUFFER;
-	pid_t       pid;
-	int         stdin_pipe;
-	int         stdout_pipe;
-	int         exit_status;
-	time_t      start_time;
-	std::string cgi_output;
+	pid_t  pid;
+	int    stdin_pipe;
+	int    stdout_pipe;
+	int    exit_status;
+	time_t start_time;
+	int    request_body_fd;
 
 	CgiContext();
 };
@@ -28,7 +27,7 @@ std::vector< std::string > buildCgiArgv(const HttpRequest& req,
 void                       buildCgiEnvp(const HttpRequest&    req,
                                         const ServerConfig&   cfg,
                                         std::vector< char* >& envp);
-bool                       executeChild(CgiContext&          ctx,
-                                        std::vector< char* > envp,
-                                        std::vector< char* > argv);
+bool                       executeChild(CgiContext& ctx,
+                                        const std::vector< std::string >&,
+                                        const std::vector< std::string >&);
 

@@ -13,8 +13,8 @@ cgitb.enable()
 
 # Настройки
 UPLOAD_DIR = "./uploads"  # Директория для загрузки
-MAX_FILE_SIZE = 100 * 1024 * 1024  # 10 MB
-ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.zip', '.doc', '.docx'}
+MAX_FILE_SIZE = 100 * 1024 * 1024
+ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.zip', '.doc', '.docx', '.txz'}
 
 def create_upload_dir():
     """Создает директорию для загрузки, если её нет"""

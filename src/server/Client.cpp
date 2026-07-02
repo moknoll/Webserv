@@ -12,6 +12,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+const size_t Client::MAX_CGI_BUFFER = 100 * 1024 * 1024;
+
 Client::Client(int fd, const ServerConfig& config) :
         cgi_pipe_in(-1),
         cgi_pipe_out(-1),
@@ -58,27 +60,11 @@ void Client::processRequest()
 		executeCGI(request, cgi, config_);
 		cgi_pipe_in = cgi.stdin_pipe;
 		cgi_pipe_out = cgi.stdout_pipe;
+		request_body_fd_ = cgi.request_body_fd;
 
 		cgi_pid = cgi.pid;
 		cgi_output_buf.clear();
 		cgi_input_buf_.clear();
-
-		if (cgi_pipe_in == -1)
-			request_body_fd_ = -1;
-		else
-		{
-			request_body_fd_ =
-			    open(request.getBodyTempFileName().c_str(), O_RDONLY);
-			if (request_body_fd_ == -1)
-			{
-				send_buffer_ =
-				    handler.makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR)
-				        .toString();
-				state_ = HTTP_SEND;
-				keep_alive_ = false;
-				return;
-			}
-		}
 
 		if (cgi.exit_status)
 		{
@@ -96,8 +82,6 @@ void Client::processRequest()
 		response = handler.handle(request);
 		if (response.isReady()) // ???
 		{
-			// if (handler.getState() == HttpHandler::HTTP_CLOSE)
-			// 	keep_alive_ = false;
 			send_buffer_ = response.toString();
 			state_ = HTTP_SEND;
 		}
@@ -213,7 +197,6 @@ void Client::reset()
 	recv_buffer_.clear();
 	send_buffer_.clear();
 	state_ = HTTP_RECV;
-	// cgi.reset()
 }
 
 bool Client::CGIProcessFinished()
@@ -227,8 +210,6 @@ bool Client::CGIProcessFinished()
 	}
 	else if (ret == pid)
 	{
-		std::cout << "PID: " << pid << " status: " << WIFEXITED(status) << '\n';
-
 		if (WIFEXITED(status))
 		{
 			int code = WEXITSTATUS(status);
@@ -275,7 +256,7 @@ bool Client::writeRequestBody()
 
 	if (!cgi_input_buf_.empty())
 	{
-		std::cout << cgi_input_buf_ << '\n';
+		// std::cout << cgi_input_buf_ << '\n';
 		ssize_t r =
 		    write(cgi_pipe_in, cgi_input_buf_.data(), cgi_input_buf_.size());
 		if (r <= 0)

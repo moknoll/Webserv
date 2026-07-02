@@ -2,6 +2,7 @@
 #include "../http/HttpRequest.hpp"
 #include "../http/constants.hpp"
 #include "../lib/ws.hpp"
+#include <algorithm>
 #include <cstddef>
 #include <ctime>
 #include <fcntl.h>
@@ -20,26 +21,19 @@ CgiContext::CgiContext()
 	stdout_pipe = -1;
 	exit_status = 0;
 	start_time = 0;
-	cgi_output.reserve(1024 * 1024);
+	request_body_fd = -1;
 }
 
 static std::string normalizeHeader(std::string name)
 {
-	for (size_t i = 0; i < name.size(); i++)
-	{
-		if (name[i] == '-')
-			name[i] = '_';
-		else
-			name[i] = std::toupper(static_cast< unsigned char >(name[i]));
-	}
-	return name;
+	std::replace(name.begin(), name.end(), '-', '_');
+	return ws::toUpperCase(name);
 }
 
-static std::map< std::string, std::string >
-buildCGIHeaders(const HttpRequest& req)
+static std::vector< std::string > buildCGIHeaders(const HttpRequest& req)
 {
 	const std::map< std::string, std::string >& headers = req.getHeaders();
-	std::map< std::string, std::string >        result;
+	std::vector< std::string >                  result;
 
 	for (std::map< std::string, std::string >::const_iterator it =
 	         headers.begin();
@@ -49,77 +43,94 @@ buildCGIHeaders(const HttpRequest& req)
 		if (ws::toUpperCase(it->first) == "CONTENT-LENGTH"
 		    || ws::toUpperCase(it->first) == "CONTENT-TYPE")
 			continue;
-		std::string header_name = "HTTP_" + normalizeHeader(it->first);
-		result[header_name] = it->second;
-		// std::cout << "->>>"<< it->first << " " << it->second << '\n';
+		std::string n = "HTTP_" + normalizeHeader(it->first);
+		std::string h = n + "=" + it->second;
+		result.push_back(h);
 	}
 	return result;
 }
 
-static std::map< std::string, std::string > buildEnv(const HttpRequest&  req,
-                                                     const ServerConfig& cfg)
+std::string getPATH_INFO(const HttpRequest& req)
 {
-	std::string                          uri = req.getURI();
-	size_t                               ext = uri.find(".py");
-	size_t                               q = uri.find("?");
-	std::map< std::string, std::string > env;
+	std::string uri = req.getURI();
+	size_t      ext_pos = uri.find(".py");
+	size_t      query_pos = uri.find("?");
+	std::string path_info = "";
+
+	if (query_pos != std::string::npos)
+		path_info = uri.substr(ext_pos + 3, query_pos - ext_pos - 3);
+	else
+		path_info = uri.substr(ext_pos + 3);
+
+	return path_info;
+}
+
+std::string getPATH_STRANSLATED(const std::string& root,
+                                const std::string& path_info)
+{
+	std::string ret = root;
+	if (!ret.empty() && ret[ret.size() - 1] == '/')
+		ret.substr(ret.size() - 1);
+
+	ret += path_info;
+
+	return ret;
+}
+
+static std::vector< std::string > buildEnv(const HttpRequest&  req,
+                                           const ServerConfig& cfg)
+{
+	const Location*            loc = req.getLocation();
+	std::string                uri = req.getURI();
+	size_t                     ext = uri.find(".py");
+	size_t                     q = uri.find("?");
+	std::vector< std::string > env;
 
 	env = buildCGIHeaders(req);
+
 	if (req.getMethod() == "POST")
 	{
-		env["CONTENT_LENGTH"] = ws::to_string(req.getContentLenght());
-		env["CONTENT_TYPE"] = req.getHeader("Content-Type");
+		env.push_back("CONTENT_LENGTH="
+		              + ws::to_string(req.getContentLenght()));
+		env.push_back("CONTENT_TYPE=" + req.getHeader("Content-Type"));
 	}
-	env["REQUEST_METHOD"] = req.getMethod();
-
-	env["SERVER_NAME"] = cfg.server_name;
-	env["SERVER_PORT"] = ws::to_string(cfg.port);
-	env["SERVER_PROTOCOL"] = "HTTP/1.1";
-	env["GATEWAY_INTERFACE"] = "CGI/1.1";
+	env.push_back("REQUEST_METHOD=" + req.getMethod());
+	env.push_back("SERVER_NAME=" + cfg.server_name);
+	env.push_back("SERVER_PORT=" + ws::to_string(cfg.port));
+	env.push_back("SERVER_PROTOCOL=HTTP/1.1");
+	env.push_back("GATEWAY_INTERFACE=CGI/1.1");
 
 	if (ext != std::string::npos)
 	{
-		env["SCRIPT_NAME"] = req.getPath().substr(0, ext);
-		env["PATH_INFO"] = req.getPath().substr(ext);
+		std::string path_info = getPATH_INFO(req);
 
-		if (!env["PATH_INFO"].empty())
-			env["PATH_TRANSLATED"] = cfg.root + env["PATH_INFO"];
-		else
-			env["PATH_TRANSLATED"] = "";
+		env.push_back("SCRIPT_NAME=" + req.getURI().substr(0, ext + 3));
+		env.push_back("PATH_INFO=" + getPATH_INFO(req));
+
+		if (!path_info.empty())
+		{
+			std::string pt = getPATH_STRANSLATED(loc->root, path_info);
+			env.push_back("PATH_TRANSLATED=" + pt);
+		}
 	}
+
 	if (q != std::string::npos)
-		env["QUERY_STRING"] = uri.substr(q + 1);
+		env.push_back("QUERY_STRING=" + uri.substr(q + 1));
 	else
-		env["QUERY_STRING"] = "";
+		env.push_back("QUERY_STRING=");
 
 	return env;
-}
-
-void buildCgiEnvp(const HttpRequest&    req,
-                  const ServerConfig&   cfg,
-                  std::vector< char* >& envp)
-{
-	std::map< std::string, std::string > env = buildEnv(req, cfg);
-
-	for (std::map< std::string, std::string >::iterator it = env.begin();
-	     it != env.end();
-	     ++it)
-	{
-		std::string env_var = it->first + "=" + it->second;
-		envp.push_back(const_cast< char* >(env_var.c_str()));
-		// std::cout << env_var << '\n';
-	}
-	envp.push_back(NULL);
-
-	// for (size_t i = 0; i < envp.size(); ++i)
-	// 	std::cout << "envp" << i << envp[i] << std::endl;
 }
 
 std::vector< std::string > buildCgiArgv(const HttpRequest& req, CgiContext& ctx)
 {
 	std::string path = req.getPath();
-	PathInfo    path_info = ws::checkPath(path);
-	PathInfo    cgi_path_info = ws::checkPath(req.getLocation()->cgi_path);
+	size_t      ext_pos = path.find(".py");
+	if (ext_pos != std::string::npos)
+		path = path.substr(0, ext_pos + 3);
+
+	PathInfo path_info = ws::checkPath(path);
+	PathInfo cgi_path_info = ws::checkPath(req.getLocation()->cgi_path);
 	std::vector< std::string > argv;
 	if (!path_info.exists && !path_info.readable)
 	{
@@ -131,29 +142,24 @@ std::vector< std::string > buildCgiArgv(const HttpRequest& req, CgiContext& ctx)
 		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	// argv.push_back(const_cast< char* >(req.getLocation()->cgi_path.c_str()));
-	// argv.push_back(const_cast< char* >(path.c_str()));
-	// argv.push_back(NULL);
 	argv.push_back(req.getLocation()->cgi_path);
 	argv.push_back(path);
 	return argv;
 }
 
-bool executeChild(CgiContext&                          ctx,
-                  std::map< std::string, std::string > env,
-                  std::vector< std::string >           arg)
+bool executeChild(CgiContext&                       ctx,
+                  const std::vector< std::string >& args,
+                  const std::vector< std::string >& env)
 {
 	std::vector< char* > envp;
 	std::vector< char* > argv;
-	argv.push_back(const_cast< char* >(arg[0].c_str()));
-	argv.push_back(const_cast< char* >(arg[1].c_str()));
+	argv.push_back(const_cast< char* >(args[0].c_str()));
+	argv.push_back(const_cast< char* >(args[1].c_str()));
 	argv.push_back(NULL);
 
-	std::map< std::string, std::string >::iterator it = env.begin();
-	for (; it != env.end(); ++it)
+	for (size_t i = 0; i < env.size(); ++i)
 	{
-		std::string env_var = it->first + "=" + it->second;
-		envp.push_back(const_cast< char* >(env_var.c_str()));
+		envp.push_back(const_cast< char* >(env[i].c_str()));
 	}
 	envp.push_back(NULL);
 
@@ -188,7 +194,7 @@ bool executeChild(CgiContext&                          ctx,
 		close(pipe_out[0]);
 		close(pipe_out[1]);
 
-		execve(argv[0], &argv[0], &envp[0]);
+		execve(argv[0], argv.data(), envp.data());
 		_exit(127);
 	}
 	close(pipe_in[0]);
@@ -207,20 +213,30 @@ bool executeChild(CgiContext&                          ctx,
 void
 executeCGI(const HttpRequest& req, CgiContext& ctx, const ServerConfig& cfg)
 {
-	std::vector< std::string >           argv = buildCgiArgv(req, ctx);
-	std::map< std::string, std::string > env = buildEnv(req, cfg);
+	std::vector< std::string > args = buildCgiArgv(req, ctx);
 	if (ctx.exit_status)
 		return;
 
+	std::vector< std::string > env = buildEnv(req, cfg);
 	if (ctx.exit_status)
 		return;
 
-	if (!executeChild(ctx, env, argv))
+	if (!executeChild(ctx, args, env))
 		return;
 
 	fcntl(ctx.stdout_pipe, F_SETFL, O_NONBLOCK);
 	if (req.getMethod() == "POST")
+	{
+		ctx.request_body_fd = open(req.getBodyTempFileName().c_str(), O_RDONLY);
+		if (ctx.request_body_fd == -1)
+		{
+			close(ctx.stdin_pipe);
+			close(ctx.stdout_pipe);
+			ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
+			return;
+		}
 		fcntl(ctx.stdin_pipe, F_SETFL, O_NONBLOCK);
+	}
 	else
 	{
 		close(ctx.stdin_pipe);

@@ -215,11 +215,10 @@ void Core::sendResponseToClient_(int client_fd)
 
 	if (buffer.empty())
 	{
-		client->reset();
 		LOG_DEBUG("Response sent");
 		if (client->isKeepAlive())
 		{
-			// LOG_DEBUG("isKeepAlive");
+			client->reset();
 			setEvent_(client_fd, POLLIN);
 		}
 		else

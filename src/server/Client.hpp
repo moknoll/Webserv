@@ -67,6 +67,8 @@ class Client
 	                                       const ServerConfig& cfg);
 
   private:
+	static const size_t MAX_CGI_BUFFER;
+
 	const ServerConfig& config_;
 	int                 fd_;
 	std::string         recv_buffer_;
