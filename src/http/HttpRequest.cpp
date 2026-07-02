@@ -12,14 +12,12 @@
 
 #include "HttpRequest.hpp"
 #include "../lib/ws.hpp"
-#include "../server/Client.hpp"
 #include "constants.hpp"
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
-#include <iostream>
 #include <map>
 #include <string>
 #include <unistd.h>
@@ -396,26 +394,29 @@ void HttpRequest::resolveURI()
 
 void HttpRequest::buildPath_()
 {
-	std::string sub_uri;
-	std::string::size_type	p = uri_.find('?');
-	if (p != std::string::npos)
-		sub_uri = uri_.substr(location_->path.length(), p);
-	else
-		sub_uri = uri_.substr(location_->path.length());
-
-	std::string path = location_->root;
-
-	if (!path.empty() && path[path.length() - 1] != '/')
-		path += '/';
-
-	if (!sub_uri.empty() && sub_uri[0] == '/')
-		path += sub_uri.substr(1);
-	else
+	if (uri_.length() < location_->path.length())
 	{
-		path += sub_uri;
+		path_ = location_->root;
+		return;
 	}
 
-	path_ = path;
+	std::string            sub_uri = uri_.substr(location_->path.length());
+
+	std::string::size_type query_pos = sub_uri.find('?');
+	if (query_pos != std::string::npos)
+		sub_uri.erase(query_pos);
+
+	path_ = location_->root;
+
+	if (!path_.empty() && path_[path_.length() - 1] != '/')
+		path_ += '/';
+
+	if (!sub_uri.empty() && sub_uri[0] == '/')
+		path_ += sub_uri.substr(1);
+	else
+	{
+		path_ += sub_uri;
+	}
 }
 
 static bool matchPrefix(const std::string& uri, const std::string& loc)

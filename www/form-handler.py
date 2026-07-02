@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import cgi
+import sys
 
 # Set the content type to HTML
 # print()
@@ -15,18 +16,16 @@ message = form.getvalue('message')
 
 # Print out the form data
 
-body = """
-<html>
+body = f"""<html>
 <body>
 <h1>Form Data</h1>
-<p>Name: %s</p>
-<p>Email: %s</p>
-<p>Message: %s</p>
+<p>Name: {name}</p>
+<p>Email: {email}</p>
+<p>Message: {message}</p>
 </body>
-</html>
-""" % (name, email, message)
+</html>"""
 
-print("Content-type: text/html\r")
-print("Content-Length: %d\r" % len(body))
+print(f"Content-type: text/html\r")
+print(f"Content-Length: {len(body)}\r")
 print("\r")
-print(body)
+sys.stdout.write(body)
