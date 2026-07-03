@@ -11,8 +11,8 @@
 /* ************************************************************************** */
 
 #include "HttpRequest.hpp"
-#include "../lib/ws.hpp"
 #include "../constants.hpp"
+#include "../lib/ws.hpp"
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -40,13 +40,17 @@ HttpRequest::HttpRequest(const HttpRequest& other) :
         content_length_(other.content_length_),
         method_(other.method_),
         uri_(other.uri_),
+        path_(other.path_),
+        location_(other.location_),
         http_version_(other.http_version_),
         body_(other.body_),
         headers_(other.headers_),
         chunked_(other.chunked_),
+        multipart_(other.multipart_),
         boundary_(other.boundary_),
         recv_bytes_(other.recv_bytes_),
         state_(other.state_),
+        body_temp_file_(other.body_temp_file_),
         fd_(other.fd_)
 {
 }
@@ -64,6 +68,8 @@ void HttpRequest::reset()
 	content_length_ = 0;
 	method_.clear();
 	uri_.clear();
+	path_.clear();
+	// Location	location_;
 	http_version_.clear();
 	body_.clear();
 	headers_.clear();
@@ -119,7 +125,7 @@ void HttpRequest::processHeaderFields()
 	std::map< std::string, std::string >::iterator it = headers_.begin();
 	for (; it != headers_.end(); ++it)
 	{
-		if (it->first == "Content-Length")
+		if (ws::toUpperCase(it->first) == "CONTENT-LENGTH")
 			content_length_ = ws::stosize(it->second);
 
 		if (it->first == "Transfer-Encoding" && it->second == "chunked")
@@ -127,7 +133,7 @@ void HttpRequest::processHeaderFields()
 			chunked_ = true;
 		}
 
-		if (it->first == "Content-Type"
+		if (ws::toUpperCase(it->first) == "CONTENT-TYPE"
 		    && it->second.find("multipart/form-data;") == 0)
 		{
 			multipart_ = true;
@@ -140,7 +146,7 @@ void HttpRequest::processHeaderFields()
 		}
 	}
 
-	if (headers_.find("Content-Length") != headers_.end() && chunked_)
+	if (content_length_ > 0 && chunked_)
 		fail(HTTP_BAD_REQUEST);
 }
 

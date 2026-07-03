@@ -83,7 +83,7 @@ class HttpRequest
 	std::string                          body_temp_file_;
 	int                                  fd_;
 
-	void            parseBody(std::string& raw_data);
+	void                                 parseBody(std::string& raw_data);
 	void            parseHeaderLine(const std::string& header_line);
 	void            parseHeaderLines(const std::string& headers);
 	void            parseHeaders(const std::string& headers);

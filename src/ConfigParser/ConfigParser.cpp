@@ -1,5 +1,4 @@
 #include "ConfigParser.hpp"
-#include <algorithm>
 #include <cctype>
 #include <cstdlib>
 #include <iostream>
