@@ -24,8 +24,9 @@
 
 HttpRequest::HttpRequest(const ServerConfig& cfg) :
         config_(cfg),
-        err_status_(HTTP_OK),
+        err_status_(0),
         content_length_(0),
+        location_(),
         chunked_(false),
         multipart_(false),
         recv_bytes_(0),
@@ -64,12 +65,12 @@ HttpRequest::~HttpRequest()
 
 void HttpRequest::reset()
 {
-	err_status_ = HTTP_OK;
+	err_status_ = 0;
 	content_length_ = 0;
 	method_.clear();
 	uri_.clear();
 	path_.clear();
-	// Location	location_;
+	location_ = Location();
 	http_version_.clear();
 	body_.clear();
 	headers_.clear();
@@ -257,19 +258,13 @@ bool HttpRequest::saveBodyToTempFile(std::string& raw_data)
 
 void HttpRequest::parseBody(std::string& raw_data)
 {
-	if (location_ == NULL)
-	{
-		fail(HTTP_NOT_FOUND);
-		return;
-	}
-
-	if (content_length_ > location_->client_max_body_size)
+	if (content_length_ > location_.client_max_body_size)
 	{
 		fail(HTTP_CONTENT_TOO_LARGE);
 		return;
 	}
 
-	if (chunked_ && recv_bytes_ > location_->client_max_body_size)
+	if (chunked_ && recv_bytes_ > location_.client_max_body_size)
 	{
 		fail(HTTP_CONTENT_TOO_LARGE);
 		return;
@@ -388,31 +383,32 @@ void HttpRequest::resolveURI()
 		return;
 	}
 
-	location_ = FindMatchingUri_();
-	if (location_ == NULL)
+	const Location* loc = FindMatchingUri_();
+	if (loc == NULL)
 	{
 		fail(HTTP_NOT_FOUND);
 		return;
 	}
+	location_ = *loc;
 
 	buildPath_();
 }
 
 void HttpRequest::buildPath_()
 {
-	if (uri_.length() < location_->path.length())
+	if (uri_.length() < location_.path.length())
 	{
-		path_ = location_->root;
+		path_ = location_.root;
 		return;
 	}
 
-	std::string            sub_uri = uri_.substr(location_->path.length());
+	std::string            sub_uri = uri_.substr(location_.path.length());
 
 	std::string::size_type query_pos = sub_uri.find('?');
 	if (query_pos != std::string::npos)
 		sub_uri.erase(query_pos);
 
-	path_ = location_->root;
+	path_ = location_.root;
 
 	if (!path_.empty() && path_[path_.length() - 1] != '/')
 		path_ += '/';
@@ -516,9 +512,14 @@ std::string HttpRequest::getPath() const
 	return path_;
 }
 
-const Location* HttpRequest::getLocation() const
+Location HttpRequest::getLocation() const
 {
 	return location_;
+}
+
+const ServerConfig& HttpRequest::getConfig() const
+{
+	return config_;
 }
 
 bool HttpRequest::isAlmostDone() const
@@ -529,11 +530,6 @@ bool HttpRequest::isAlmostDone() const
 bool HttpRequest::isComplete() const
 {
 	return state_ == sw_done;
-}
-
-void HttpRequest::setStatus(int status)
-{
-	this->err_status_ = status;
 }
 
 bool HttpRequest::isChunked() const

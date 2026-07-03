@@ -11,10 +11,10 @@
 /* ************************************************************************** */
 
 #include "HttpHandler.hpp"
+#include "../constants.hpp"
 #include "../lib/ws.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
-#include "../constants.hpp"
 
 #include <cerrno>
 #include <cstddef>
@@ -35,7 +35,7 @@ const size_t HttpHandler::FILE_CHUNK_SIZE = 512 * 1024;
 
 HttpHandler::HttpHandler(const ServerConfig& cfg) :
         config_(cfg),
-        loc_(NULL),
+        loc_(),
         error_(0),
         fd_(-1)
 {
@@ -60,12 +60,10 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	// const std::string& uri = req.getURI();
 	const std::string& host = req.getHeader("Host");
 
-	this->loc_ = req.getLocation();
-	if (this->loc_ == NULL)
-		return makeStatusResponse(HTTP_NOT_FOUND);
+	loc_ = req.getLocation();
 
-	if (this->loc_->has_redirect)
-		return redirect(loc_->redirect.first, loc_->redirect.second, host);
+	if (loc_.has_redirect)
+		return redirect(loc_.redirect.first, loc_.redirect.second, host);
 
 	const std::string& method = req.getMethod();
 
@@ -84,9 +82,6 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 
 HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 {
-	if (this->loc_ == NULL)
-		return HttpResponse(HTTP_INTERNAL_SERVER_ERROR);
-
 	const std::string&     raw_uri = req.getURI();
 	std::string::size_type p = raw_uri.find('?');
 	const std::string&     uri = raw_uri.substr(0, p);
@@ -98,12 +93,12 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 		if (uri != "/" && uri[uri.size() - 1] != '/')
 			return redirect(HTTP_MOVED_PERMANENTLY, uri + "/", host);
 
-		std::string index_file = path + loc_->index;
+		std::string index_file = path + loc_.index;
 
 		if (ws::checkFile(index_file.c_str()) == FILE_OK)
 			return makeFileResponse(index_file);
 
-		if (loc_->autoindex)
+		if (loc_.autoindex)
 			return makeDirectoryListingResponse(path, uri);
 
 		return makeStatusResponse(HTTP_FORBIDDEN);
@@ -149,7 +144,7 @@ std::string HttpHandler::sanitizeFileName(const std::string& filename)
 
 std::string HttpHandler::buildUploadPath(const std::string& filename)
 {
-	std::string path = loc_->upload_path;
+	std::string path = loc_.upload_path;
 
 	if (!path.empty() && path[path.size() - 1] != '/')
 		path += '/';
@@ -158,8 +153,8 @@ std::string HttpHandler::buildUploadPath(const std::string& filename)
 	{
 		path += sanitizeFileName(filename);
 	}
-
-	// if filename is empty generate name with time
+	else
+		path += "upload_" + ws::to_string(std::time(NULL));
 
 	return path;
 }
@@ -383,7 +378,7 @@ bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 
 HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 {
-	if (loc_->upload_path.empty())
+	if (loc_.upload_path.empty())
 	{
 		std::string path = req.getPath();
 		PathInfo    info = ws::checkPath(path);
@@ -581,9 +576,9 @@ HttpResponse HttpHandler::makeDirectoryListingResponse(const std::string& path,
 
 bool HttpHandler::isAllowedMethod(const std::string& method) const
 {
-	for (size_t i = 0; i < loc_->allowed_methods.size(); i++)
+	for (size_t i = 0; i < loc_.allowed_methods.size(); i++)
 	{
-		if (method == loc_->allowed_methods[i])
+		if (method == loc_.allowed_methods[i])
 			return true;
 	}
 	return false;
@@ -591,7 +586,7 @@ bool HttpHandler::isAllowedMethod(const std::string& method) const
 
 void HttpHandler::reset()
 {
-	loc_ = NULL;
+	loc_ = Location();
 	closeFile();
 	error_ = 0;
 	upload_file_path_.clear();

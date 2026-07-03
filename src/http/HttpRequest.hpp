@@ -21,6 +21,8 @@
 #define MAX_METHOD_LEN  7
 #define MAX_HEADER_SIZE 1024 * 32
 
+typedef std::map< std::string, std::string > HeaderMap;
+
 class HttpRequest
 {
   public:
@@ -38,63 +40,62 @@ class HttpRequest
 	HttpRequest(const HttpRequest& other);
 	~HttpRequest();
 
-	HttpRequest&      operator=(const HttpRequest& other);
+	HttpRequest&        operator=(const HttpRequest& other);
 
-	void              parse(std::string& raw);
+	void                parse(std::string& raw);
 
-	std::string       getURI() const;
-	std::string       getHeader(const std::string& name) const;
-	std::string       getMethod() const;
-	const std::string getbody() const; // ?
-	const Location*   getLocation() const;
-	std::string       getPath() const;
-	int               getRequestStatus() const;
-	size_t            getContentLenght() const;
-	size_t            getReceivedBytes() const;
-	std::string       getBoundary() const;
-	std::string       getBodyTempFileName() const;
-	std::map< std::string, std::string > getHeaders() const;
+	std::string         getURI() const;
+	std::string         getHeader(const std::string& name) const;
+	std::string         getMethod() const;
+	std::string         getPath() const;
+	HeaderMap           getHeaders() const;
+	int                 getRequestStatus() const;
+	size_t              getContentLenght() const;
+	size_t              getReceivedBytes() const;
+	std::string         getBoundary() const;
+	std::string         getBodyTempFileName() const;
+	Location            getLocation() const;
+	const ServerConfig& getConfig() const;
+	const std::string   getbody() const; // ?
 
-	void                                 setStatus(int status);
+	bool                isChunked() const;
+	bool                isMultipart() const;
+	bool                isComplete() const;
+	bool                isAlmostDone() const;
 
-	bool                                 isChunked() const;
-	bool                                 isMultipart() const;
-	bool                                 isComplete() const;
-	bool                                 isAlmostDone() const;
-
-	void                                 reset();
+	void                reset();
 
   private:
-	const ServerConfig&                  config_;
-	int                                  err_status_;
-	size_t                               content_length_;
-	std::string                          method_;
-	std::string                          uri_;
-	std::string                          path_;
-	const Location*                      location_;
-	std::string                          http_version_;
-	std::string                          body_;
-	std::map< std::string, std::string > headers_;
-	bool                                 chunked_;
-	bool                                 multipart_;
-	std::string                          boundary_;
-	size_t                               recv_bytes_;
-	State                                state_;
-	std::string                          body_temp_file_;
-	int                                  fd_;
+	const ServerConfig& config_;
+	int                 err_status_;
+	size_t              content_length_;
+	std::string         method_;
+	std::string         uri_;
+	std::string         path_;
+	Location            location_;
+	std::string         http_version_;
+	std::string         body_;
+	HeaderMap           headers_;
+	bool                chunked_;
+	bool                multipart_;
+	std::string         boundary_;
+	size_t              recv_bytes_;
+	State               state_;
+	std::string         body_temp_file_;
+	int                 fd_;
 
-	void                                 parseBody(std::string& raw_data);
-	void            parseHeaderLine(const std::string& header_line);
-	void            parseHeaderLines(const std::string& headers);
-	void            parseHeaders(const std::string& headers);
-	void            processHeaderFields();
-	void            parseChunked(std::string& raw_data);
-	bool            isValidMethod(const std::string& method);
-	void            fail(int status);
-	bool            saveBodyToTempFile(std::string& raw_data);
-	void            resolveURI();
-	void            buildPath_();
-	const Location* FindMatchingUri_() const;
-	void            closeFile_();
+	void                parseBody(std::string& raw_data);
+	void                parseHeaderLine(const std::string& header_line);
+	void                parseHeaderLines(const std::string& headers);
+	void                parseHeaders(const std::string& headers);
+	void                processHeaderFields();
+	void                parseChunked(std::string& raw_data);
+	bool                isValidMethod(const std::string& method);
+	void                fail(int status);
+	bool                saveBodyToTempFile(std::string& raw_data);
+	void                resolveURI();
+	void                buildPath_();
+	void                closeFile_();
+	const Location*     FindMatchingUri_() const;
 };
 

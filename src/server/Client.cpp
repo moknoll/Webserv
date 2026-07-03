@@ -35,7 +35,7 @@ Client::~Client()
 
 void Client::processRequest()
 {
-	if (request.getRequestStatus() != HTTP_OK)
+	if (request.getRequestStatus())
 	{
 		keep_alive_ = false;
 		state_ = HTTP_SEND;
@@ -44,18 +44,10 @@ void Client::processRequest()
 		    handler.makeStatusResponse(request.getRequestStatus()).toString();
 		return;
 	}
-	const Location* loc = request.getLocation();
-	if (loc == NULL)
-	{
-		keep_alive_ = false;
-		state_ = HTTP_SEND;
-		send_buffer_ = handler.makeStatusResponse(HTTP_NOT_FOUND).toString();
-		return;
-	}
 
-	if (loc->has_cgi)
+	if (request.getLocation().has_cgi)
 	{
-		executeCGI(request, cgi_ctx_, config_);
+		executeCGI(request, cgi_ctx_);
 		request_body_fd_ = cgi_ctx_.request_body_fd;
 
 		cgi_output_buf.clear();

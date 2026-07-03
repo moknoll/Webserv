@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <ctime>
 #include <fcntl.h>
+#include <iostream>
 #include <string.h>
 #include <string>
 #include <sys/types.h>
@@ -77,16 +78,14 @@ std::string getPATH_STRANSLATED(const std::string& root,
 	return ret;
 }
 
-static std::vector< std::string > buildEnv(const HttpRequest&  req,
-                                           const ServerConfig& cfg)
+static std::vector< std::string > buildEnv(const HttpRequest& req)
 {
-	const Location*            loc = req.getLocation();
+	const Location             loc = req.getLocation();
 	std::string                uri = req.getURI();
 	size_t                     ext = uri.find(".py");
 	size_t                     q = uri.find("?");
-	std::vector< std::string > env;
 
-	env = buildCGIHeaders(req);
+	std::vector< std::string > env = buildCGIHeaders(req);
 
 	if (req.getMethod() == "POST")
 	{
@@ -95,8 +94,8 @@ static std::vector< std::string > buildEnv(const HttpRequest&  req,
 		env.push_back("CONTENT_TYPE=" + req.getHeader("Content-Type"));
 	}
 	env.push_back("REQUEST_METHOD=" + req.getMethod());
-	env.push_back("SERVER_NAME=" + cfg.server_name);
-	env.push_back("SERVER_PORT=" + ws::to_string(cfg.port));
+	env.push_back("SERVER_NAME=" + req.getConfig().server_name);
+	env.push_back("SERVER_PORT=" + ws::to_string(req.getConfig().port));
 	env.push_back("SERVER_PROTOCOL=HTTP/1.1");
 	env.push_back("GATEWAY_INTERFACE=CGI/1.1");
 
@@ -109,7 +108,7 @@ static std::vector< std::string > buildEnv(const HttpRequest&  req,
 
 		if (!path_info.empty())
 		{
-			std::string pt = getPATH_STRANSLATED(loc->root, path_info);
+			std::string pt = getPATH_STRANSLATED(loc.root, path_info);
 			env.push_back("PATH_TRANSLATED=" + pt);
 		}
 	}
@@ -130,7 +129,7 @@ std::vector< std::string > buildCgiArgv(const HttpRequest& req, CgiContext& ctx)
 		path = path.substr(0, ext_pos + 3);
 
 	PathInfo path_info = ws::checkPath(path);
-	PathInfo cgi_path_info = ws::checkPath(req.getLocation()->cgi_path);
+	PathInfo cgi_path_info = ws::checkPath(req.getLocation().cgi_path);
 	std::vector< std::string > argv;
 	if (!path_info.exists && !path_info.readable)
 	{
@@ -142,7 +141,7 @@ std::vector< std::string > buildCgiArgv(const HttpRequest& req, CgiContext& ctx)
 		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	argv.push_back(req.getLocation()->cgi_path);
+	argv.push_back(req.getLocation().cgi_path);
 	argv.push_back(path);
 	return argv;
 }
@@ -216,14 +215,13 @@ bool executeChild(CgiContext&                       ctx,
 	return true;
 }
 
-void
-executeCGI(const HttpRequest& req, CgiContext& ctx, const ServerConfig& cfg)
+void executeCGI(const HttpRequest& req, CgiContext& ctx)
 {
 	std::vector< std::string > args = buildCgiArgv(req, ctx);
 	if (ctx.exit_status)
 		return;
 
-	std::vector< std::string > env = buildEnv(req, cfg);
+	std::vector< std::string > env = buildEnv(req);
 	if (ctx.exit_status)
 		return;
 

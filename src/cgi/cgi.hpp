@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../ConfigParser/ServerConfig.hpp"
 #include "../http/HttpRequest.hpp"
 
 #include <ctime>
@@ -20,14 +19,10 @@ struct CgiContext
 	CgiContext();
 };
 
-void
-executeCGI(const HttpRequest& req, CgiContext& ctx, const ServerConfig& cfg);
-std::vector< std::string > buildCgiArgv(const HttpRequest& req,
-                                        CgiContext&        ctx);
-void                       buildCgiEnvp(const HttpRequest&    req,
-                                        const ServerConfig&   cfg,
-                                        std::vector< char* >& envp);
-bool                       executeChild(CgiContext& ctx,
-                                        const std::vector< std::string >&,
-                                        const std::vector< std::string >&);
+void                       executeCGI(const HttpRequest& req, CgiContext& ctx);
+std::vector< std::string > buildCgiArgv(const HttpRequest&, CgiContext&);
+void buildCgiEnvp(const HttpRequest&, std::vector< char* >&);
+bool executeChild(CgiContext& ctx,
+                  const std::vector< std::string >&,
+                  const std::vector< std::string >&);
 

@@ -37,7 +37,7 @@ class HttpHandler
 	static const size_t        FILE_CHUNK_SIZE;
 
 	const ServerConfig&        config_;
-	const Location*            loc_;
+	Location                   loc_;
 	int                        error_;
 	std::string                upload_file_path_;
 	// std::string                temp_file_;
