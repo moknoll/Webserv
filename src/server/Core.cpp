@@ -12,10 +12,10 @@
 
 #include "Core.hpp"
 // #include "../ConfigParser/ServerConfig.hpp"
+#include "../constants.hpp"
 #include "../logger/Logger.hpp"
 #include "Client.hpp"
 #include "Server.hpp"
-// #include "Sockets.hpp"
 
 #include <cstddef>
 #include <ctime>
@@ -50,11 +50,6 @@ Core::Core(const std::vector< ServerConfig >& configs)
 		fd_infos_[fd].server = s;
 		fd_infos_[fd].type = FD_SERVER;
 
-		// struct pollfd pfd;
-		// pfd.fd = s->getSocketFd();
-		// std::cout << "sock_fd:" << s->getSocketFd() << std::endl;
-		// pfd.events = POLLIN;
-		// poll_fds_.push_back(pfd);
 		std::cout << "sock_fd:" << fd << std::endl;
 	}
 }
@@ -83,21 +78,6 @@ Core::~Core()
 	}
 }
 
-// Server* Core::findServerByFd(int serverFd)
-// {
-// 	for (size_t i = 0; i < _servers.size(); i++)
-// 	{
-// 		if (_servers[i]->getSocketFd() == serverFd)
-// 			return _servers[i];
-// 	}
-// 	return NULL;
-// }
-
-/**
- * @brief Runs the main event loop for the server.
- *
- * @throws std::runtime_error if poll() fails
- */
 void Core::run()
 {
 	while (true)
@@ -123,13 +103,6 @@ void Core::run()
 	}
 }
 
-/**
- * @brief Accepts a new incoming connection on a listening server socket.
- *
- * @param serverSocketFd File descriptor of the listening server socket to
- *                       accept a new client from.
- * @return void
- */
 void Core::acceptNewClient_(const Server& server)
 {
 	int                server_fd = server.getSocketFd();

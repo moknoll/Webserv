@@ -18,6 +18,12 @@
 #include <sstream>
 #include <string>
 
+bool ws::has_suffix(const std::string& s, const std::string& suffix)
+{
+	return s.size() > suffix.size()
+	    && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 std::string ws::trim(const std::string& s, char c)
 {
 	std::string::size_type begin = s.find_first_not_of(c);

@@ -12,7 +12,7 @@
 
 #include "HttpRequest.hpp"
 #include "../lib/ws.hpp"
-#include "constants.hpp"
+#include "../constants.hpp"
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>

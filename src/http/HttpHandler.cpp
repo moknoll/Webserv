@@ -14,7 +14,7 @@
 #include "../lib/ws.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
-#include "constants.hpp"
+#include "../constants.hpp"
 
 #include <cerrno>
 #include <cstddef>

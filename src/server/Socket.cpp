@@ -1,25 +1,17 @@
 #include "Socket.hpp"
+#include "../constants.hpp"
+#include "../lib/ws.hpp"
+
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
 #include <netdb.h>
-#include <sstream>
 #include <string>
 #include <unistd.h>
 
-static std::string to_string(int num)
-{
-	std::string       str;
-	std::stringstream ss;
-
-	ss << num;
-
-	str = ss.str();
-	return str;
-}
-
-Socket::Socket(const ServerConfig& config) : fd_(-1)
+Socket::Socket(const ServerConfig& config) :
+        fd_(-1)
 {
 	int              yes = 1;
 	int              status;
@@ -32,7 +24,7 @@ Socket::Socket(const ServerConfig& config) : fd_(-1)
 	hints.ai_flags = AI_PASSIVE;
 
 	this->host_ = config.host;
-	this->port_ = to_string(config.port);
+	this->port_ = ws::to_string(config.port);
 	std::cout << "Config: host='" << this->host_ << "' port='" << this->port_
 	          << "'" << std::endl;
 

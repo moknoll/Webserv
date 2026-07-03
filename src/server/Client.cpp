@@ -1,6 +1,6 @@
 #include "Client.hpp"
 #include "../cgi/cgi.hpp"
-#include "../http/constants.hpp"
+#include "../constants.hpp"
 #include "../lib/ws.hpp"
 
 #include <cstddef>

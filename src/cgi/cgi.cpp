@@ -1,12 +1,13 @@
 #include "cgi.hpp"
+#include "../constants.hpp"
 #include "../http/HttpRequest.hpp"
-#include "../http/constants.hpp"
 #include "../lib/ws.hpp"
+
 #include <algorithm>
+#include <csignal>
 #include <cstddef>
 #include <ctime>
 #include <fcntl.h>
-#include <iostream>
 #include <string.h>
 #include <string>
 #include <sys/types.h>
@@ -15,7 +16,6 @@
 
 CgiContext::CgiContext()
 {
-	// const size_t MAX_CGI_BUFFER = 10 * 1024 * 1024;
 	pid = -1;
 	stdin_pipe = -1;
 	stdout_pipe = -1;
@@ -174,12 +174,18 @@ bool executeChild(CgiContext&                       ctx,
 	}
 	if (pipe(pipe_out) == -1)
 	{
+		close(pipe_in[0]);
+		close(pipe_in[1]);
 		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
 		return false;
 	}
 	pid_t pid = fork();
 	if (pid < 0)
 	{
+		close(pipe_in[0]);
+		close(pipe_in[1]);
+		close(pipe_out[0]);
+		close(pipe_out[1]);
 		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
 		return false;
 	}
@@ -232,6 +238,10 @@ executeCGI(const HttpRequest& req, CgiContext& ctx, const ServerConfig& cfg)
 		{
 			close(ctx.stdin_pipe);
 			close(ctx.stdout_pipe);
+			kill(ctx.pid, SIGTERM);
+			ctx.pid = -1;
+			ctx.stdin_pipe = -1;
+			ctx.stdout_pipe = -1;
 			ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
 			return;
 		}
@@ -243,3 +253,4 @@ executeCGI(const HttpRequest& req, CgiContext& ctx, const ServerConfig& cfg)
 		ctx.stdin_pipe = -1;
 	}
 }
+

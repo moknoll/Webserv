@@ -175,6 +175,8 @@ class ws
 
 	static std::string       randString(size_t len = 5);
 
+	static bool has_suffix(const std::string& s, const std::string& suffix);
+
 	/**
 	 * @brief Converts a value of any type to its string representation.
 	 *

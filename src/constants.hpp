@@ -16,6 +16,9 @@
 #define SERVER_NAME_STR                      "Webserv"
 #define HTTP_VERSION                         "HTTP/1.1"
 
+#define SOCKET_ERROR -1
+#define BACKLOG      10 // How may pending connections queue will hold
+
 #define OK                                   0
 #define ERROR                                -1
 #define AGAIN                                -2
@@ -27,16 +30,6 @@
 #define LF                                   '\n'   // Line Feed  (New line)
 #define CR                                   '\r'   // Carriage Return
 #define CRLF                                 "\x0d\x0a"
-
-#define HTTP_UNKNOWN                         0x0001 // (1 << 0) 1
-#define HTTP_GET                             0x0002 // (1 << 1) 2
-#define HTTP_POST                            0x0004 // (1 << 2) 4
-#define HTTP_DELETE                          0x0008 // (1 << 3) 8
-#define HTTP_HEAD                            0x0010 // (1 << 4) 16
-#define HTTP_PUT                             0x0020 // (1 << 5) 32
-#define HTTP_COPY                            0x0040 // (1 << 6) 64
-#define HTTP_MOVE                            0x0080 // (1 << 7) 128
-#define HTTP_CONNECT                         0x0100 // (1 << 8) 257
 
 #define HTTP_CONNECTION_CLOSE                1
 #define HTTP_CONNECTION_KEEP_ALIVE           2
