@@ -2,23 +2,37 @@
 
 import cgi
 import sys
+import os
+import json
 
-# Set the content type to HTML
-# print()
-
-# Get the form data from the request
 form = cgi.FieldStorage()
+filename = "message.json"
 
-# Extract the form field values
-name = form.getvalue('name')
-email = form.getvalue('email')
-message = form.getvalue('message')
+name = form.getvalue("name")
+email = form.getvalue("email")
+message = form.getvalue("message")
 
-# Print out the form data
+obj = {"name": name, "email": email, "message": message}
+
+if os.path.exists(filename):
+	try:
+		with open(filename, "r") as file:
+			data = json.load(file)
+	except json.JSONDecodeError:
+		data =[]
+else:
+	data = []
+
+if in data 
+	data.append(obj)
+
+with open(filename, "w") as file:
+	json.dump(data, file, indent=4)
+
 
 body = f"""<html>
 <body>
-<h1>Form Data</h1>
+<h1>New Data added!</h1>
 <p>Name: {name}</p>
 <p>Email: {email}</p>
 <p>Message: {message}</p>
