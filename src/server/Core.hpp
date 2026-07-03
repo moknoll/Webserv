@@ -55,14 +55,15 @@ class Core
 	void    setEvent_(int client_fd, int state);
 	void    addFdtoPoll_(int fd, int event);
 
-	void    readCGioutput(Client& client);
-	void    writeCGIinput(Client& client);
+	void    readCGi_output_(Client* client, int fd);
+	void    writeCGI_input_(Client* client, int fd);
 
 	FdInfo* getFdInfo(int fd);
 	void    checkCGIProcesses();
 
-	// void                         cleanPollFds();
+	void    registerCgiFds(Client* client);
 	void    removePollFd(int fd);
+	// void                         cleanPollFds();
 
 	Core();
 

@@ -85,11 +85,16 @@ void Core::run()
 		int ret = poll(poll_fds_.data(), poll_fds_.size(), 3000);
 		if (ret == -1)
 			throw std::runtime_error("Poll failed");
+		// if (ret == 0) // What to do
 
+		// ckeckTimeOutCGI(); // ?????????????????????/
+		// ckeckTimeOutClient();
 		for (size_t i = 0; i < poll_fds_.size(); i++)
 		{
 			pollfd& pfd = poll_fds_[i];
 
+			// if (poll_fds_[i].revents == POLLERR || poll_fds_[i].revents ==
+			// POLLHUP) // What to do
 			if (poll_fds_[i].revents & POLLIN)
 			{
 				handlePOLLIN(pfd);
@@ -155,19 +160,20 @@ void Core::handleClientMessage_(Client* client, int client_fd)
 
 	if (client->getHttpState() == Client::CGI_STATE)
 	{
-		addFdtoPoll_(client->cgi_pipe_out, POLLIN);
-		addFdtoPoll_(client->cgi_pipe_in, POLLOUT);
-		if (client->getFdCGI_out() != -1)
-		{
-			fd_infos_[client->cgi_pipe_out].client = client;
-			fd_infos_[client->cgi_pipe_out].type = FD_PIPE_OUT;
-		}
-
-		if (client->getFdCGI_in() != -1)
-		{
-			fd_infos_[client->cgi_pipe_in].client = client;
-			fd_infos_[client->cgi_pipe_in].type = FD_PIPE_IN;
-		}
+		registerCgiFds(client);
+		// addFdtoPoll_(client->cgi_pipe_out, POLLIN);
+		// addFdtoPoll_(client->cgi_pipe_in, POLLOUT);
+		// if (client->getFdCGI_out() != -1)
+		// {
+		// 	fd_infos_[client->cgi_pipe_out].client = client;
+		// 	fd_infos_[client->cgi_pipe_out].type = FD_PIPE_OUT;
+		// }
+		//
+		// if (client->getFdCGI_in() != -1)
+		// {
+		// 	fd_infos_[client->cgi_pipe_in].client = client;
+		// 	fd_infos_[client->cgi_pipe_in].type = FD_PIPE_IN;
+		// }
 	}
 	setEvent_(client_fd, POLLOUT);
 }
@@ -252,11 +258,10 @@ void Core::setEvent_(int client_fd, int state)
 	}
 }
 
-void Core::readCGioutput(Client& client)
+void Core::readCGi_output_(Client* client, int fd)
 {
-	if (client.getHttpState() != Client::CGI_STATE)
+	if (!client || client->getHttpState() != Client::CGI_STATE)
 		return;
-	int fd = client.cgi_pipe_out;
 
 	LOG_DEBUG("Try read from CGI PIPE output");
 
@@ -265,28 +270,25 @@ void Core::readCGioutput(Client& client)
 
 	if (r > 0)
 	{
-		// client.cgi.appendCgiOutput(buf, r);
-		client.cgi_output_buf.append(buf, r);
+		client->appendCgiOutput(buf, r);
 	}
 }
 
-void Core::writeCGIinput(Client& client)
+void Core::writeCGI_input_(Client* client, int fd)
 {
-	if (client.cgi_pipe_in == -1)
+	if (!client || fd == -1)
 		return;
+
 	LOG_DEBUG("Write to CGI input");
-	if (client.writeRequestBody())
+	if (client->writeRequestBody(fd))
 	{
-		removePollFd(client.cgi_pipe_in);
-		fd_infos_.erase(client.cgi_pipe_in);
-		close(client.cgi_pipe_in);
-		client.cgi_pipe_in = -1;
+		removePollFd(fd);
+		fd_infos_.erase(fd);
 	}
 }
 
 void Core::checkCGIProcesses()
 {
-	// std::map< int, Client* >::iterator it = _clients.begin();
 	std::map< int, FdInfo >::iterator it = fd_infos_.begin();
 	for (; it != fd_infos_.end(); ++it)
 	{
@@ -297,11 +299,12 @@ void Core::checkCGIProcesses()
 		{
 			if (client->CGIProcessFinished())
 			{
+				CgiContext cgi_ctx = client->getCGIContext();
 				LOG_DEBUG("CGI FInished");
-				removePollFd(client->cgi_pipe_in);
-				removePollFd(client->cgi_pipe_out);
-				fd_infos_.erase(client->cgi_pipe_in);
-				fd_infos_.erase(client->cgi_pipe_out);
+				removePollFd(cgi_ctx.stdout_pipe);
+				removePollFd(cgi_ctx.stdin_pipe);
+				fd_infos_.erase(cgi_ctx.stdout_pipe);
+				fd_infos_.erase(cgi_ctx.stdin_pipe);
 				setEvent_(client->getClientFd(), POLLOUT);
 			}
 		}
@@ -351,7 +354,7 @@ void Core::handlePOLLIN(pollfd& pfd)
 	switch (info->type)
 	{
 		case FD_SERVER:   acceptNewClient_(*info->server); break;
-		case FD_PIPE_OUT: readCGioutput(*info->client); break;
+		case FD_PIPE_OUT: readCGi_output_(info->client, pfd.fd); break;
 		case FD_CLIENT:   handleClientMessage_(info->client, pfd.fd); break;
 		default:          break;
 	}
@@ -366,7 +369,7 @@ void Core::handlePOLLOUT(pollfd& pfd)
 
 	switch (info->type)
 	{
-		case FD_PIPE_IN: writeCGIinput(*info->client); break;
+		case FD_PIPE_IN: writeCGI_input_(info->client, pfd.fd); break;
 		case FD_CLIENT:
 			sendResponseToClient_(pfd.fd);
 			break;
@@ -383,4 +386,23 @@ Core::FdInfo* Core::getFdInfo(int fd)
 		return NULL;
 
 	return &(it->second);
+}
+
+void Core::registerCgiFds(Client* client)
+{
+	const CgiContext cgi_ctx = client->getCGIContext();
+
+	addFdtoPoll_(cgi_ctx.stdout_pipe, POLLIN);
+	addFdtoPoll_(cgi_ctx.stdin_pipe, POLLOUT);
+	if (cgi_ctx.stdout_pipe != -1)
+	{
+		fd_infos_[cgi_ctx.stdout_pipe].client = client;
+		fd_infos_[cgi_ctx.stdout_pipe].type = FD_PIPE_OUT;
+	}
+
+	if (cgi_ctx.stdin_pipe != -1)
+	{
+		fd_infos_[cgi_ctx.stdin_pipe].client = client;
+		fd_infos_[cgi_ctx.stdin_pipe].type = FD_PIPE_IN;
+	}
 }

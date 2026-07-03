@@ -33,16 +33,16 @@ class Client
 		HTTP_CLOSE
 	};
 
-	CgiContext  cgi;
-	int         cgi_pipe_in;
-	int         cgi_pipe_out;
-	int         cgi_pid;
+	// int         cgi_pipe_in;
+	// int         cgi_pipe_out;
+	// int         cgi_pid;
 	std::string cgi_output_buf;
 	std::string cgi_input_buf_;
 	int         request_body_fd_;
-	bool        writeRequestBody();
+	bool        writeRequestBody(int fd);
 	void        buildCGIResponse();
 	bool        CGIProcessFinished();
+	void        appendCgiOutput(const char* buf, size_t size_of_bytes);
 
 	void        reset();
 
@@ -62,9 +62,7 @@ class Client
 	int         getFdCGI_in() const;
 	int         getFdCGI_out() const;
 	int         getHttpState() const;
-
-	static const Location* FindMatchingUri(const std::string&  uri,
-	                                       const ServerConfig& cfg);
+	CgiContext  getCGIContext() const;
 
   private:
 	static const size_t MAX_CGI_BUFFER;
@@ -75,6 +73,7 @@ class Client
 	std::string         send_buffer_;
 	bool                keep_alive_;
 	STATE               state_;
+	CgiContext          cgi_ctx_;
 
 	HttpRequest         request;
 	HttpResponse        response;

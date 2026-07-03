@@ -15,9 +15,9 @@
 const size_t Client::MAX_CGI_BUFFER = 100 * 1024 * 1024;
 
 Client::Client(int fd, const ServerConfig& config) :
-        cgi_pipe_in(-1),
-        cgi_pipe_out(-1),
-        cgi_pid(-1),
+        // cgi_pipe_in(-1),
+        // cgi_pipe_out(-1),
+        // cgi_pid(-1),
         config_(config),
         fd_(fd),
         keep_alive_(true),
@@ -55,21 +55,16 @@ void Client::processRequest()
 
 	if (loc->has_cgi)
 	{
-		// CgiContext cgi;
+		executeCGI(request, cgi_ctx_, config_);
+		request_body_fd_ = cgi_ctx_.request_body_fd;
 
-		executeCGI(request, cgi, config_);
-		cgi_pipe_in = cgi.stdin_pipe;
-		cgi_pipe_out = cgi.stdout_pipe;
-		request_body_fd_ = cgi.request_body_fd;
-
-		cgi_pid = cgi.pid;
 		cgi_output_buf.clear();
 		cgi_input_buf_.clear();
 
-		if (cgi.exit_status)
+		if (cgi_ctx_.exit_status)
 		{
-			send_buffer_ =
-			    handler.makeStatusResponse(cgi.exit_status).toString();
+			response = handler.makeStatusResponse(cgi_ctx_.exit_status);
+			send_buffer_ = response.toString();
 			state_ = HTTP_SEND;
 			keep_alive_ = false;
 			return;
@@ -197,12 +192,14 @@ void Client::reset()
 	recv_buffer_.clear();
 	send_buffer_.clear();
 	state_ = HTTP_RECV;
+	cgi_output_buf.clear();
+	cgi_input_buf_.clear();
 }
 
 bool Client::CGIProcessFinished()
 {
 	int   status;
-	pid_t pid = cgi_pid;
+	pid_t pid = cgi_ctx_.pid;
 	pid_t ret = waitpid(pid, &status, WNOHANG);
 	if (ret == 0)
 	{
@@ -232,11 +229,11 @@ bool Client::CGIProcessFinished()
 		else if (WIFSIGNALED(status))
 			send_buffer_ =
 			    handler.makeStatusResponse(HTTP_GATEWAY_TIME_OUT).toString();
-		cgi_pid = -1;
-		close(cgi_pipe_in);
-		close(cgi_pipe_out);
-		cgi_pipe_in = -1;
-		cgi_pipe_out = -1;
+		cgi_ctx_.pid = -1;
+		close(cgi_ctx_.stdin_pipe);
+		close(cgi_ctx_.stdout_pipe);
+		cgi_ctx_.stdin_pipe = -1;
+		cgi_ctx_.stdout_pipe = -1;
 	}
 	else
 	{
@@ -247,20 +244,23 @@ bool Client::CGIProcessFinished()
 	return true;
 }
 
-bool Client::writeRequestBody()
+void Client::appendCgiOutput(const char* buf, size_t size_of_bytes)
+{
+	cgi_output_buf.append(buf, size_of_bytes);
+}
+
+bool Client::writeRequestBody(int fd)
 {
 	// static const size_t FILE_CHUNK_SIZE = 512 * 1024;
 	char buf[1024 * 512];
 
-	std::cout << "I AM HERE\n";
-
 	if (!cgi_input_buf_.empty())
 	{
-		// std::cout << cgi_input_buf_ << '\n';
-		ssize_t r =
-		    write(cgi_pipe_in, cgi_input_buf_.data(), cgi_input_buf_.size());
+		ssize_t r = write(fd, cgi_input_buf_.data(), cgi_input_buf_.size());
 		if (r <= 0)
 		{
+			close(cgi_ctx_.stdin_pipe);
+			cgi_ctx_.stdin_pipe = -1;
 			return true;
 		}
 
@@ -295,6 +295,8 @@ bool Client::writeRequestBody()
 			close(request_body_fd_);
 			request_body_fd_ = -1;
 		}
+		close(cgi_ctx_.stdin_pipe);
+		cgi_ctx_.stdin_pipe = -1;
 		return true;
 	}
 	return false;
@@ -335,24 +337,30 @@ int Client::getClientFd() const
 	return this->fd_;
 }
 
-int Client::getFdCGI_in() const
-{
-	// return cgi.getFdCGI_in();
-	return cgi_pipe_in;
-}
+// int Client::getFdCGI_in() const
+// {
+// 	// return cgi.getFdCGI_in();
+// 	return cgi_pipe_in;
+// }
 
-int Client::getFdCGI_out() const
-{
-	// return cgi.getFdCGI_out();
-	return cgi_pipe_out;
-}
+// int Client::getFdCGI_out() const
+// {
+// 	// return cgi.getFdCGI_out();
+// 	return cgi_pipe_out;
+// }
 
 int Client::getHttpState() const
 {
 	return state_;
 }
 
+CgiContext Client::getCGIContext() const
+{
+	return cgi_ctx_;
+}
+
 void Client::setState(enum STATE state)
 {
 	state_ = state;
 }
+
