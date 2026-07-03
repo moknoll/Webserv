@@ -21,8 +21,12 @@ struct Location
 	std::string                   cgi_path;      // "/usr/bin/python3"
 	bool                          has_redirect;  //
 	bool                          has_cgi;       //
+	
 	Location();
-	Location(ServerConfig& srv);
+    Location(ServerConfig& srv);
+    Location(const Location& other);
+    Location& operator=(const Location& other);
+    ~Location();
 };
 
 struct ServerConfig
@@ -38,4 +42,7 @@ struct ServerConfig
 	std::vector< Location >       locations;   // all location blocks
 
 	ServerConfig();
+    ServerConfig(const ServerConfig& other);
+    ServerConfig& operator=(const ServerConfig& other);
+    ~ServerConfig();
 };

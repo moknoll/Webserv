@@ -8,8 +8,39 @@ ServerConfig::ServerConfig()
       index("index.html"),
       client_max_body_size(0),
       redirect(std::make_pair(-1, ""))
+{}
+
+ServerConfig::ServerConfig(const ServerConfig& other)
+    : host(other.host),
+      port(other.port),
+      server_name(other.server_name),
+      root(other.root),
+      index(other.index),
+      client_max_body_size(other.client_max_body_size),
+      redirect(other.redirect),
+      error_pages(other.error_pages),
+      locations(other.locations)
+{}
+
+ServerConfig& ServerConfig::operator=(const ServerConfig& other)
 {
+    if (this != &other)
+    {
+        host = other.host;
+        port = other.port;
+        server_name = other.server_name;
+        root = other.root;
+        index = other.index;
+        client_max_body_size = other.client_max_body_size;
+        redirect = other.redirect;
+        error_pages = other.error_pages;
+        locations = other.locations;
+    }
+    return *this;
 }
+
+ServerConfig::~ServerConfig() {}
+
 
 Location::Location()
     : path("/"),
@@ -23,8 +54,7 @@ Location::Location()
       cgi_path(""),
       has_redirect(false),
       has_cgi(false)
-{
-}
+{}
 
 
 Location::Location(ServerConfig &srv)
@@ -33,12 +63,50 @@ Location::Location(ServerConfig &srv)
       index(srv.index),
       autoindex(false),
       client_max_body_size(srv.client_max_body_size),
-      redirect(std::make_pair(-1, "")),
+      redirect(srv.redirect),
       upload_path(""),
       cgi_extension(""),
       cgi_path(""),
       has_redirect(false),
       has_cgi(false)
+{}
+
+Location::Location(const Location& other)
+    : path(other.path),
+      root(other.root),
+      index(other.index),
+      autoindex(other.autoindex),
+      client_max_body_size(other.client_max_body_size),
+      allowed_methods(other.allowed_methods),
+      error_pages(other.error_pages),
+      redirect(other.redirect),
+      upload_path(other.upload_path),
+      cgi_extension(other.cgi_extension),
+      cgi_path(other.cgi_path),
+      has_redirect(other.has_redirect),
+      has_cgi(other.has_cgi)
+{}
+
+Location& Location::operator=(const Location& other)
 {
+    if (this != &other)
+    {
+        path = other.path;
+        root = other.root;
+        index = other.index;
+        autoindex = other.autoindex;
+        client_max_body_size = other.client_max_body_size;
+        allowed_methods = other.allowed_methods;
+        error_pages = other.error_pages;
+        redirect = other.redirect;
+        upload_path = other.upload_path;
+        cgi_extension = other.cgi_extension;
+        cgi_path = other.cgi_path;
+        has_redirect = other.has_redirect;
+        has_cgi = other.has_cgi;
+    }
+    return *this;
 }
+
+Location::~Location() {}
 

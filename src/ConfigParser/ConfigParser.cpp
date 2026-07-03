@@ -101,7 +101,6 @@ size_t ConfigParser::parseSize(const std::string& s)
 	if (s.empty())
 		throw std::runtime_error("client_max_body_size: empty value");
 
-	// Якщо останній символ — літера (суфікс)
 	char        last = s[s.size() - 1];
 
 	size_t      multiplier = 1;
@@ -109,7 +108,7 @@ size_t ConfigParser::parseSize(const std::string& s)
 
 	if (last == 'K' || last == 'M' || last == 'G')
 	{
-		number = s.substr(0, s.size() - 1); // відкидаємо суфікс
+		number = s.substr(0, s.size() - 1);
 
 		if (last == 'K')
 			multiplier = 1024;
@@ -119,7 +118,6 @@ size_t ConfigParser::parseSize(const std::string& s)
 			multiplier = 1024 * 1024 * 1024;
 	}
 
-	// Перевіряємо, що number — це чисте число
 	for (size_t i = 0; i < number.size(); i++)
 		if (!isdigit(number[i]))
 			throw std::runtime_error("client_max_body_size: invalid number: "
@@ -131,7 +129,9 @@ size_t ConfigParser::parseSize(const std::string& s)
 
 void ConfigParser::validateMethod(const std::string& m)
 {
-	if (m != "GET" && m != "POST" && m != "DELETE")
+	if (m != "GET" && m != "POST" && m != "DELETE" && m != "HEAD" && m != "PUT" && m != "CONNECT"
+	    && m != "OPTIONS" && m != "TRACE" && m != "PATCH"
+	    && m != "MOVE")
 		throw std::runtime_error("wrong HTTP method: " + m);
 }
 
@@ -274,7 +274,7 @@ void ConfigParser::parseServer()
 			validateRedirectCode(code);
 
 			std::string path = tokenizer.next();
-			validatePath(path);
+			validateRedirectPath(path);
 
 			server.redirect = std::make_pair(code, path);
 			expect(";");
@@ -290,6 +290,8 @@ void ConfigParser::parseServer()
 		    "No root path location. Check and fix your .conf file");
 
 	servers.push_back(server);
+
+	// debugPrint();
 }
 
 // ---------------- Parse location block ----------------
@@ -401,6 +403,11 @@ void ConfigParser::parseLocation(ServerConfig& server)
 			throw std::runtime_error("unknown directive in location: " + tok);
 		}
 	}
+	
+	if (server.redirect.first != -1) {
+		loc.has_redirect = true;
+		loc.redirect = server.redirect;
+	}
 
 	server.locations.push_back(loc);
 }
@@ -421,3 +428,90 @@ bool ConfigParser::validateRootLocation(ServerConfig& server)
 	}
 	return false;
 }
+
+////////////// debug func for visual only. delete after use /////////////////////
+
+// void ConfigParser::debugPrint() const
+// {
+//     std::cout << "==================== PARSED CONFIG ====================\n";
+
+//     for (size_t i = 0; i < servers.size(); i++)
+//     {
+//         const ServerConfig& s = servers[i];
+
+//         std::cout << "\n-------------------- SERVER " << i << " --------------------\n";
+//         std::cout << "server_name: " << s.server_name << "\n";
+//         std::cout << "host:        " << s.host << "\n";
+//         std::cout << "port:        " << s.port << "\n";
+//         std::cout << "root:        " << s.root << "\n";
+//         std::cout << "index:       " << s.index << "\n";
+//         std::cout << "client_max_body_size: " << s.client_max_body_size << "\n";
+
+//         if (!s.redirect.first)
+//             std::cout << "redirect:    none\n";
+//         else
+//             std::cout << "redirect:    " << s.redirect.first
+//                       << " -> " << s.redirect.second << "\n";
+
+//         // Error pages
+//         std::cout << "error_pages:\n";
+//         for (std::map<int, std::string>::const_iterator it = s.error_pages.begin();
+//              it != s.error_pages.end(); ++it)
+//         {
+//             std::cout << "  " << it->first << " => " << it->second << "\n";
+//         }
+
+//         // Locations
+//         std::cout << "\n  ---- LOCATIONS ----\n";
+//         for (size_t j = 0; j < s.locations.size(); j++)
+//         {
+//             const Location& loc = s.locations[j];
+
+//             std::cout << "\n  Location " << j << ":\n";
+//             std::cout << "    path:        " << loc.path << "\n";
+//             std::cout << "    root:        " << loc.root << "\n";
+//             std::cout << "    index:       " << loc.index << "\n";
+//             std::cout << "    autoindex:   " << (loc.autoindex ? "on" : "off") << "\n";
+//             std::cout << "    client_max_body_size: " << loc.client_max_body_size << "\n";
+
+//             // Allowed methods
+//             std::cout << "    allowed_methods: ";
+//             if (loc.allowed_methods.empty())
+//                 std::cout << "(none)";
+//             else
+//             {
+//                 for (size_t k = 0; k < loc.allowed_methods.size(); k++)
+//                     std::cout << loc.allowed_methods[k] << " ";
+//             }
+//             std::cout << "\n";
+
+//             // Error pages
+//             std::cout << "    error_pages:\n";
+//             for (std::map<int, std::string>::const_iterator it = loc.error_pages.begin();
+//                  it != loc.error_pages.end(); ++it)
+//             {
+//                 std::cout << "      " << it->first << " => " << it->second << "\n";
+//             }
+
+//             // Redirect
+        
+//             std::cout << "    redirect: " << loc.redirect.first
+//                       << " -> " << loc.redirect.second << "\n";
+
+//             // Upload path
+//             std::cout << "    upload_path: ";
+//             if (loc.upload_path.empty())
+//                 std::cout << "(none)\n";
+//             else
+//                 std::cout << loc.upload_path << "\n";
+
+//             // CGI
+//             std::cout << "    CGI:\n";
+//             std::cout << "      has_cgi: " << (loc.has_cgi ? "yes" : "no") << "\n";
+//             std::cout << "      cgi_extension: " << loc.cgi_extension << "\n";
+//             std::cout << "      cgi_path:      " << loc.cgi_path << "\n";
+//         }
+//     }
+
+//     std::cout << "\n================== END PARSED CONFIG ==================\n";
+// }
