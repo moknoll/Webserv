@@ -49,7 +49,7 @@ class HttpRequest
 	std::string         getMethod() const;
 	std::string         getPath() const;
 	HeaderMap           getHeaders() const;
-	int                 getRequestStatus() const;
+	int                 getStatus() const;
 	size_t              getContentLenght() const;
 	size_t              getReceivedBytes() const;
 	std::string         getBoundary() const;

@@ -59,8 +59,6 @@ class Client
 	void        setRecvBuffer(const std::string& request);  // ??????????
 	void        setState(enum STATE state);
 
-	int         getFdCGI_in() const;
-	int         getFdCGI_out() const;
 	int         getHttpState() const;
 	CgiContext  getCGIContext() const;
 
@@ -82,4 +80,7 @@ class Client
 	Client();
 	Client(const Client& other);
 	Client& operator=(const Client& other);
+
+	void    safeClosePipeFds_();
 };
+

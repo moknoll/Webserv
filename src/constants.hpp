@@ -16,8 +16,13 @@
 #define SERVER_NAME_STR                      "Webserv"
 #define HTTP_VERSION                         "HTTP/1.1"
 
-#define SOCKET_ERROR -1
-#define BACKLOG      10 // How may pending connections queue will hold
+#define POLL_TIMEOUT                         3000
+#define MAX_CGI_TIMEOUT                      5
+#define REQUEST_READ_TIMEOUT                 60
+#define KEEPALIVE_TIMEOUT                    90
+
+#define SOCKET_ERROR                         -1
+#define BACKLOG                              10 // How may pending connections queue will hold
 
 #define OK                                   0
 #define ERROR                                -1
@@ -27,8 +32,8 @@
 #define DECLINED                             -5
 #define ABORT                                -6
 
-#define LF                                   '\n'   // Line Feed  (New line)
-#define CR                                   '\r'   // Carriage Return
+#define LF                                   '\n' // Line Feed  (New line)
+#define CR                                   '\r' // Carriage Return
 #define CRLF                                 "\x0d\x0a"
 
 #define HTTP_CONNECTION_CLOSE                1

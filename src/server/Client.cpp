@@ -3,9 +3,12 @@
 #include "../constants.hpp"
 #include "../lib/ws.hpp"
 
+#include <csignal>
 #include <cstddef>
 #include <cstdlib>
+#include <ctime>
 #include <fcntl.h>
+#include <ios>
 #include <iostream>
 #include <string>
 #include <sys/types.h>
@@ -15,9 +18,6 @@
 const size_t Client::MAX_CGI_BUFFER = 100 * 1024 * 1024;
 
 Client::Client(int fd, const ServerConfig& config) :
-        // cgi_pipe_in(-1),
-        // cgi_pipe_out(-1),
-        // cgi_pid(-1),
         config_(config),
         fd_(fd),
         keep_alive_(true),
@@ -35,13 +35,11 @@ Client::~Client()
 
 void Client::processRequest()
 {
-	if (request.getRequestStatus())
+	if (request.getStatus())
 	{
 		keep_alive_ = false;
 		state_ = HTTP_SEND;
-
-		send_buffer_ =
-		    handler.makeStatusResponse(request.getRequestStatus()).toString();
+		response = HttpResponse::error(request, request.getStatus());
 		return;
 	}
 
@@ -55,30 +53,27 @@ void Client::processRequest()
 
 		if (cgi_ctx_.exit_status)
 		{
-			response = handler.makeStatusResponse(cgi_ctx_.exit_status);
-			send_buffer_ = response.toString();
+			response = HttpResponse::error(request, cgi_ctx_.exit_status);
 			state_ = HTTP_SEND;
 			keep_alive_ = false;
 			return;
 		}
-
 		state_ = CGI_STATE;
 	}
 	else
 	{
 		response = handler.handle(request);
-		if (response.isReady()) // ???
-		{
-			send_buffer_ = response.toString();
-			state_ = HTTP_SEND;
-		}
+		state_ = HTTP_SEND;
 	}
 }
 
 std::string Client::serialize()
 {
 	if (send_buffer_.empty())
-		send_buffer_ = handler.getFileChunk();
+	{
+		send_buffer_ = response.nextChunk();
+	}
+	// send_buffer_ = handler.getFileChunk();
 
 	return send_buffer_;
 }
@@ -157,12 +152,14 @@ void Client::buildCGIResponse()
 	}
 	std::cout << "body size: " << body.size()
 	          << " content_length: " << content_length << '\n';
-	if (!have_content_type
-	    || (have_content_length && content_length != body.size()))
-
+	if (!have_content_type)
 	{
 		send_buffer_ = handler.makeStatusResponse(HTTP_BAD_GATEWAY).toString();
 		return;
+	}
+	if (have_content_length && content_length != body.size())
+	{
+		body = body.substr(0, content_length);
 	}
 
 	response.setStatus(status);
@@ -185,7 +182,16 @@ void Client::reset()
 	send_buffer_.clear();
 	state_ = HTTP_RECV;
 	cgi_output_buf.clear();
-	cgi_input_buf_.clear();
+}
+
+bool checkTimeOut(std::time_t start)
+{
+	std::time_t now = std::time(NULL);
+
+	if (now - start > 5)
+		return true;
+
+	return false;
 }
 
 bool Client::CGIProcessFinished()
@@ -195,6 +201,22 @@ bool Client::CGIProcessFinished()
 	pid_t ret = waitpid(pid, &status, WNOHANG);
 	if (ret == 0)
 	{
+		if (checkTimeOut(cgi_ctx_.start_time))
+		{
+			kill(cgi_ctx_.pid, SIGTERM);
+			pid_t r = waitpid(cgi_ctx_.pid, &status, WNOHANG);
+			if (r == 0)
+			{
+				std::cout << "process don't finished\n";
+				// kill(cgi_ctx_.pid, SIGINT);
+			}
+			send_buffer_ =
+			    handler.makeStatusResponse(HTTP_GATEWAY_TIME_OUT).toString();
+			cgi_ctx_.pid = -1;
+			safeClosePipeFds_();
+			state_ = HTTP_SEND;
+			return true;
+		}
 		return false;
 	}
 	else if (ret == pid)
@@ -205,11 +227,6 @@ bool Client::CGIProcessFinished()
 			if (code == 0)
 			{
 				buildCGIResponse();
-				// int cgi_status = cgi.buildResponse();
-				// if (cgi_status == HTTP_OK)
-				// send_buffer_ = cgi.getResponse().toString();
-				// else
-				// send_buffer_ = makeStatusResponse(cgi_status).toString();
 			}
 			else
 			{
@@ -218,14 +235,8 @@ bool Client::CGIProcessFinished()
 				        .toString();
 			}
 		}
-		else if (WIFSIGNALED(status))
-			send_buffer_ =
-			    handler.makeStatusResponse(HTTP_GATEWAY_TIME_OUT).toString();
 		cgi_ctx_.pid = -1;
-		close(cgi_ctx_.stdin_pipe);
-		close(cgi_ctx_.stdout_pipe);
-		cgi_ctx_.stdin_pipe = -1;
-		cgi_ctx_.stdout_pipe = -1;
+		safeClosePipeFds_();
 	}
 	else
 	{
@@ -246,51 +257,35 @@ bool Client::writeRequestBody(int fd)
 	// static const size_t FILE_CHUNK_SIZE = 512 * 1024;
 	char buf[1024 * 512];
 
-	if (!cgi_input_buf_.empty())
+	if (!cgi_ctx_.request_body.is_open())
 	{
-		ssize_t r = write(fd, cgi_input_buf_.data(), cgi_input_buf_.size());
-		if (r <= 0)
+		if (cgi_ctx_.stdin_pipe != -1)
 		{
 			close(cgi_ctx_.stdin_pipe);
 			cgi_ctx_.stdin_pipe = -1;
-			return true;
 		}
-
-		size_t sent = static_cast< size_t >(r);
-		cgi_input_buf_.erase(0, sent);
+		return true;
 	}
 
-	if (cgi_input_buf_.empty() && request_body_fd_ != -1)
-	{
-		// ssize_t n = read(request_body_fd_, &cgi_input_buf_[0],
-		// FILE_CHUNK_SIZE);
-		ssize_t n = read(request_body_fd_, buf, sizeof(buf));
-		if (n <= 0)
-		{
-			close(request_body_fd_);
-			request_body_fd_ = -1;
-		}
+	cgi_ctx_.request_body.read(buf, sizeof(buf));
+	// if (cgi_ctx_.request_body_.fail()) ????
+	std::streamsize read_bytes = cgi_ctx_.request_body.gcount();
 
-		cgi_input_buf_.append(buf, n);
-		// if (n > 0 && static_cast< size_t >(n) < FILE_CHUNK_SIZE)
-		// {
-		// 	cgi_input_buf_.resize(static_cast< size_t >(n));
-		// 	close(request_body_fd_);
-		// 	request_body_fd_ = -1;
-		// }
+	ssize_t         sent_bytes = write(fd, buf, read_bytes);
+	if (sent_bytes < read_bytes)
+	{
+		ssize_t rest_bytes = read_bytes - sent_bytes;
+		cgi_ctx_.request_body.seekg(-(rest_bytes), std::ios::cur);
 	}
 
-	if (cgi_input_buf_.empty())
+	if (cgi_ctx_.request_body.eof())
 	{
-		if (request_body_fd_ != -1)
-		{
-			close(request_body_fd_);
-			request_body_fd_ = -1;
-		}
+		cgi_ctx_.request_body.close();
 		close(cgi_ctx_.stdin_pipe);
 		cgi_ctx_.stdin_pipe = -1;
 		return true;
 	}
+
 	return false;
 }
 
@@ -329,18 +324,6 @@ int Client::getClientFd() const
 	return this->fd_;
 }
 
-// int Client::getFdCGI_in() const
-// {
-// 	// return cgi.getFdCGI_in();
-// 	return cgi_pipe_in;
-// }
-
-// int Client::getFdCGI_out() const
-// {
-// 	// return cgi.getFdCGI_out();
-// 	return cgi_pipe_out;
-// }
-
 int Client::getHttpState() const
 {
 	return state_;
@@ -356,3 +339,16 @@ void Client::setState(enum STATE state)
 	state_ = state;
 }
 
+void Client::safeClosePipeFds_()
+{
+	if (cgi_ctx_.stdin_pipe != -1)
+	{
+		close(cgi_ctx_.stdin_pipe);
+		cgi_ctx_.stdin_pipe = -1;
+	}
+	if (cgi_ctx_.stdout_pipe != -1)
+	{
+		close(cgi_ctx_.stdout_pipe);
+		cgi_ctx_.stdout_pipe = -1;
+	}
+}

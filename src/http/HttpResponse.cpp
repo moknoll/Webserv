@@ -11,29 +11,46 @@
 /* ************************************************************************** */
 
 #include "HttpResponse.hpp"
-#include "../lib/ws.hpp"
 #include "../constants.hpp"
+#include "../lib/ws.hpp"
+#include "HttpRequest.hpp"
 
+#include <cerrno>
 #include <cstddef>
 #include <ctime>
+#include <dirent.h>
+#include <fcntl.h>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <unistd.h>
 #include <vector>
 
-HttpResponse::HttpResponse() : status_(0), status_line_(""), body_("") {}
+const size_t HttpResponse::FILE_CHUNK_SIZE = 512 * 1024;
 
-HttpResponse::HttpResponse(const int status) : status_(status)
+HttpResponse::HttpResponse() :
+        status_(0),
+        status_line_(""),
+        body_(""),
+        fd_(-1)
+{
+}
+
+HttpResponse::HttpResponse(const int status) :
+        status_(status)
 {
 	this->status_line_ = "HTTP/1.1 ";
 	this->status_line_ += getStatusMsg(status_);
 	this->status_line_ += CRLF;
 }
 
-HttpResponse::HttpResponse(const HttpResponse& other)
-    : status_(other.status_), status_line_(other.status_line_),
-      headers_(other.headers_), body_(other.body_)
+HttpResponse::HttpResponse(const HttpResponse& other) :
+        status_(other.status_),
+        status_line_(other.status_line_),
+        headers_(other.headers_),
+        body_(other.body_),
+        fd_(other.fd_)
 {
 }
 
@@ -45,6 +62,7 @@ void HttpResponse::reset()
 	status_line_.clear();
 	headers_.clear();
 	body_.clear();
+	closeFile();
 }
 
 bool HttpResponse::isReady() const
@@ -60,8 +78,124 @@ HttpResponse& HttpResponse::operator=(const HttpResponse& other)
 		status_line_ = other.status_line_;
 		headers_ = other.headers_;
 		body_ = other.body_;
+		fd_ = other.fd_;
 	}
 	return *this;
+}
+
+HttpResponse HttpResponse::error(const HttpRequest& req, int status)
+{
+	HttpResponse res(status);
+	std::string  content;
+
+	if (status == HTTP_NOT_ALLOWED)
+	{
+		std::string methods = "";
+		for (size_t i = 0; i < req.getLocation().allowed_methods.size(); i++)
+		{
+			if (i != 0)
+				methods += ", ";
+			methods += req.getLocation().allowed_methods[i];
+		}
+		res.setHeader("Allow", methods);
+	}
+	std::map< int, std::string >::const_iterator it =
+	    req.getConfig().error_pages.find(status);
+	if (it != req.getConfig().error_pages.end())
+	{
+		ws::readFile(it->second.c_str(), content);
+	}
+
+	if (content.empty())
+		content = res.buildErrorPage(status);
+
+	if (status < HTTP_OK || status == HTTP_NO_CONTENT
+	    || status == HTTP_NOT_MODIFIED || req.getMethod() == "HEAD")
+		content = "";
+
+	res.setFullResponse(content, "html");
+	return res;
+}
+
+HttpResponse HttpResponse::file(const HttpRequest& req, const std::string& path)
+{
+	int fd = open(path.c_str(), O_RDONLY);
+	if (fd == -1)
+	{
+		switch (errno)
+		{
+			case ENOENT: return HttpResponse::error(req, HTTP_NOT_FOUND);
+			case EACCES: return HttpResponse::error(req, HTTP_FORBIDDEN);
+			case EISDIR: return HttpResponse::error(req, HTTP_FORBIDDEN);
+			default:
+				return HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	HttpResponse res(HTTP_OK);
+	res.setFullResponse("", ws::getFileExtension(path));
+	res.setFileFd(fd);
+	size_t cl = ws::getFileSize(path.c_str());
+	res.setHeader("Content-Length", ws::to_string(cl));
+	return res;
+}
+
+HttpResponse HttpResponse::directory(const HttpRequest& req)
+{
+	const std::string path = req.getPath();
+
+	DIR*              dir = opendir(path.c_str());
+	if (dir == NULL)
+		return HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
+
+	std::vector< std::string > files;
+	struct dirent*             entry;
+
+	while ((entry = readdir(dir)) != NULL)
+	{
+		std::string name = entry->d_name;
+		if (name == "." || name == "..")
+			continue;
+		if (ws::isDirectory(path + name) && name[name.size() - 1] != '/')
+			name += '/';
+		files.push_back(name);
+	}
+
+	closedir(dir);
+
+	HttpResponse res(HTTP_OK);
+	std::string  content = res.buildDirectoryPage(files, path, req.getURI());
+	res.setFullResponse(content, "html");
+	return res;
+}
+
+std::string HttpResponse::nextChunk()
+{
+	if (status_ != 0)
+	{
+		std::string buf = toString();
+		status_ = 0;
+		return buf;
+	}
+
+	if (fd_ == -1)
+		return "";
+
+	std::string buffer(FILE_CHUNK_SIZE, '\0');
+	ssize_t     n = read(fd_, &buffer[0], FILE_CHUNK_SIZE);
+	if (n <= 0)
+	{
+		closeFile();
+		return "";
+	}
+
+	if (static_cast< size_t >(n) < FILE_CHUNK_SIZE)
+	{
+		buffer.resize(static_cast< size_t >(n));
+		closeFile();
+	}
+
+	return buffer;
 }
 
 /*
@@ -124,6 +258,11 @@ void HttpResponse::setBody(const std::string& content)
 {
 	body_ = content;
 	setHeader("Content-Length", ws::to_string(content.size()));
+}
+
+void HttpResponse::setFileFd(int fd)
+{
+	this->fd_ = fd;
 }
 
 std::string HttpResponse::buildErrorPage(int err_status) const
@@ -271,3 +410,11 @@ const std::string HttpResponse::getMimeType(const std::string& ext) const
 }
 // clang-format on
 
+void HttpResponse::closeFile()
+{
+	if (fd_ != -1)
+	{
+		close(fd_);
+		fd_ = -1;
+	}
+}

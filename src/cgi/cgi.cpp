@@ -8,7 +8,8 @@
 #include <cstddef>
 #include <ctime>
 #include <fcntl.h>
-#include <iostream>
+#include <fstream>
+#include <ios>
 #include <string.h>
 #include <string>
 #include <sys/types.h>
@@ -25,6 +26,14 @@ CgiContext::CgiContext()
 	request_body_fd = -1;
 }
 
+CgiContext::CgiContext(const CgiContext& other) :
+        pid(other.pid),
+        stdin_pipe(other.stdin_pipe),
+        stdout_pipe(other.stdout_pipe),
+        request_body_fd(other.request_body_fd)
+
+{
+}
 static std::string normalizeHeader(std::string name)
 {
 	std::replace(name.begin(), name.end(), '-', '_');
@@ -209,9 +218,6 @@ bool executeChild(CgiContext&                       ctx,
 	ctx.stdin_pipe = pipe_in[1];
 	ctx.stdout_pipe = pipe_out[0];
 
-	fcntl(ctx.stdin_pipe, F_SETFL, O_NONBLOCK);
-	fcntl(ctx.stdout_pipe, F_SETFL, O_NONBLOCK);
-
 	return true;
 }
 
@@ -231,8 +237,11 @@ void executeCGI(const HttpRequest& req, CgiContext& ctx)
 	fcntl(ctx.stdout_pipe, F_SETFL, O_NONBLOCK);
 	if (req.getMethod() == "POST")
 	{
-		ctx.request_body_fd = open(req.getBodyTempFileName().c_str(), O_RDONLY);
-		if (ctx.request_body_fd == -1)
+		// ctx.request_body_fd = open(req.getBodyTempFileName().c_str(),
+		// O_RDONLY);
+		ctx.request_body.open(req.getBodyTempFileName().c_str(),
+		                      std::ios::in | std::ios::binary);
+		if (!ctx.request_body.is_open())
 		{
 			close(ctx.stdin_pipe);
 			close(ctx.stdout_pipe);
@@ -243,6 +252,18 @@ void executeCGI(const HttpRequest& req, CgiContext& ctx)
 			ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
 			return;
 		}
+
+		// if (ctx.request_body_fd == -1)
+		// {
+		// 	close(ctx.stdin_pipe);
+		// 	close(ctx.stdout_pipe);
+		// 	kill(ctx.pid, SIGTERM);
+		// 	ctx.pid = -1;
+		// 	ctx.stdin_pipe = -1;
+		// 	ctx.stdout_pipe = -1;
+		// 	ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
+		// 	return;
+		// }
 		fcntl(ctx.stdin_pipe, F_SETFL, O_NONBLOCK);
 	}
 	else

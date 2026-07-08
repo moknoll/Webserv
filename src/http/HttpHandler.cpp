@@ -31,13 +31,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-const size_t HttpHandler::FILE_CHUNK_SIZE = 512 * 1024;
+// const size_t HttpHandler::FILE_CHUNK_SIZE = 512 * 1024;
 
 HttpHandler::HttpHandler(const ServerConfig& cfg) :
         config_(cfg),
         loc_(),
-        error_(0),
-        fd_(-1)
+        error_(0)
+// fd_(-1)
 {
 }
 
@@ -45,30 +45,27 @@ HttpHandler::HttpHandler(const HttpHandler& other) :
         config_(other.config_),
         loc_(other.loc_),
         error_(other.error_),
-        upload_file_path_(other.upload_file_path_),
-        fd_(other.fd_)
+        upload_file_path_(other.upload_file_path_)
+// fd_(other.fd_)
 {
 }
 
 HttpHandler::~HttpHandler()
 {
-	closeFile();
+	// closeFile();
 }
 
 HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
-	// const std::string& uri = req.getURI();
-	const std::string& host = req.getHeader("Host");
-
 	loc_ = req.getLocation();
 
-	if (loc_.has_redirect)
-		return redirect(loc_.redirect.first, loc_.redirect.second, host);
+	if (this->loc_.has_redirect)
+		return redirect(loc_.redirect.first, loc_.redirect.second);
 
 	const std::string& method = req.getMethod();
 
 	if (!isAllowedMethod(method))
-		return makeStatusResponse(HTTP_NOT_ALLOWED);
+		return HttpResponse::error(req, HTTP_NOT_ALLOWED);
 
 	if (method == "GET")
 		return handleGET(req);
@@ -77,34 +74,31 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 	else if (method == "DELETE")
 		return handleDELETE(req);
 
-	return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+	return HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
 }
 
 HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 {
-	const std::string&     raw_uri = req.getURI();
-	std::string::size_type p = raw_uri.find('?');
-	const std::string&     uri = raw_uri.substr(0, p);
-	const std::string&     host = req.getHeader("Host");
-	std::string            path = req.getPath();
+	std::string path = req.getPath();
+	std::cout << "PATH: " << path << std::endl;
 
 	if (ws::isDirectory(path))
 	{
-		if (uri != "/" && uri[uri.size() - 1] != '/')
-			return redirect(HTTP_MOVED_PERMANENTLY, uri + "/", host);
+		if (req.getURI() != "/" && req.getURI()[req.getURI().size() - 1] != '/')
+			return redirect(HTTP_MOVED_PERMANENTLY, req.getURI() + "/");
 
 		std::string index_file = path + loc_.index;
 
 		if (ws::checkFile(index_file.c_str()) == FILE_OK)
-			return makeFileResponse(index_file);
+			return HttpResponse::file(req, index_file);
 
 		if (loc_.autoindex)
-			return makeDirectoryListingResponse(path, uri);
+			return HttpResponse::directory(req);
 
-		return makeStatusResponse(HTTP_FORBIDDEN);
+		return HttpResponse::error(req, HTTP_FORBIDDEN);
 	}
 
-	return makeFileResponse(path);
+	return HttpResponse::file(req, path);
 }
 
 bool HttpHandler::validateUploadPath(const std::string& path)
@@ -467,15 +461,10 @@ HttpResponse HttpHandler::makeStatusResponse(int status)
 	return res;
 }
 
-HttpResponse HttpHandler::redirect(int                status,
-                                   const std::string& target,
-                                   const std::string& host)
+HttpResponse HttpHandler::redirect(int status, const std::string& target)
 {
 	HttpResponse res(status);
 	std::string  t = target;
-
-	if (target[0] == '/')
-		t = "http://" + host + target;
 
 	res.setHeader("Location", t);
 
@@ -484,95 +473,80 @@ HttpResponse HttpHandler::redirect(int                status,
 	return res;
 }
 
-HttpResponse HttpHandler::makeFileResponse(const std::string& path)
-{
-	switch (ws::checkFile(path.c_str()))
-	{
-		case FILE_OK:        break;
-		case ERR_NOT_FOUND:  return makeStatusResponse(HTTP_NOT_FOUND);
-		case ERR_PERMISSION: return makeStatusResponse(HTTP_FORBIDDEN);
-		case ERR_IS_DIR:     return makeStatusResponse(HTTP_FORBIDDEN);
-		default:             return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-	}
-
-	this->fd_ = open(path.c_str(), O_RDONLY);
-	if (fd_ == -1)
-		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-
-	HttpResponse res(HTTP_OK);
-	size_t       cl = ws::getFileSize(path.c_str());
-	res.setFullResponse("", ws::getFileExtension(path));
-	res.setHeader("Content-Length", ws::to_string(cl));
-	return res;
-}
-
-std::string HttpHandler::getFileChunk()
-{
-	if (fd_ == -1)
-		return "";
-
-	std::string buffer(FILE_CHUNK_SIZE, '\0');
-	ssize_t     n = read(fd_, &buffer[0], FILE_CHUNK_SIZE);
-	if (n <= 0)
-	{
-		closeFile();
-		return "";
-	}
-
-	if (static_cast< size_t >(n) < FILE_CHUNK_SIZE)
-	{
-		buffer.resize(static_cast< size_t >(n));
-		closeFile();
-	}
-
-	return buffer;
-}
-
-// std::string HttpHandler::buildPath(const std::string& uri) const
+// HttpResponse HttpHandler::makeFileResponse(const std::string& path)
 // {
-// 	std::string sub_uri = uri.substr(loc_->path.length());
-// 	std::string path = loc_->root;
-//
-// 	if (!path.empty() && path[path.length() - 1] != '/')
-// 		path += '/';
-//
-// 	if (!sub_uri.empty() && sub_uri[0] == '/')
-// 		path += sub_uri.substr(1);
-// 	else
+// 	switch (ws::checkFile(path.c_str()))
 // 	{
-// 		path += sub_uri;
+// 		case FILE_OK:        break;
+// 		case ERR_NOT_FOUND:  return makeStatusResponse(HTTP_NOT_FOUND);
+// 		case ERR_PERMISSION: return makeStatusResponse(HTTP_FORBIDDEN);
+// 		case ERR_IS_DIR:     return makeStatusResponse(HTTP_FORBIDDEN);
+// 		default:             return
+// makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 // 	}
 //
-// 	return path;
+// 	this->fd_ = open(path.c_str(), O_RDONLY);
+// 	if (fd_ == -1)
+// 		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+//
+// 	HttpResponse res(HTTP_OK);
+// 	size_t       cl = ws::getFileSize(path.c_str());
+// 	res.setFullResponse("", ws::getFileExtension(path));
+// 	res.setHeader("Content-Length", ws::to_string(cl));
+// 	return res;
 // }
 
-HttpResponse HttpHandler::makeDirectoryListingResponse(const std::string& path,
-                                                       const std::string& uri)
-{
-	DIR* dir = opendir(path.c_str());
-	if (dir == NULL)
-		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+// std::string HttpHandler::getFileChunk()
+// {
+// 	if (fd_ == -1)
+// 		return "";
+//
+// 	std::string buffer(FILE_CHUNK_SIZE, '\0');
+// 	ssize_t     n = read(fd_, &buffer[0], FILE_CHUNK_SIZE);
+// 	if (n <= 0)
+// 	{
+// 		closeFile();
+// 		return "";
+// 	}
+//
+// 	if (static_cast< size_t >(n) < FILE_CHUNK_SIZE)
+// 	{
+// 		buffer.resize(static_cast< size_t >(n));
+// 		closeFile();
+// 	}
+//
+// 	return buffer;
+// }
 
-	std::vector< std::string > files;
-	struct dirent*             entry;
-
-	while ((entry = readdir(dir)) != NULL)
-	{
-		std::string name = entry->d_name;
-		if (name == "." || name == "..")
-			continue;
-		if (ws::isDirectory(path + name) && name[name.size() - 1] != '/')
-			name += '/';
-		files.push_back(name);
-	}
-
-	closedir(dir);
-
-	HttpResponse res(HTTP_OK);
-	std::string  content = res.buildDirectoryPage(files, path, uri);
-	res.setFullResponse(content, "html");
-	return res;
-}
+// HttpResponse HttpHandler::makeDirectoryListingResponse(const std::string&
+// path,
+//                                                        const std::string&
+//                                                        uri)
+// {
+// 	DIR* dir = opendir(path.c_str());
+// 	if (dir == NULL)
+// 		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+//
+// 	std::vector< std::string > files;
+// 	struct dirent*             entry;
+//
+// 	while ((entry = readdir(dir)) != NULL)
+// 	{
+// 		std::string name = entry->d_name;
+// 		if (name == "." || name == "..")
+// 			continue;
+// 		if (ws::isDirectory(path + name) && name[name.size() - 1] != '/')
+// 			name += '/';
+// 		files.push_back(name);
+// 	}
+//
+// 	closedir(dir);
+//
+// 	HttpResponse res(HTTP_OK);
+// 	std::string  content = res.buildDirectoryPage(files, path, uri);
+// 	res.setFullResponse(content, "html");
+// 	return res;
+// }
 
 bool HttpHandler::isAllowedMethod(const std::string& method) const
 {
@@ -587,16 +561,16 @@ bool HttpHandler::isAllowedMethod(const std::string& method) const
 void HttpHandler::reset()
 {
 	loc_ = Location();
-	closeFile();
+	// closeFile();
 	error_ = 0;
 	upload_file_path_.clear();
 }
 
-void HttpHandler::closeFile()
-{
-	if (fd_ != -1)
-	{
-		close(fd_);
-		fd_ = -1;
-	}
-}
+// void HttpHandler::closeFile()
+// {
+// 	if (fd_ != -1)
+// 	{
+// 		close(fd_);
+// 		fd_ = -1;
+// 	}
+// }

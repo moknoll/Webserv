@@ -227,7 +227,7 @@ void HttpRequest::parseChunked(std::string& raw_data)
 
 bool HttpRequest::saveBodyToTempFile(std::string& raw_data)
 {
-	body_temp_file_ = "/tmp/wsload_" + ws::randString();
+	body_temp_file_ = "./wsload_" + ws::randString();
 
 	if (fd_ == -1)
 	{
@@ -470,7 +470,7 @@ const std::string HttpRequest::getbody() const
 	return body_;
 }
 
-int HttpRequest::getRequestStatus() const
+int HttpRequest::getStatus() const
 {
 	return this->err_status_;
 }
