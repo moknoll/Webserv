@@ -197,7 +197,23 @@ curl -X POST -H "Content-Type: application/octet-stream" -H "X-Filename: photo.j
 - [RFC 7230 - HTTP/1.1: Message Syntax and Routing](https://datatracker.ietf.org/doc/html/rfc7230)
 - [MDN Web Docs - HTTP Guides](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides)
 - [MDN Web Docs - How the Web Works](https://developer.mozilla.org/en-US/docs/Learn_web_development/Getting_started/Web_standards/How_the_web_works)
+- [Nginx Docs](https://nginx.org/en/docs)
 
 ### Socket Programming
-
 - [Beej's Guide to Network Programming](https://beej.us/guide/bgnet/html/split/)
+
+## AI Usage 
+**Documentation and Comments**
+- README structure and formatting
+- Documentation clarity
+- Code comments and explanations
+  
+**Research and Learning**
+- Explanation of network programming concetps
+- HTTP implemetntaion of nginx
+  
+**Code Review and Debugging**
+- Review code structure
+- Identify possible bugs and edge cases
+- Discuss possible solutions and improvements
+
