@@ -1,0 +1,230 @@
+#!/usr/bin/python
+
+import sys
+
+body = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webserv CGI</title>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:Arial, Helvetica, sans-serif;
+    min-height:100vh;
+    background:linear-gradient(135deg,#1f2937,#0f172a);
+    color:white;
+}
+
+.background{
+    position:fixed;
+    inset:0;
+    background:
+        radial-gradient(circle at top left, rgba(0,140,255,.2), transparent 40%),
+        radial-gradient(circle at bottom right, rgba(0,255,180,.15), transparent 40%);
+    z-index:-1;
+}
+
+.navbar{
+    height:70px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:0 40px;
+    background:rgba(15,23,42,.95);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(255,255,255,.1);
+}
+
+.logo{
+    font-size:28px;
+    font-weight:bold;
+}
+
+.logo a{
+    color:white;
+    text-decoration:none;
+}
+
+.container{
+    width:90%;
+    max-width:900px;
+    margin:40px auto;
+}
+
+.box{
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.15);
+    backdrop-filter:blur(10px);
+    border-radius:15px;
+    padding:30px;
+    margin:25px 0;
+    text-align:center;
+    transition:.3s;
+}
+
+.box:hover{
+    transform:translateY(-5px);
+    box-shadow:0 10px 30px rgba(0,0,0,.4);
+}
+
+img{
+    max-width:100%;
+    border-radius:10px;
+    box-shadow:0 10px 25px rgba(0,0,0,.4);
+}
+
+h1{
+    font-size:3rem;
+    margin-bottom:20px;
+}
+
+input[type=text]{
+    width:280px;
+    padding:12px;
+    border:none;
+    border-radius:8px;
+    font-size:16px;
+    outline:none;
+    margin-right:10px;
+}
+
+input[type=submit]{
+    padding:12px 30px;
+    border:none;
+    border-radius:8px;
+    background:#3b82f6;
+    color:white;
+    font-size:16px;
+    cursor:pointer;
+    transition:.3s;
+}
+
+input[type=submit]:hover{
+    background:#2563eb;
+    transform:scale(1.05);
+}
+
+footer{
+    text-align:center;
+    margin:40px 0;
+    color:#cbd5e1;
+}
+
+/* ===== Navigation ===== */
+
+.navbar {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    height: 70px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    padding: 0 40px;
+
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(12px);
+
+    border-bottom: 1px solid rgba(255,255,255,.1);
+
+    z-index: 1000;
+}
+
+.logo a {
+    color: white;
+    text-decoration: none;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.nav-links {
+    display: flex;
+    list-style: none;
+    gap: 25px;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    font-size: 18px;
+
+    transition: .3s;
+}
+
+.nav-links a:hover {
+    color: #3b82f6;
+}
+
+.container {
+    width: 90%;
+    max-width: 1000px;
+    margin: 40px auto;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="background"></div>
+
+
+<nav class="navbar">
+		<div class="logo">
+			<a href="/">Webserv</a>
+		</div>
+
+		<ul class="nav-links">
+			<li><a href="/cgi-bin/helloCGI.py">Home</a></li>
+			<li><a href="/cgi-bin/upload.py">Upload</a></li>
+			<li><a href="/cgi-bin/form-handler.py">Form handler</a></li>
+			<li><a href="/cgi-bin/session_management.py">Session management</a></li>
+			<li><a href="https://github.com/">GitHub</a></li>
+		</ul>
+	</nav>
+
+
+<div class="container">
+
+    <div class="box">
+        <h1>CGI </h1>
+        <p>Python CGI example running on Webserv.</p>
+    </div>
+
+    <div class="box">
+        <img src="/lang.gif" alt="Hello CGI">
+    </div>
+
+    <div class="box">
+        <form method="POST" action="/cgi-bin/env-view.py">
+            <input type="text" name="username" value="test">
+            <input type="submit" value="Send">
+        </form>
+    </div>
+
+</div>
+
+<footer>
+    Webserv by [nmagomad] [mknoll] [oklimov]
+</footer>
+
+</body>
+</html>
+"""
+
+print("Content-Type: text/html\r")
+print(f"Content-Length: {len(body.encode('utf-8'))}\r")
+print("\r")
+sys.stdout.write(body)

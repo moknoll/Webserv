@@ -1,7 +1,9 @@
 #include "Client.hpp"
 #include "../cgi/cgi.hpp"
 #include "../constants.hpp"
+#include "../http/HttpHandler.hpp"
 #include "../lib/ws.hpp"
+#include "../logger/Logger.hpp"
 
 #include <csignal>
 #include <cstddef>
@@ -24,7 +26,8 @@ Client::Client(int fd, const ServerConfig& config) :
         state_(HTTP_RECV),
         request(config),
         response(),
-        handler(config)
+        // handler(config),
+        i(0)
 {
 }
 
@@ -46,10 +49,9 @@ void Client::processRequest()
 	if (request.getLocation().has_cgi)
 	{
 		executeCGI(request, cgi_ctx_);
-		request_body_fd_ = cgi_ctx_.request_body_fd;
+		// request_body_fd_ = cgi_ctx_.request_body_fd;
 
 		cgi_output_buf.clear();
-		cgi_input_buf_.clear();
 
 		if (cgi_ctx_.exit_status)
 		{
@@ -62,7 +64,8 @@ void Client::processRequest()
 	}
 	else
 	{
-		response = handler.handle(request);
+		HttpHandler h(config_);
+		response = h.handle(request);
 		state_ = HTTP_SEND;
 	}
 }
@@ -95,8 +98,7 @@ void Client::buildCGIResponse()
 		sep = cgi_output_buf.find("\n\n");
 		if (sep == std::string::npos)
 		{
-			send_buffer_ =
-			    handler.makeStatusResponse(HTTP_BAD_GATEWAY).toString();
+			response = HttpResponse::error(request, HTTP_BAD_GATEWAY);
 			return;
 		}
 
@@ -120,8 +122,7 @@ void Client::buildCGIResponse()
 		size_t c = line.find(':');
 		if (c == std::string::npos)
 		{
-			send_buffer_ =
-			    handler.makeStatusResponse(HTTP_BAD_GATEWAY).toString();
+			response = HttpResponse::error(request, HTTP_BAD_GATEWAY);
 			return;
 		}
 
@@ -154,7 +155,7 @@ void Client::buildCGIResponse()
 	          << " content_length: " << content_length << '\n';
 	if (!have_content_type)
 	{
-		send_buffer_ = handler.makeStatusResponse(HTTP_BAD_GATEWAY).toString();
+		response = HttpResponse::error(request, HTTP_BAD_GATEWAY);
 		return;
 	}
 	if (have_content_length && content_length != body.size())
@@ -175,7 +176,7 @@ void Client::parseRequest(const char* buffer, size_t size)
 
 void Client::reset()
 {
-	handler.reset();
+	// handler.reset();
 	request.reset();
 	response.reset();
 	recv_buffer_.clear();
@@ -210,8 +211,7 @@ bool Client::CGIProcessFinished()
 				std::cout << "process don't finished\n";
 				// kill(cgi_ctx_.pid, SIGINT);
 			}
-			send_buffer_ =
-			    handler.makeStatusResponse(HTTP_GATEWAY_TIME_OUT).toString();
+			response = HttpResponse::error(request, HTTP_GATEWAY_TIME_OUT);
 			cgi_ctx_.pid = -1;
 			safeClosePipeFds_();
 			state_ = HTTP_SEND;
@@ -230,9 +230,8 @@ bool Client::CGIProcessFinished()
 			}
 			else
 			{
-				send_buffer_ =
-				    handler.makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR)
-				        .toString();
+				response =
+				    HttpResponse::error(request, HTTP_INTERNAL_SERVER_ERROR);
 			}
 		}
 		cgi_ctx_.pid = -1;
@@ -240,8 +239,7 @@ bool Client::CGIProcessFinished()
 	}
 	else
 	{
-		send_buffer_ =
-		    handler.makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR).toString();
+		response = HttpResponse::error(request, HTTP_INTERNAL_SERVER_ERROR);
 	}
 	state_ = HTTP_SEND;
 	return true;
@@ -254,6 +252,7 @@ void Client::appendCgiOutput(const char* buf, size_t size_of_bytes)
 
 bool Client::writeRequestBody(int fd)
 {
+	++i;
 	// static const size_t FILE_CHUNK_SIZE = 512 * 1024;
 	char buf[1024 * 512];
 
@@ -272,12 +271,26 @@ bool Client::writeRequestBody(int fd)
 	std::streamsize read_bytes = cgi_ctx_.request_body.gcount();
 
 	ssize_t         sent_bytes = write(fd, buf, read_bytes);
-	if (sent_bytes < read_bytes)
+	if (sent_bytes <= 0)
 	{
+		if (cgi_ctx_.request_body.eof())
+			cgi_ctx_.request_body.clear();
+		cgi_ctx_.request_body.seekg(-(read_bytes), std::ios::cur);
+	}
+	if (sent_bytes > 0 && sent_bytes < read_bytes)
+	{
+		if (cgi_ctx_.request_body.eof())
+			cgi_ctx_.request_body.clear();
 		ssize_t rest_bytes = read_bytes - sent_bytes;
+		LOG_DEBUG("rest_bytes: " + ws::to_string(rest_bytes));
 		cgi_ctx_.request_body.seekg(-(rest_bytes), std::ios::cur);
 	}
 
+	LOG_DEBUG("read: " + ws::to_string(read_bytes));
+	LOG_DEBUG("sent: " + ws::to_string(sent_bytes));
+
+	// if (i == 5)
+	// 	std::exit(10);
 	if (cgi_ctx_.request_body.eof())
 	{
 		cgi_ctx_.request_body.close();

@@ -13,6 +13,7 @@
 #include "HttpResponse.hpp"
 #include "../constants.hpp"
 #include "../lib/ws.hpp"
+#include "../logger/Logger.hpp"
 #include "HttpRequest.hpp"
 
 #include <cerrno>
@@ -33,12 +34,15 @@ HttpResponse::HttpResponse() :
         status_(0),
         status_line_(""),
         body_(""),
-        fd_(-1)
+        fd_(-1),
+        start_send_(false)
 {
 }
 
 HttpResponse::HttpResponse(const int status) :
-        status_(status)
+        status_(status),
+        fd_(-1),
+        start_send_(false)
 {
 	this->status_line_ = "HTTP/1.1 ";
 	this->status_line_ += getStatusMsg(status_);
@@ -50,7 +54,8 @@ HttpResponse::HttpResponse(const HttpResponse& other) :
         status_line_(other.status_line_),
         headers_(other.headers_),
         body_(other.body_),
-        fd_(other.fd_)
+        fd_(other.fd_),
+        start_send_(other.start_send_)
 {
 }
 
@@ -62,12 +67,8 @@ void HttpResponse::reset()
 	status_line_.clear();
 	headers_.clear();
 	body_.clear();
+	start_send_ = false;
 	closeFile();
-}
-
-bool HttpResponse::isReady() const
-{
-	return status_ != 0;
 }
 
 HttpResponse& HttpResponse::operator=(const HttpResponse& other)
@@ -79,6 +80,7 @@ HttpResponse& HttpResponse::operator=(const HttpResponse& other)
 		headers_ = other.headers_;
 		body_ = other.body_;
 		fd_ = other.fd_;
+		start_send_ = other.start_send_;
 	}
 	return *this;
 }
@@ -169,13 +171,23 @@ HttpResponse HttpResponse::directory(const HttpRequest& req)
 	return res;
 }
 
+HttpResponse HttpResponse::redirect(int status, const std::string& target)
+{
+	HttpResponse res(status);
+
+	res.setHeader("Location", target);
+
+	res.setFullResponse(res.buildErrorPage(status), "html");
+
+	return res;
+}
+
 std::string HttpResponse::nextChunk()
 {
-	if (status_ != 0)
+	if (!start_send_)
 	{
-		std::string buf = toString();
-		status_ = 0;
-		return buf;
+		start_send_ = true;
+		return toString();
 	}
 
 	if (fd_ == -1)
@@ -185,6 +197,7 @@ std::string HttpResponse::nextChunk()
 	ssize_t     n = read(fd_, &buffer[0], FILE_CHUNK_SIZE);
 	if (n <= 0)
 	{
+		LOG_DEBUG("Error: reading from response file");
 		closeFile();
 		return "";
 	}

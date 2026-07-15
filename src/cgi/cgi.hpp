@@ -15,7 +15,7 @@ struct CgiContext
 	int          stdout_pipe;
 	int          exit_status;
 	time_t       start_time;
-	int          request_body_fd;
+	// int          request_body_fd;
 	std::fstream request_body;
 
 	CgiContext();

@@ -31,6 +31,7 @@ class HttpResponse
 	static HttpResponse error(const HttpRequest& req, int status);
 	static HttpResponse file(const HttpRequest& req, const std::string& path);
 	static HttpResponse directory(const HttpRequest& req);
+	static HttpResponse redirect(int status, const std::string& target);
 
 	std::string         nextChunk();
 	std::string         toString() const;
@@ -48,7 +49,6 @@ class HttpResponse
 	                               const std::string&                path,
 	                               const std::string&                uri);
 	void        reset();
-	bool        isReady() const;
 
   private:
 	static const size_t                  FILE_CHUNK_SIZE;
@@ -58,6 +58,7 @@ class HttpResponse
 	std::map< std::string, std::string > headers_;
 	std::string                          body_;
 	int                                  fd_;
+	bool                                 start_send_;
 
 	void                                 closeFile();
 	const char*                          getStatusMsg(int status) const;

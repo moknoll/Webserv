@@ -13,6 +13,7 @@
 #include "HttpHandler.hpp"
 #include "../constants.hpp"
 #include "../lib/ws.hpp"
+#include "../logger/Logger.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 
@@ -31,36 +32,29 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-// const size_t HttpHandler::FILE_CHUNK_SIZE = 512 * 1024;
-
 HttpHandler::HttpHandler(const ServerConfig& cfg) :
         config_(cfg),
-        loc_(),
-        error_(0)
-// fd_(-1)
+        loc_()
+// error_(0)
 {
 }
 
 HttpHandler::HttpHandler(const HttpHandler& other) :
         config_(other.config_),
-        loc_(other.loc_),
-        error_(other.error_),
-        upload_file_path_(other.upload_file_path_)
-// fd_(other.fd_)
+        loc_(other.loc_)
+// error_(other.error_)
 {
 }
 
-HttpHandler::~HttpHandler()
-{
-	// closeFile();
-}
+HttpHandler::~HttpHandler() {}
 
 HttpResponse HttpHandler::handle(const HttpRequest& req)
 {
 	loc_ = req.getLocation();
 
 	if (this->loc_.has_redirect)
-		return redirect(loc_.redirect.first, loc_.redirect.second);
+		return HttpResponse::redirect(loc_.redirect.first,
+		                              loc_.redirect.second);
 
 	const std::string& method = req.getMethod();
 
@@ -80,16 +74,18 @@ HttpResponse HttpHandler::handle(const HttpRequest& req)
 HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 {
 	std::string path = req.getPath();
-	std::cout << "PATH: " << path << std::endl;
 
 	if (ws::isDirectory(path))
 	{
 		if (req.getURI() != "/" && req.getURI()[req.getURI().size() - 1] != '/')
-			return redirect(HTTP_MOVED_PERMANENTLY, req.getURI() + "/");
+			return HttpResponse::redirect(HTTP_MOVED_PERMANENTLY,
+			                              req.getURI() + "/");
 
 		std::string index_file = path + loc_.index;
 
-		if (ws::checkFile(index_file.c_str()) == FILE_OK)
+		PathInfo    path_info = ws::checkPath(index_file);
+
+		if (path_info.exists && path_info.type == PATH_IS_FILE)
 			return HttpResponse::file(req, index_file);
 
 		if (loc_.autoindex)
@@ -197,6 +193,7 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 
 	if (!in.is_open())
 	{
+		LOG_DEBUG("Error: open request temp file");
 		err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
 		return false;
 	}
@@ -231,6 +228,7 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 	int fd = openUploadFile(path.c_str(), err_res);
 	if (fd == -1)
 	{
+		LOG_DEBUG("Error: open upload file");
 		return false;
 	}
 
@@ -328,48 +326,6 @@ bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 	return true;
 }
 
-// bool HttpHandler::exceedsBodySizeLimit(const HttpRequest& req) const
-// {
-// 	const size_t mbs = loc_->client_max_body_size;
-// 	const size_t cl = req.getContentLenght();
-// 	const size_t rb = req.getReceivedBytes();
-//
-// 	return (cl > mbs || (req.isChunked() && rb > mbs));
-// }
-
-// bool HttpHandler::saveBodyToTempFile(const HttpRequest& req,
-//                                      HttpResponse&      err_res)
-// {
-// 	const std::string data = req.getbody();
-//
-// 	if (state_ == HTTP_INIT)
-// 	{
-// 		temp_file_ = "/tmp/wsload_" + ws::randString();
-//
-// 		fd_ = open(
-// 		    temp_file_.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
-// 		if (fd_ == -1)
-// 		{
-// 			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-// 			return false;
-// 		}
-// 		state_ = HTTP_RECV;
-// 	}
-//
-// 	if (!data.empty())
-// 	{
-// 		ssize_t n = write(fd_, data.data(), data.size());
-// 		if (n == -1)
-// 		{
-// 			resetUpload();
-// 			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-// 			return false;
-// 		}
-// 	}
-//
-// 	return true;
-// }
-
 HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 {
 	if (loc_.upload_path.empty())
@@ -396,26 +352,6 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 	if (!success)
 		return error_respons;
 	return makeStatusResponse(HTTP_CREATED);
-	// // if (!saveBodyToTempFile(req, error_respons))
-	// // 	return error_respons;
-	//
-	// if (req.isComplete())
-	// {
-	// 	closeFile();
-	// 	state_ = HTTP_COMPLETE;
-	//
-	// 	bool success = req.isMultipart() ?
-	// 	                   saveUploadedFileFromTemp(req, error_respons) :
-	// 	                   savePlainBody(req, error_respons);
-	//
-	// 	std::remove(temp_file_.c_str());
-	// 	if (!success)
-	// 		return error_respons;
-	//
-	// 	return makeStatusResponse(HTTP_CREATED);
-	// }
-
-	return HttpResponse();
 }
 
 HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
@@ -461,17 +397,17 @@ HttpResponse HttpHandler::makeStatusResponse(int status)
 	return res;
 }
 
-HttpResponse HttpHandler::redirect(int status, const std::string& target)
-{
-	HttpResponse res(status);
-	std::string  t = target;
-
-	res.setHeader("Location", t);
-
-	res.setFullResponse(res.buildErrorPage(status), "html");
-
-	return res;
-}
+// HttpResponse HttpHandler::redirect(int status, const std::string& target)
+// {
+// 	HttpResponse res(status);
+// 	std::string  t = target;
+//
+// 	res.setHeader("Location", t);
+//
+// 	res.setFullResponse(res.buildErrorPage(status), "html");
+//
+// 	return res;
+// }
 
 // HttpResponse HttpHandler::makeFileResponse(const std::string& path)
 // {
@@ -561,16 +497,6 @@ bool HttpHandler::isAllowedMethod(const std::string& method) const
 void HttpHandler::reset()
 {
 	loc_ = Location();
-	// closeFile();
-	error_ = 0;
-	upload_file_path_.clear();
+	// error_ = 0;
+	// upload_file_path_.clear();
 }
-
-// void HttpHandler::closeFile()
-// {
-// 	if (fd_ != -1)
-// 	{
-// 		close(fd_);
-// 		fd_ = -1;
-// 	}
-// }

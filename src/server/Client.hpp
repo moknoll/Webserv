@@ -13,7 +13,6 @@
 #pragma once
 
 #include "../cgi/cgi.hpp"
-#include "../http/HttpHandler.hpp"
 #include "../http/HttpRequest.hpp"
 #include "../http/HttpResponse.hpp"
 #include <cstddef>
@@ -37,7 +36,7 @@ class Client
 	// int         cgi_pipe_out;
 	// int         cgi_pid;
 	std::string cgi_output_buf;
-	std::string cgi_input_buf_;
+	// std::string cgi_input_buf_;
 	int         request_body_fd_;
 	bool        writeRequestBody(int fd);
 	void        buildCGIResponse();
@@ -75,7 +74,8 @@ class Client
 
 	HttpRequest         request;
 	HttpResponse        response;
-	HttpHandler         handler;
+	// HttpHandler         handler;
+	int                 i;
 
 	Client();
 	Client(const Client& other);

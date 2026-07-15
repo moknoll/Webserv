@@ -13,6 +13,7 @@
 #include "Core.hpp"
 // #include "../ConfigParser/ServerConfig.hpp"
 #include "../constants.hpp"
+#include "../lib/ws.hpp"
 #include "../logger/Logger.hpp"
 #include "Client.hpp"
 #include "Server.hpp"
@@ -28,16 +29,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
-
-void track_now(struct pollfd fd)
-{
-	if (fd.events & POLLIN)
-		std::cout << "Tracking POLLIN\n";
-	else if (fd.events & POLLOUT)
-		std::cout << "Tracking POLLOUT\n";
-	else if ((fd.events & (POLLIN | POLLOUT)) == (POLLIN | POLLOUT))
-		std::cout << "Tracking POLLIN and POLLOUT\n";
-}
 
 Core::Core(const std::vector< ServerConfig >& configs)
 {
@@ -124,15 +115,13 @@ void Core::acceptNewClient_(const Server& server)
 	fcntl(newClientFd, F_SETFL, O_NONBLOCK);
 	addFdtoPoll_(newClientFd, POLLIN);
 
-	// ServerConfig cfg = server.getConfig();
 	Client* client = new Client(newClientFd, server.getConfig());
 	fd_infos_[newClientFd].client = client;
 	fd_infos_[newClientFd].type = FD_CLIENT;
-	std::cout << "size of poll fds: " << poll_fds_.size() << '\n';
-	std::cout << "size of fd_infos_: " << fd_infos_.size() << '\n';
 
-	std::cout << "New Client connected: " << newClientFd << std::endl;
-	LOG_DEBUG("New client connected");
+	LOG_DEBUG("size of poll fds: " + ws::to_string(poll_fds_.size())
+	          + "; size of fd_infos_: " + ws::to_string(fd_infos_.size()));
+	LOG_DEBUG("New client connected: with fd = " + ws::to_string(newClientFd));
 }
 
 void Core::handleClientMessage_(Client* client, int client_fd)
@@ -161,19 +150,6 @@ void Core::handleClientMessage_(Client* client, int client_fd)
 	if (client->getHttpState() == Client::CGI_STATE)
 	{
 		registerCgiFds(client);
-		// addFdtoPoll_(client->cgi_pipe_out, POLLIN);
-		// addFdtoPoll_(client->cgi_pipe_in, POLLOUT);
-		// if (client->getFdCGI_out() != -1)
-		// {
-		// 	fd_infos_[client->cgi_pipe_out].client = client;
-		// 	fd_infos_[client->cgi_pipe_out].type = FD_PIPE_OUT;
-		// }
-		//
-		// if (client->getFdCGI_in() != -1)
-		// {
-		// 	fd_infos_[client->cgi_pipe_in].client = client;
-		// 	fd_infos_[client->cgi_pipe_in].type = FD_PIPE_IN;
-		// }
 	}
 	setEvent_(client_fd, POLLOUT);
 }
@@ -184,7 +160,6 @@ void Core::sendResponseToClient_(int client_fd)
 		return;
 
 	Client* client = fd_infos_.at(client_fd).client;
-	// Client* client = FindClient(clientSocketFd);
 	if (client == NULL)
 		return;
 
@@ -195,9 +170,9 @@ void Core::sendResponseToClient_(int client_fd)
 	if (buffer.empty())
 	{
 		LOG_DEBUG("Response sent");
+		client->reset();
 		if (client->isKeepAlive())
 		{
-			client->reset();
 			setEvent_(client_fd, POLLIN);
 		}
 		else
@@ -231,7 +206,7 @@ void Core::cleanupClient_(int client_fd)
 
 	fd_infos_.erase(client_fd);
 
-	LOG_DEBUG("Client disconnected");
+	LOG_DEBUG("Client " + ws::to_string(client_fd) + " disconnected");
 }
 
 void Core::addFdtoPoll_(int fd, int event)
@@ -245,12 +220,11 @@ void Core::addFdtoPoll_(int fd, int event)
 	poll_fds_.push_back(pfd);
 }
 
-void Core::setEvent_(int client_fd, int state)
+void Core::setEvent_(int fd, int state)
 {
-	// Change Poll event to writing
 	for (size_t i = 0; i < poll_fds_.size(); i++)
 	{
-		if (poll_fds_[i].fd == client_fd)
+		if (poll_fds_[i].fd == fd)
 		{
 			poll_fds_[i].events = state;
 			break;
@@ -311,24 +285,6 @@ void Core::checkCGIProcesses()
 	}
 }
 
-// void CGiTimeOut()
-// {
-// 	time_t now = std::time(NULL);
-//
-// 	maxTimeout = 60;
-// 	for client form clients:
-// 	{
-// 		client is CGI.
-// 		{
-// 			now - startCGi > maxTimeout;
-// 			kill cgi;
-// 		}
-// 		now - lastrequestfrom client > maxTimeout;
-// 		cleanClient;
-// 	}
-// }
-//
-
 void Core::removePollFd(int fd)
 {
 	if (fd == -1)
@@ -370,11 +326,8 @@ void Core::handlePOLLOUT(pollfd& pfd)
 	switch (info->type)
 	{
 		case FD_PIPE_IN: writeCGI_input_(info->client, pfd.fd); break;
-		case FD_CLIENT:
-			sendResponseToClient_(pfd.fd);
-			break;
-			break;
-		default: break;
+		case FD_CLIENT:  sendResponseToClient_(pfd.fd); break;
+		default:         break;
 	}
 }
 

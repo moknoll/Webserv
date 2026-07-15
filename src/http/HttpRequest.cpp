@@ -285,7 +285,7 @@ void HttpRequest::parse(std::string& raw_data)
 	{
 		switch (state_)
 		{
-			case sw_done: return;
+			case sw_done: closeFile_(); return;
 			case sw_almost_done:
 			{
 				size_t size = raw_data.size();

@@ -2,6 +2,7 @@
 #include "../constants.hpp"
 #include "../http/HttpRequest.hpp"
 #include "../lib/ws.hpp"
+#include "../logger/Logger.hpp"
 
 #include <algorithm>
 #include <csignal>
@@ -23,17 +24,19 @@ CgiContext::CgiContext()
 	stdout_pipe = -1;
 	exit_status = 0;
 	start_time = 0;
-	request_body_fd = -1;
+	// request_body_fd = -1;
 }
 
 CgiContext::CgiContext(const CgiContext& other) :
         pid(other.pid),
         stdin_pipe(other.stdin_pipe),
         stdout_pipe(other.stdout_pipe),
-        request_body_fd(other.request_body_fd)
+        exit_status(other.exit_status)
+// request_body_fd(other.request_body_fd)
 
 {
 }
+
 static std::string normalizeHeader(std::string name)
 {
 	std::replace(name.begin(), name.end(), '-', '_');
@@ -142,11 +145,13 @@ std::vector< std::string > buildCgiArgv(const HttpRequest& req, CgiContext& ctx)
 	std::vector< std::string > argv;
 	if (!path_info.exists && !path_info.readable)
 	{
+		LOG_DEBUG("Path to cgi script: " + path);
 		ctx.exit_status = HTTP_NOT_FOUND;
 	}
 	if (!cgi_path_info.exists && !cgi_path_info.readable
 	    && !cgi_path_info.executable)
 	{
+		LOG_DEBUG("cgi_path: " + req.getLocation().cgi_path);
 		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
 	}
 
@@ -224,25 +229,34 @@ bool executeChild(CgiContext&                       ctx,
 void executeCGI(const HttpRequest& req, CgiContext& ctx)
 {
 	std::vector< std::string > args = buildCgiArgv(req, ctx);
+
 	if (ctx.exit_status)
+	{
+		LOG_DEBUG("Error: buildCgiArgv: err=" + ws::to_string(ctx.exit_status));
 		return;
+	}
 
 	std::vector< std::string > env = buildEnv(req);
 	if (ctx.exit_status)
+	{
+		LOG_DEBUG("Error: buildEnv: err = " + ws::to_string(ctx.exit_status));
 		return;
+	}
 
 	if (!executeChild(ctx, args, env))
+	{
+		LOG_DEBUG("Error: executeChild");
 		return;
+	}
 
 	fcntl(ctx.stdout_pipe, F_SETFL, O_NONBLOCK);
 	if (req.getMethod() == "POST")
 	{
-		// ctx.request_body_fd = open(req.getBodyTempFileName().c_str(),
-		// O_RDONLY);
 		ctx.request_body.open(req.getBodyTempFileName().c_str(),
 		                      std::ios::in | std::ios::binary);
 		if (!ctx.request_body.is_open())
 		{
+			LOG_DEBUG("Error opening file ctx.request_body");
 			close(ctx.stdin_pipe);
 			close(ctx.stdout_pipe);
 			kill(ctx.pid, SIGTERM);
@@ -253,17 +267,6 @@ void executeCGI(const HttpRequest& req, CgiContext& ctx)
 			return;
 		}
 
-		// if (ctx.request_body_fd == -1)
-		// {
-		// 	close(ctx.stdin_pipe);
-		// 	close(ctx.stdout_pipe);
-		// 	kill(ctx.pid, SIGTERM);
-		// 	ctx.pid = -1;
-		// 	ctx.stdin_pipe = -1;
-		// 	ctx.stdout_pipe = -1;
-		// 	ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
-		// 	return;
-		// }
 		fcntl(ctx.stdin_pipe, F_SETFL, O_NONBLOCK);
 	}
 	else

@@ -8,44 +8,44 @@ import sys
 import shutil
 from datetime import datetime
 
-# Включаем отладку для CGI
+# Enable debugging for CGI
 cgitb.enable()
 
-# Настройки
-UPLOAD_DIR = "./uploads"  # Директория для загрузки
+# Settings
+UPLOAD_DIR = "./uploads"  # Directory for uploads
 MAX_FILE_SIZE = 100 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.zip', '.doc', '.docx', '.txz'}
 
 def create_upload_dir():
-    """Создает директорию для загрузки, если её нет"""
+    """Creates the upload directory if it does not exist"""
     if not os.path.exists(UPLOAD_DIR):
         os.makedirs(UPLOAD_DIR, mode=0o755, exist_ok=True)
 
 def get_safe_filename(filename):
-    """Очищает имя файла от опасных символов"""
-    # Удаляем пути и опасные символы
+    """Cleans the filename of dangerous characters"""
+    # Remove paths and dangerous characters
     filename = os.path.basename(filename)
-    # Заменяем пробелы на подчеркивания
+    # Replace spaces with underscores
     filename = filename.replace(' ', '_')
-    # Удаляем все, кроме букв, цифр, точек, дефисов и подчеркиваний
+    # Remove everything except letters, numbers, dots, hyphens, and underscores
     safe_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
     filename = ''.join(c for c in filename if c in safe_chars)
     return filename
 
 def is_allowed_file(filename):
-    """Проверяет, разрешен ли тип файла"""
+    """Checks if the file type is allowed"""
     ext = os.path.splitext(filename)[1].lower()
     return ext in ALLOWED_EXTENSIONS
 
 def get_file_size(file_obj):
-    """Получает размер файла"""
+    """Gets the file size"""
     file_obj.seek(0, os.SEEK_END)
     size = file_obj.tell()
     file_obj.seek(0)
     return size
 
-def print_html_header(title="Загрузка файла"):
-    """Выводит HTML заголовок"""
+def print_html_header(title="Upload file"):
+    """Outputs the HTML header"""
     print("Content-Type: text/html; charset=utf-8")
     print()
     print(f"""<!DOCTYPE html>
@@ -68,18 +68,18 @@ def print_html_header(title="Загрузка файла"):
     </style>
 </head>
 <body>
-    <h1>📤 Загрузка файла</h1>
+    <h1>📤 Upload file</h1>
 """)
 
 def print_html_footer():
-    """Выводит HTML подвал"""
+    """Outputs the HTML footer"""
     print("""
 </body>
 </html>
 """)
 
 def show_upload_form(message=""):
-    """Показывает форму загрузки"""
+    """Shows the upload form"""
     print_html_header()
     
     if message:
@@ -88,76 +88,76 @@ def show_upload_form(message=""):
     print(f"""
     <form method="post" enctype="multipart/form-data" action="{os.environ.get('SCRIPT_NAME', '')}">
         <div class="form-group">
-            <label for="file">Выберите файл:</label>
+            <label for="file">Select file:</label>
             <input type="file" name="file" id="file" required>
         </div>
         <div class="form-group">
-            <label for="description">Описание (необязательно):</label>
-            <input type="text" name="description" id="description" placeholder="Краткое описание файла">
+            <label for="description">Description (optional):</label>
+            <input type="text" name="description" id="description" placeholder="Short file description">
         </div>
-        <input type="submit" value="📤 Загрузить">
+        <input type="submit" value="📤 Upload">
     </form>
     
     <div class="file-list">
-        <h3>📁 Загруженные файлы:</h3>
-        <p><em>Проверьте директорию: {UPLOAD_DIR}</em></p>
+        <h3>📁 Uploaded files:</h3>
+        <p><em>Check directory: {UPLOAD_DIR}</em></p>
     </div>
     """)
     
     print_html_footer()
 
 def show_result(success, message, filename=""):
-    """Показывает результат загрузки"""
-    print_html_header("Результат загрузки")
+    """Shows the upload result"""
+    print_html_header("Uploaded result")
     
     if success:
         print(f'<div class="success">✅ {message}</div>')
         if filename:
-            print(f'<p><strong>Файл:</strong> {filename}</p>')
-            print(f'<p><strong>Путь:</strong> {os.path.join(UPLOAD_DIR, filename)}</p>')
+            print(f'<p><strong>File:</strong> {filename}</p>')
+            print(f'<p><strong>Path:</strong> {os.path.join(UPLOAD_DIR, filename)}</p>')
     else:
         print(f'<div class="error">❌ {message}</div>')
     
-    print('<p><a href="javascript:history.back()">← Назад</a></p>')
+    print('<p><a href="javascript:history.back()">← Back</a></p>')
     print_html_footer()
 
 def handle_upload():
-    """Обрабатывает загрузку файла"""
+    """Handles file upload"""
     try:
-        # Создаем директорию для загрузки
+        # Create upload directory
         create_upload_dir()
         
-        # Получаем данные формы
+        # Get form data
         form = cgi.FieldStorage()
         
-        # Проверяем, был ли загружен файл
+        # Check if file was uploaded
         if 'file' not in form:
-            return False, "Файл не выбран", ""
+            return False, "No file selected", ""
         
         file_item = form['file']
         
-        # Проверяем, что это файл
+        # Check that it is a file
         if not file_item.filename:
-            return False, "Имя файла не указано", ""
+            return False, "Filename not specified", ""
         
-        # Получаем имя файла
+        # Get filename
         original_filename = file_item.filename
         safe_filename = get_safe_filename(original_filename)
         
         if not safe_filename:
-            return False, "Некорректное имя файла", ""
+            return False, "Invalid filename", ""
         
-        # Проверяем тип файла
+        # Check file type
         if not is_allowed_file(safe_filename):
-            return False, f"Тип файла не разрешен. Разрешенные: {', '.join(ALLOWED_EXTENSIONS)}", ""
+            return False, f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}", ""
         
-        # Проверяем размер
+        # Check size
         if file_item.file:
             file_size = get_file_size(file_item.file)
             if file_size > MAX_FILE_SIZE:
-                return False, f"Файл слишком большой. Максимальный размер: {MAX_FILE_SIZE // (1024*1024)} MB", ""
+                return False, f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)} MB", ""
         
-        # Генерируем уникальное имя, если файл уже существует
+        # Generate a unique name if file already exists
         base, ext = os.path.splitext(safe_filename)
         counter = 1
         final_filename = safe_filename
@@ -166,36 +166,37 @@ def handle_upload():
             final_filename = f"{base}_{counter}{ext}"
             counter += 1
         
-        # Сохраняем файл
+        # Save file
         file_path = os.path.join(UPLOAD_DIR, final_filename)
         
-        # Копируем содержимое
+        # Copy contents
         with open(file_path, 'wb') as f:
             shutil.copyfileobj(file_item.file, f)
         
-        # Устанавливаем права
+        # Set permissions
         os.chmod(file_path, 0o644)
         
-        # Получаем описание
+        # Get description
         description = form.getvalue('description', '')
         
-        # Логируем загрузку
+        # Log upload
         log_entry = f"{datetime.now().isoformat()} | {final_filename} | {file_size} bytes | {description}\n"
         log_file = os.path.join(UPLOAD_DIR, "upload.log")
         with open(log_file, 'a', encoding='utf-8') as f:
             f.write(log_entry)
         
-        success_msg = f"Файл успешно загружен! Размер: {file_size} байт"
+        success_msg = f"File successfully uploaded! Size: {file_size} bytes"
         if description:
-            success_msg += f" | Описание: {description}"
+            success_msg += f" | Description: {description}"
         
         return True, success_msg, final_filename
         
     except Exception as e:
-        return False, f"Ошибка при загрузке: {str(e)}", ""
+        return False, f"Upload error: {str(e)}", ""
+
 
 def list_uploaded_files():
-    """Список загруженных файлов"""
+    """List of uploaded files"""
     try:
         if not os.path.exists(UPLOAD_DIR):
             return []
@@ -215,20 +216,20 @@ def list_uploaded_files():
     except:
         return []
 
-# ============ ОСНОВНАЯ ЛОГИКА ============
+# ============ MAIN LOGIC ============
 
 def main():
-    """Основная функция CGI скрипта"""
+    """Main function of the CGI script"""
     
-    # Проверяем метод запроса
+    # Check request method
     if os.environ.get('REQUEST_METHOD') == 'POST':
-        # Обрабатываем загрузку
+        # Handle upload
         success, message, filename = handle_upload()
         show_result(success, message, filename)
     else:
-        # Показываем форму для GET запроса
+        # Show form for GET request
         show_upload_form()
 
-# Запускаем скрипт
+# Run the script
 if __name__ == "__main__":
     main()
