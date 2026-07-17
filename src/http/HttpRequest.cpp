@@ -233,7 +233,7 @@ bool HttpRequest::saveBodyToTempFile(std::string& raw_data)
 	{
 		fd_ = open(body_temp_file_.c_str(),
 		           O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW,
-		           0644);
+		           0755);
 		if (fd_ == -1)
 		{
 			fail(HTTP_INTERNAL_SERVER_ERROR);

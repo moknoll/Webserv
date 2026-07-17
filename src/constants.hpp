@@ -16,8 +16,10 @@
 #define SERVER_NAME_STR                      "Webserv"
 #define HTTP_VERSION                         "HTTP/1.1"
 
+#define RECV_BUFFER                          8192
+#define PIPE_BUF_SIZE                        70000
 #define POLL_TIMEOUT                         3000
-#define MAX_CGI_TIMEOUT                      5
+#define CGI_TIMEOUT_SEC                      5
 #define REQUEST_READ_TIMEOUT                 60
 #define KEEPALIVE_TIMEOUT                    90
 

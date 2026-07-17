@@ -16,15 +16,16 @@
 #include "logger/Logger.hpp"
 #include "server/Core.hpp"
 
+#include <csignal>
 #include <cstddef>
 #include <cstdio>
 // #include <ctime>
 // #include <fcntl.h>
 #include <iostream>
-#include <map> // ?????
+#include <map>     // ?????
 #include <string>
 #include <utility> // ?????
-#include <vector> // ?????
+#include <vector>  // ?????
 
 void printConfig(std::vector< ServerConfig > cfg)
 {
@@ -73,8 +74,20 @@ void printConfig(std::vector< ServerConfig > cfg)
 	}
 }
 
+bool g_running = true;
+
+void signal_handler(int sig)
+{
+	if (sig == SIGINT || sig == SIGTERM || sig == SIGQUIT)
+		g_running = false;
+}
+
 int main(int argc, char* argv[])
 {
+	signal(SIGPIPE, SIG_IGN);
+	signal(SIGINT, signal_handler);
+	signal(SIGQUIT, signal_handler);
+
 	if (argc != 2)
 	{
 		std::cout << "Usage: ./websrerv <config_file>" << std::endl;
@@ -85,7 +98,7 @@ int main(int argc, char* argv[])
 
 	if (!ws::has_suffix(filename, ".conf"))
 	{
-		std::cout << "Error: Config file extention must be `.conf'\n";
+		std::cerr << "Error: Config file extention must be `.conf'\n";
 		return 1;
 	}
 
@@ -95,8 +108,9 @@ int main(int argc, char* argv[])
 	{
 		ConfigParser cfg_parser(filename);
 		cfg_parser.parse();
-		
-		printConfig(cfg_parser.getServers()); // ???????????????????????????????????????????????????????
+
+		// printConfig(cfg_parser.getServers()); //
+		// ???????????????????????????????????????????????????????
 		std::vector< ServerConfig > configs = cfg_parser.getServers();
 
 		std::cout << "Parsed Configurations:" << std::endl;
@@ -115,7 +129,7 @@ int main(int argc, char* argv[])
 	}
 	catch (const std::exception& e)
 	{
-		std::cout << "Error: " << e.what() << std::endl;
+		std::cerr << "Error: " << e.what() << std::endl;
 	}
 	return 0;
 }

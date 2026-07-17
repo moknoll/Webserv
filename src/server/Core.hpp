@@ -18,7 +18,7 @@
 #include <map>
 #include <vector>
 
-#define RECV_BUFFER 8192
+extern bool g_running;
 
 class Core
 {
@@ -47,23 +47,20 @@ class Core
 
 	void                         acceptNewClient_(const Server& server);
 	void    handleClientMessage_(Client* client, int client_fd);
-	void    sendResponseToClient_(int client_fd);
+	void    sendResponseToClient_(Client* client, int client_fd);
 	void    cleanupClient_(int client_fd);
 	void    handlePOLLIN(pollfd& pfd);
 	void    handlePOLLOUT(pollfd& pfd);
-
+	void    handlePollerr(pollfd& pfd);
 	void    setEvent_(int client_fd, int state);
 	void    addFdtoPoll_(int fd, int event);
-
 	void    readCGi_output_(Client* client, int fd);
 	void    writeCGI_input_(Client* client, int fd);
-
-	FdInfo* getFdInfo(int fd);
 	void    checkCGIProcesses();
-
+	void    checkClientTimeouts();
 	void    registerCgiFds(Client* client);
 	void    removePollFd(int fd);
-	// void                         cleanPollFds();
+	FdInfo* getFdInfo(int fd);
 
 	Core();
 

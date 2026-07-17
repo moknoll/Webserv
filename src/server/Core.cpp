@@ -21,9 +21,9 @@
 #include <cstddef>
 #include <ctime>
 #include <fcntl.h>
-#include <iostream>
 #include <map>
 #include <netdb.h>
+#include <set>
 #include <sys/poll.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -41,51 +41,56 @@ Core::Core(const std::vector< ServerConfig >& configs)
 		fd_infos_[fd].server = s;
 		fd_infos_[fd].type = FD_SERVER;
 
-		std::cout << "sock_fd:" << fd << std::endl;
+		LOG_DEBUG("sock_fd: " + ws::to_string(fd));
 	}
 }
 
 Core::~Core()
 {
-	// for(size_t i = 0; i < _serverfds.size(); i++)
-	// {
-	// 	if(_serverfds[i] != -1)
-	// 		close(_serverfds[i]);
-	// }
-	// Check later on how to close?
-	//
-	// std::vector< Server* >::iterator it_serv = _servers.begin();
-	// for (; it_serv != _servers.end(); ++it_serv)
-	// 	delete *it_serv;
-
-	// std::map< int, Client* >::iterator it_client = _clients.begin();
+	LOG_DEBUG("Call Core destructor");
 	std::map< int, FdInfo >::iterator it_info = fd_infos_.begin();
 	for (; it_info != fd_infos_.end(); ++it_info)
 	{
-		if (it_info->first == FD_SERVER)
+		FdInfo inof = it_info->second;
+
+		if (inof.type == FD_SERVER)
+		{
 			delete it_info->second.server;
-		else if (it_info->first == FD_CLIENT)
+
+			LOG_DEBUG("Delete Server");
+		}
+		else if (inof.type == FD_CLIENT)
+		{
 			delete it_info->second.client;
+			LOG_DEBUG("Delete Client");
+		}
 	}
 }
 
 void Core::run()
 {
-	while (true)
+	while (g_running)
 	{
 		int ret = poll(poll_fds_.data(), poll_fds_.size(), 3000);
 		if (ret == -1)
+		{
+			if (errno == EINTR)
+				continue;
 			throw std::runtime_error("Poll failed");
+		}
 		// if (ret == 0) // What to do
 
-		// ckeckTimeOutCGI(); // ?????????????????????
 		// ckeckTimeOutClient();
 		for (size_t i = 0; i < poll_fds_.size(); i++)
 		{
 			pollfd& pfd = poll_fds_[i];
 
-			// if (poll_fds_[i].revents == POLLERR || poll_fds_[i].revents ==
-			// POLLHUP) // What to do
+			if (poll_fds_[i].revents & (POLLERR | POLLHUP))
+			{
+				handlePollerr(pfd);
+				continue;
+			}
+
 			if (poll_fds_[i].revents & POLLIN)
 			{
 				handlePOLLIN(pfd);
@@ -95,7 +100,9 @@ void Core::run()
 				handlePOLLOUT(pfd);
 			}
 		}
+
 		checkCGIProcesses();
+		checkClientTimeouts();
 	}
 }
 
@@ -140,6 +147,7 @@ void Core::handleClientMessage_(Client* client, int client_fd)
 			return;
 		}
 
+		client->updateLastActivity();
 		client->parseRequest(buffer, recv_bytes);
 		if (!client->isRequestComplete())
 			return;
@@ -154,17 +162,11 @@ void Core::handleClientMessage_(Client* client, int client_fd)
 	setEvent_(client_fd, POLLOUT);
 }
 
-void Core::sendResponseToClient_(int client_fd)
+void Core::sendResponseToClient_(Client* client, int client_fd)
 {
-	if (fd_infos_.find(client_fd) == fd_infos_.end())
+	if (!client || client->getHttpState() != Client::HTTP_SEND)
 		return;
 
-	Client* client = fd_infos_.at(client_fd).client;
-	if (client == NULL)
-		return;
-
-	if (client->getHttpState() != Client::HTTP_SEND)
-		return;
 	std::string buffer = client->serialize();
 
 	if (buffer.empty())
@@ -189,6 +191,7 @@ void Core::sendResponseToClient_(int client_fd)
 		return;
 	}
 
+	client->updateLastActivity();
 	size_t sent = static_cast< size_t >(sent_bytes);
 	buffer.erase(0, sent);
 	client->setSendBuffer(buffer);
@@ -209,17 +212,6 @@ void Core::cleanupClient_(int client_fd)
 	LOG_DEBUG("Client " + ws::to_string(client_fd) + " disconnected");
 }
 
-void Core::addFdtoPoll_(int fd, int event)
-{
-	if (fd == -1)
-		return;
-
-	struct pollfd pfd;
-	pfd.fd = fd;
-	pfd.events = event;
-	poll_fds_.push_back(pfd);
-}
-
 void Core::setEvent_(int fd, int state)
 {
 	for (size_t i = 0; i < poll_fds_.size(); i++)
@@ -237,14 +229,12 @@ void Core::readCGi_output_(Client* client, int fd)
 	if (!client || client->getHttpState() != Client::CGI_STATE)
 		return;
 
-	LOG_DEBUG("Try read from CGI PIPE output");
+	LOG_DEBUG("Try read from CGI output");
 
-	char    buf[RECV_BUFFER];
-	ssize_t r = read(fd, buf, sizeof(buf));
-
-	if (r > 0)
+	if (client->readCgiOutput_(fd))
 	{
-		client->appendCgiOutput(buf, r);
+		removePollFd(fd);
+		fd_infos_.erase(fd);
 	}
 }
 
@@ -254,7 +244,7 @@ void Core::writeCGI_input_(Client* client, int fd)
 		return;
 
 	LOG_DEBUG("Write to CGI input");
-	if (client->writeRequestBody(fd))
+	if (client->writeCgiInput(fd))
 	{
 		removePollFd(fd);
 		fd_infos_.erase(fd);
@@ -263,26 +253,53 @@ void Core::writeCGI_input_(Client* client, int fd)
 
 void Core::checkCGIProcesses()
 {
+	std::set< int >                   fds_to_remove;
+
 	std::map< int, FdInfo >::iterator it = fd_infos_.begin();
 	for (; it != fd_infos_.end(); ++it)
 	{
-		Client* client = it->second.client;
-		if (client == NULL)
+		FdInfo info = it->second;
+
+		if (info.type != FD_CLIENT || info.client == NULL)
 			continue;
+
+		Client* client = info.client;
+
 		if (client->getHttpState() == Client::CGI_STATE)
 		{
+			CgiContext cgi_ctx = client->getCGIContext();
+
 			if (client->CGIProcessFinished())
 			{
-				CgiContext cgi_ctx = client->getCGIContext();
 				LOG_DEBUG("CGI FInished");
-				removePollFd(cgi_ctx.stdout_pipe);
-				removePollFd(cgi_ctx.stdin_pipe);
-				fd_infos_.erase(cgi_ctx.stdout_pipe);
-				fd_infos_.erase(cgi_ctx.stdin_pipe);
+				fds_to_remove.insert(cgi_ctx.stdin_pipe);
+				fds_to_remove.insert(cgi_ctx.stdout_pipe);
+				// removePollFd(cgi_ctx.stdout_pipe);
+				// removePollFd(cgi_ctx.stdin_pipe);
+				// fd_infos_.erase(cgi_ctx.stdout_pipe);
+				// fd_infos_.erase(cgi_ctx.stdin_pipe);
 				setEvent_(client->getClientFd(), POLLOUT);
 			}
 		}
 	}
+
+	std::set< int >::iterator it_r = fds_to_remove.begin();
+	for (; it_r != fds_to_remove.end(); ++it_r)
+	{
+		removePollFd(*it_r);
+		fd_infos_.erase(*it_r);
+	}
+}
+
+void Core::addFdtoPoll_(int fd, int event)
+{
+	if (fd == -1)
+		return;
+
+	struct pollfd pfd;
+	pfd.fd = fd;
+	pfd.events = event;
+	poll_fds_.push_back(pfd);
 }
 
 void Core::removePollFd(int fd)
@@ -320,14 +337,46 @@ void Core::handlePOLLOUT(pollfd& pfd)
 {
 	FdInfo* info = getFdInfo(pfd.fd);
 
-	if (!info || !info->client)
+	if (!info)
 		return;
 
 	switch (info->type)
 	{
 		case FD_PIPE_IN: writeCGI_input_(info->client, pfd.fd); break;
-		case FD_CLIENT:  sendResponseToClient_(pfd.fd); break;
+		case FD_CLIENT:  sendResponseToClient_(info->client, pfd.fd); break;
 		default:         break;
+	}
+}
+
+void Core::handlePollerr(pollfd& pfd)
+{
+	FdInfo* info = getFdInfo(pfd.fd);
+
+	if (!info)
+		return;
+
+	switch (info->type)
+	{
+		case FD_CLIENT:
+		{
+			cleanupClient_(pfd.fd);
+			LOG_DEBUG("FD Client iS POLLERR & POLLHUP");
+			break;
+		}
+		case FD_PIPE_IN: removePollFd(pfd.fd); break;
+		case FD_PIPE_OUT:
+		{
+			LOG_DEBUG("FD PIPE OUT iS POLLERR & POLLHUP");
+			Client* client = info->client;
+			if (!client)
+				return;
+			if (client->readCgiOutput_(pfd.fd))
+			{
+				removePollFd(pfd.fd);
+				fd_infos_.erase(pfd.fd);
+			}
+		}
+		default: break;
 	}
 }
 
@@ -357,5 +406,31 @@ void Core::registerCgiFds(Client* client)
 	{
 		fd_infos_[cgi_ctx.stdin_pipe].client = client;
 		fd_infos_[cgi_ctx.stdin_pipe].type = FD_PIPE_IN;
+	}
+}
+
+void Core::checkClientTimeouts()
+{
+	time_t now = std::time(NULL);
+
+	for (std::map< int, FdInfo >::iterator it = fd_infos_.begin();
+	     it != fd_infos_.end();)
+	{
+		FdInfo info = it->second;
+
+		if (info.type == FD_CLIENT)
+		{
+			Client* client = info.client;
+			if (client && client->getHttpState() != Client::CGI_STATE
+			    && now - client->getLastActivity() > KEEPALIVE_TIMEOUT)
+			{
+				int fd = client->getClientFd();
+				++it;
+				cleanupClient_(fd);
+				LOG_DEBUG("Client " + ws::to_string(fd) + " TIMEDOUT");
+				continue;
+			}
+		}
+		++it;
 	}
 }

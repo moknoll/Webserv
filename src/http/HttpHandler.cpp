@@ -97,6 +97,57 @@ HttpResponse HttpHandler::handleGET(const HttpRequest& req)
 	return HttpResponse::file(req, path);
 }
 
+HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
+{
+	if (loc_.upload_path.empty())
+	{
+		std::string path = req.getPath();
+		PathInfo    info = ws::checkPath(path);
+		if (info.exists)
+		{
+			if (info.type == PATH_IS_DIR)
+				return HttpResponse::error(req, HTTP_FORBIDDEN);
+			if (info.type == PATH_IS_FILE)
+				return HttpResponse::error(req, HTTP_NOT_ALLOWED);
+		}
+		else
+			return HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
+	}
+
+	HttpResponse error_respons;
+
+	bool         success = req.isMultipart() ?
+	                           saveUploadedFileFromTemp(req, error_respons) :
+	                           savePlainBody(req, error_respons);
+
+	if (!success)
+		return error_respons;
+	return makeStatusResponse(HTTP_CREATED);
+}
+
+HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
+{
+	const std::string path = req.getPath();
+
+	if (ws::isDirectory(path.c_str()))
+		return HttpResponse::error(req, HTTP_FORBIDDEN);
+
+	switch (ws::checkFile(path.c_str()))
+	{
+		case FILE_OK:        break;
+		case ERR_IS_DIR:     return HttpResponse::error(req, HTTP_FORBIDDEN);
+		case ERR_PERMISSION: return HttpResponse::error(req, HTTP_FORBIDDEN);
+		case ERR_NOT_FOUND:  return HttpResponse::error(req, HTTP_NOT_FOUND);
+		default:             return HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
+	}
+
+	if (std::remove(path.c_str()) != 0)
+		return HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
+	HttpResponse resp(HTTP_NO_CONTENT);
+	resp.setFullResponse();
+	return resp;
+}
+
 bool HttpHandler::validateUploadPath(const std::string& path)
 {
 	if (path.empty())
@@ -326,57 +377,6 @@ bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 	return true;
 }
 
-HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
-{
-	if (loc_.upload_path.empty())
-	{
-		std::string path = req.getPath();
-		PathInfo    info = ws::checkPath(path);
-		if (info.exists)
-		{
-			if (info.type == PATH_IS_DIR)
-				return makeStatusResponse(HTTP_FORBIDDEN);
-			if (info.type == PATH_IS_FILE)
-				return makeStatusResponse(HTTP_NOT_ALLOWED);
-		}
-		else
-			return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-	}
-
-	HttpResponse error_respons;
-
-	bool         success = req.isMultipart() ?
-	                           saveUploadedFileFromTemp(req, error_respons) :
-	                           savePlainBody(req, error_respons);
-
-	if (!success)
-		return error_respons;
-	return makeStatusResponse(HTTP_CREATED);
-}
-
-HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
-{
-	const std::string path = req.getPath();
-
-	if (ws::isDirectory(path.c_str()))
-		return makeStatusResponse(HTTP_FORBIDDEN);
-
-	switch (ws::checkFile(path.c_str()))
-	{
-		case FILE_OK:        break;
-		case ERR_IS_DIR:     return makeStatusResponse(HTTP_FORBIDDEN);
-		case ERR_PERMISSION: return makeStatusResponse(HTTP_FORBIDDEN);
-		case ERR_NOT_FOUND:  return makeStatusResponse(HTTP_NOT_FOUND);
-		default:             return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-	}
-
-	if (std::remove(path.c_str()) != 0)
-		return makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
-	HttpResponse resp(HTTP_NO_CONTENT);
-	resp.setFullResponse();
-	return resp;
-}
-
 HttpResponse HttpHandler::makeStatusResponse(int status)
 {
 	HttpResponse                                 res(status);
@@ -492,11 +492,4 @@ bool HttpHandler::isAllowedMethod(const std::string& method) const
 			return true;
 	}
 	return false;
-}
-
-void HttpHandler::reset()
-{
-	loc_ = Location();
-	// error_ = 0;
-	// upload_file_path_.clear();
 }

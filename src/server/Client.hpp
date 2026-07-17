@@ -16,6 +16,7 @@
 #include "../http/HttpRequest.hpp"
 #include "../http/HttpResponse.hpp"
 #include <cstddef>
+#include <ctime>
 #include <string>
 
 class Client
@@ -32,16 +33,12 @@ class Client
 		HTTP_CLOSE
 	};
 
-	// int         cgi_pipe_in;
-	// int         cgi_pipe_out;
-	// int         cgi_pid;
 	std::string cgi_output_buf;
-	// std::string cgi_input_buf_;
-	int         request_body_fd_;
-	bool        writeRequestBody(int fd);
+	bool        writeCgiInput(int fd);
+	bool        readCgiOutput_(int fd);
 	void        buildCGIResponse();
 	bool        CGIProcessFinished();
-	void        appendCgiOutput(const char* buf, size_t size_of_bytes);
+	void        tryFinalizeCGI_();
 
 	void        reset();
 
@@ -49,17 +46,19 @@ class Client
 	std::string serialize();
 	void        parseRequest(const char* buffer, size_t size);
 
-	std::string getResponseBuffer() const; // ??????????
-	std::string getRequestBuffer() const;  // ???????????
+	std::string getResponseBuffer() const;                  // ??????????
+	std::string getRequestBuffer() const;                   // ???????????
 	bool        isRequestComplete() const;
 	bool        isKeepAlive() const;
-	int         getClientFd() const;
 	void        setSendBuffer(const std::string& response); // ???????
 	void        setRecvBuffer(const std::string& request);  // ??????????
 	void        setState(enum STATE state);
 
+	int         getClientFd() const;
 	int         getHttpState() const;
 	CgiContext  getCGIContext() const;
+	time_t      getLastActivity() const;
+	void        updateLastActivity();
 
   private:
 	static const size_t MAX_CGI_BUFFER;
@@ -69,13 +68,14 @@ class Client
 	std::string         recv_buffer_;
 	std::string         send_buffer_;
 	bool                keep_alive_;
+	time_t              last_activity_;
 	STATE               state_;
 	CgiContext          cgi_ctx_;
 
 	HttpRequest         request;
 	HttpResponse        response;
 	// HttpHandler         handler;
-	int                 i;
+	// time_t last_activity_;
 
 	Client();
 	Client(const Client& other);

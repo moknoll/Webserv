@@ -9,32 +9,56 @@
 #include <cstddef>
 #include <ctime>
 #include <fcntl.h>
-#include <fstream>
-#include <ios>
 #include <string.h>
-#include <string>
 #include <sys/types.h>
 #include <unistd.h>
-#include <vector>
 
 CgiContext::CgiContext()
 {
 	pid = -1;
 	stdin_pipe = -1;
 	stdout_pipe = -1;
-	exit_status = 0;
+	error = 0;
 	start_time = 0;
-	// request_body_fd = -1;
+	exit_ok = false;
+	pipe_stdout_eof = false;
+	procese_reaped = false;
+	cgi_timed_out = false;
 }
 
 CgiContext::CgiContext(const CgiContext& other) :
         pid(other.pid),
         stdin_pipe(other.stdin_pipe),
         stdout_pipe(other.stdout_pipe),
-        exit_status(other.exit_status)
-// request_body_fd(other.request_body_fd)
+        error(other.error),
+        start_time(other.start_time),
+        exit_ok(other.exit_ok),
+        pipe_stdout_eof(other.pipe_stdout_eof),
+        procese_reaped(other.procese_reaped),
+        cgi_timed_out(other.cgi_timed_out)
 
 {
+}
+
+CgiContext::~CgiContext()
+{
+	if (request_body.is_open())
+		request_body.close();
+}
+
+void resetCgiContext(CgiContext& ctx)
+{
+	ctx.pid = -1;
+	ctx.stdin_pipe = -1;
+	ctx.stdout_pipe = -1;
+	ctx.error = 0;
+	ctx.start_time = 0;
+	ctx.exit_ok = false;
+	ctx.pipe_stdout_eof = false;
+	ctx.procese_reaped = false;
+	ctx.cgi_timed_out = false;
+	if (ctx.request_body.is_open())
+		ctx.request_body.close();
 }
 
 static std::string normalizeHeader(std::string name)
@@ -146,13 +170,13 @@ std::vector< std::string > buildCgiArgv(const HttpRequest& req, CgiContext& ctx)
 	if (!path_info.exists && !path_info.readable)
 	{
 		LOG_DEBUG("Path to cgi script: " + path);
-		ctx.exit_status = HTTP_NOT_FOUND;
+		ctx.error = HTTP_NOT_FOUND;
 	}
 	if (!cgi_path_info.exists && !cgi_path_info.readable
 	    && !cgi_path_info.executable)
 	{
 		LOG_DEBUG("cgi_path: " + req.getLocation().cgi_path);
-		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
+		ctx.error = HTTP_INTERNAL_SERVER_ERROR;
 	}
 
 	argv.push_back(req.getLocation().cgi_path);
@@ -182,14 +206,14 @@ bool executeChild(CgiContext&                       ctx,
 
 	if (pipe(pipe_in) == -1)
 	{
-		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
+		ctx.error = HTTP_INTERNAL_SERVER_ERROR;
 		return false;
 	}
 	if (pipe(pipe_out) == -1)
 	{
 		close(pipe_in[0]);
 		close(pipe_in[1]);
-		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
+		ctx.error = HTTP_INTERNAL_SERVER_ERROR;
 		return false;
 	}
 	pid_t pid = fork();
@@ -199,7 +223,7 @@ bool executeChild(CgiContext&                       ctx,
 		close(pipe_in[1]);
 		close(pipe_out[0]);
 		close(pipe_out[1]);
-		ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
+		ctx.error = HTTP_INTERNAL_SERVER_ERROR;
 		return false;
 	}
 
@@ -230,16 +254,16 @@ void executeCGI(const HttpRequest& req, CgiContext& ctx)
 {
 	std::vector< std::string > args = buildCgiArgv(req, ctx);
 
-	if (ctx.exit_status)
+	if (ctx.error)
 	{
-		LOG_DEBUG("Error: buildCgiArgv: err=" + ws::to_string(ctx.exit_status));
+		LOG_DEBUG("Error: buildCgiArgv: err=" + ws::to_string(ctx.error));
 		return;
 	}
 
 	std::vector< std::string > env = buildEnv(req);
-	if (ctx.exit_status)
+	if (ctx.error)
 	{
-		LOG_DEBUG("Error: buildEnv: err = " + ws::to_string(ctx.exit_status));
+		LOG_DEBUG("Error: buildEnv: err = " + ws::to_string(ctx.error));
 		return;
 	}
 
@@ -263,7 +287,7 @@ void executeCGI(const HttpRequest& req, CgiContext& ctx)
 			ctx.pid = -1;
 			ctx.stdin_pipe = -1;
 			ctx.stdout_pipe = -1;
-			ctx.exit_status = HTTP_INTERNAL_SERVER_ERROR;
+			ctx.error = HTTP_INTERNAL_SERVER_ERROR;
 			return;
 		}
 

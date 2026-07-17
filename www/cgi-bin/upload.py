@@ -13,7 +13,7 @@ cgitb.enable()
 
 # Settings
 UPLOAD_DIR = "./uploads"  # Directory for uploads
-MAX_FILE_SIZE = 100 * 1024 * 1024
+MAX_FILE_SIZE = 700 * 1024 * 1024
 ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.zip', '.doc', '.docx', '.txz'}
 
 def create_upload_dir():
