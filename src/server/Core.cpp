@@ -24,6 +24,7 @@
 #include <map>
 #include <netdb.h>
 #include <set>
+#include <string>
 #include <sys/poll.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -41,7 +42,9 @@ Core::Core(const std::vector< ServerConfig >& configs)
 		fd_infos_[fd].server = s;
 		fd_infos_[fd].type = FD_SERVER;
 
-		LOG_DEBUG("sock_fd: " + ws::to_string(fd));
+		LOG_INFO("Server is running on port " + ws::to_string(configs[i].port));
+		LOG_DEBUG("Server socket created successfully (fd: " + ws::to_string(fd)
+		          + ")");
 	}
 }
 
@@ -56,7 +59,6 @@ Core::~Core()
 		if (inof.type == FD_SERVER)
 		{
 			delete it_info->second.server;
-
 			LOG_DEBUG("Delete Server");
 		}
 		else if (inof.type == FD_CLIENT)
@@ -126,9 +128,9 @@ void Core::acceptNewClient_(const Server& server)
 	fd_infos_[newClientFd].client = client;
 	fd_infos_[newClientFd].type = FD_CLIENT;
 
-	LOG_DEBUG("size of poll fds: " + ws::to_string(poll_fds_.size())
-	          + "; size of fd_infos_: " + ws::to_string(fd_infos_.size()));
-	LOG_DEBUG("New client connected: with fd = " + ws::to_string(newClientFd));
+	LOG_INFO("New client connected: (fd: " + ws::to_string(newClientFd) + ")");
+	LOG_DEBUG("Size of poll fds: " + ws::to_string(poll_fds_.size()));
+	LOG_DEBUG("Size of fd_infos_: " + ws::to_string(fd_infos_.size()));
 }
 
 void Core::handleClientMessage_(Client* client, int client_fd)
@@ -171,7 +173,7 @@ void Core::sendResponseToClient_(Client* client, int client_fd)
 
 	if (buffer.empty())
 	{
-		LOG_DEBUG("Response sent");
+		LOG_DEBUG("Sending Response finished");
 		client->reset();
 		if (client->isKeepAlive())
 		{
@@ -274,10 +276,6 @@ void Core::checkCGIProcesses()
 				LOG_DEBUG("CGI FInished");
 				fds_to_remove.insert(cgi_ctx.stdin_pipe);
 				fds_to_remove.insert(cgi_ctx.stdout_pipe);
-				// removePollFd(cgi_ctx.stdout_pipe);
-				// removePollFd(cgi_ctx.stdin_pipe);
-				// fd_infos_.erase(cgi_ctx.stdout_pipe);
-				// fd_infos_.erase(cgi_ctx.stdin_pipe);
 				setEvent_(client->getClientFd(), POLLOUT);
 			}
 		}
@@ -427,7 +425,7 @@ void Core::checkClientTimeouts()
 				int fd = client->getClientFd();
 				++it;
 				cleanupClient_(fd);
-				LOG_DEBUG("Client " + ws::to_string(fd) + " TIMEDOUT");
+				LOG_DEBUG("Client " + ws::to_string(fd) + " TIMED OUT");
 				continue;
 			}
 		}

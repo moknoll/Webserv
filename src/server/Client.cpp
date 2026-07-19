@@ -16,7 +16,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-const size_t Client::MAX_CGI_BUFFER = 100 * 1024 * 1024;
+const size_t Client::MAX_CGI_BUFFER = 105 * 1024 * 1024;
 
 Client::Client(int fd, const ServerConfig& config) :
         config_(config),
@@ -84,7 +84,7 @@ void Client::buildCGIResponse()
 {
 	std::string            raw_headers;
 	std::string            body;
-	int                    status = 200;
+	int                    status = HTTP_OK;
 
 	std::string::size_type sep = cgi_output_buf.find("\r\n\r\n");
 	if (sep != std::string::npos)
@@ -133,7 +133,7 @@ void Client::buildCGIResponse()
 
 		if (ws::toUpperCase(name) == "STATUS")
 			status = std::atoi(value.c_str());
-		else if (ws::toUpperCase(name) == "LOCATION" && status == 0)
+		if (ws::toUpperCase(name) == "LOCATION" && status == HTTP_OK)
 		{
 			status = 302;
 			response.setHeader(name, value);
@@ -152,7 +152,7 @@ void Client::buildCGIResponse()
 	}
 	LOG_DEBUG("Body size: " + ws::to_string(body.size()));
 	LOG_DEBUG("Content lenght: " + ws::to_string(content_length));
-	if (!have_content_type)
+	if (!body.empty() && !have_content_type)
 	{
 		response = HttpResponse::error(request, HTTP_BAD_GATEWAY);
 		return;
@@ -268,7 +268,7 @@ bool Client::readCgiOutput_(int pipe_fd)
 		cgi_output_buf.append(buf, ret);
 	else if (ret == 0)
 	{
-		LOG_DEBUG("EOF: " + ws::to_string(cgi_ctx_.procese_reaped));
+		LOG_DEBUG("EOF Reading from stdout pipe");
 		cgi_ctx_.pipe_stdout_eof = true;
 		tryFinalizeCGI_();
 		return true;

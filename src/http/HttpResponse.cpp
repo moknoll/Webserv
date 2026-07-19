@@ -197,7 +197,7 @@ std::string HttpResponse::nextChunk()
 	ssize_t     n = read(fd_, &buffer[0], FILE_CHUNK_SIZE);
 	if (n <= 0)
 	{
-		LOG_DEBUG("Error: reading from response file");
+		LOG_ERROR("Error: reading from response file");
 		closeFile();
 		return "";
 	}

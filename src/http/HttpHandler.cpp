@@ -35,14 +35,12 @@
 HttpHandler::HttpHandler(const ServerConfig& cfg) :
         config_(cfg),
         loc_()
-// error_(0)
 {
 }
 
 HttpHandler::HttpHandler(const HttpHandler& other) :
         config_(other.config_),
         loc_(other.loc_)
-// error_(other.error_)
 {
 }
 
@@ -122,7 +120,9 @@ HttpResponse HttpHandler::handlePOST(const HttpRequest& req)
 
 	if (!success)
 		return error_respons;
-	return makeStatusResponse(HTTP_CREATED);
+	HttpResponse res(HTTP_CREATED);
+	res.setFullResponse(res.buildErrorPage(HTTP_CREATED), "html");
+	return res;
 }
 
 HttpResponse HttpHandler::handleDELETE(const HttpRequest& req)
@@ -200,19 +200,24 @@ std::string HttpHandler::buildUploadPath(const std::string& filename)
 	return path;
 }
 
-int HttpHandler::openUploadFile(const std::string& path, HttpResponse& err_res)
+int HttpHandler::openUploadFile(const HttpRequest& req,
+                                const std::string& path,
+                                HttpResponse&      err_res)
 {
 	int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0644);
 	if (fd == -1)
 	{
 		if (errno == EEXIST)
-			err_res = makeStatusResponse(HTTP_CONFLICT);
+			err_res = HttpResponse::error(req, HTTP_CONFLICT);
 		else if (errno == EACCES || errno == EISDIR)
-			err_res = makeStatusResponse(HTTP_FORBIDDEN);
+			err_res = HttpResponse::error(req, HTTP_FORBIDDEN);
 		else if (errno == ENOSPC)
-			err_res = makeStatusResponse(HTTP_INSUFFICIENT_STORAGE);
+			err_res = HttpResponse::error(req, HTTP_INSUFFICIENT_STORAGE);
 		else
-			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+		{
+			LOG_DEBUG(strerror(errno));
+			err_res = HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
+		}
 
 		return fd;
 	}
@@ -239,13 +244,17 @@ static const char* find_bytes_(const char* ext_start,
 bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
                                            HttpResponse&      err_res)
 {
-	std::string   temp_file = req.getBodyTempFileName();
-	std::ifstream in(temp_file.c_str(), std::ios::binary);
+	std::string temp_file = req.getBodyTempFileName();
+	LOG_DEBUG("try open file" + req.getBodyTempFileName());
+	std::ifstream in(temp_file.c_str(), std::ios::in | std::ios::binary);
 
 	if (!in.is_open())
 	{
-		LOG_DEBUG("Error: open request temp file");
-		err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+		LOG_ERROR("Error: open request temp file");
+		LOG_DEBUG(req.getBodyTempFileName());
+		if (std::remove(req.getBodyTempFileName().c_str()) != 0)
+			LOG_DEBUG("Error: remov file");
+		err_res = HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
 		return false;
 	}
 
@@ -262,7 +271,7 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 		std::string::size_type e_p = line.find("\"\r", p);
 		if (e_p == std::string::npos)
 		{
-			err_res = makeStatusResponse(HTTP_BAD_REQUEST);
+			err_res = HttpResponse::error(req, HTTP_BAD_REQUEST);
 			return false;
 		}
 		p += 10;
@@ -272,14 +281,14 @@ bool HttpHandler::saveUploadedFileFromTemp(const HttpRequest& req,
 	std::string path = buildUploadPath(filename);
 	if (!validateUploadPath(path))
 	{
-		err_res = makeStatusResponse(HTTP_FORBIDDEN);
+		err_res = HttpResponse::error(req, HTTP_FORBIDDEN);
 		return false;
 	}
 
-	int fd = openUploadFile(path.c_str(), err_res);
+	int fd = openUploadFile(req, path.c_str(), err_res);
 	if (fd == -1)
 	{
-		LOG_DEBUG("Error: open upload file");
+		LOG_ERROR("Error: open upload file");
 		return false;
 	}
 
@@ -335,14 +344,15 @@ bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 	std::string filename = req.getHeader("X-Filename");
 	if (filename.empty())
 	{
-		err_res = makeStatusResponse(HTTP_BAD_REQUEST);
+		LOG_DEBUG("X-Filename not set: filename is empty");
+		err_res = HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
 		return false;
 	}
 
 	std::string path = buildUploadPath(filename);
 	if (!validateUploadPath(path))
 	{
-		err_res = makeStatusResponse(HTTP_FORBIDDEN);
+		err_res = HttpResponse::error(req, HTTP_FORBIDDEN);
 		return false;
 	}
 
@@ -350,11 +360,11 @@ bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 	std::ifstream in(temp_file.c_str(), std::ios::binary);
 	if (!in.is_open())
 	{
-		err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+		err_res = HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
 		return false;
 	}
 
-	int fd = openUploadFile(path.c_str(), err_res);
+	int fd = openUploadFile(req, path.c_str(), err_res);
 	if (fd == -1)
 		return false;
 
@@ -369,7 +379,7 @@ bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 		if (write(fd, &buffer[0], bytes_read) < 0)
 		{
 			close(fd);
-			err_res = makeStatusResponse(HTTP_INTERNAL_SERVER_ERROR);
+			err_res = HttpResponse::error(req, HTTP_INTERNAL_SERVER_ERROR);
 			return false;
 		}
 	}
@@ -377,25 +387,25 @@ bool HttpHandler::savePlainBody(const HttpRequest& req, HttpResponse& err_res)
 	return true;
 }
 
-HttpResponse HttpHandler::makeStatusResponse(int status)
-{
-	HttpResponse                                 res(status);
-	std::string                                  content;
-
-	std::map< int, std::string >::const_iterator it =
-	    config_.error_pages.find(status);
-	if (it != config_.error_pages.end())
-	{
-		if (ws::readFile(it->second.c_str(), content))
-		{
-			res.setFullResponse(content, "html");
-			return res;
-		}
-	}
-
-	res.setFullResponse(res.buildErrorPage(status), "html");
-	return res;
-}
+// HttpResponse HttpHandler::makeStatusResponse(int status)
+// {
+// 	HttpResponse                                 res(status);
+// 	std::string                                  content;
+//
+// 	std::map< int, std::string >::const_iterator it =
+// 	    config_.error_pages.find(status);
+// 	if (it != config_.error_pages.end())
+// 	{
+// 		if (ws::readFile(it->second.c_str(), content))
+// 		{
+// 			res.setFullResponse(content, "html");
+// 			return res;
+// 		}
+// 	}
+//
+// 	res.setFullResponse(res.buildErrorPage(status), "html");
+// 	return res;
+// }
 
 // HttpResponse HttpHandler::redirect(int status, const std::string& target)
 // {

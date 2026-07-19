@@ -175,6 +175,10 @@ class ws
 
 	static std::string       randString(size_t len = 5);
 
+	static std::string       removeDots(const std::string& path);
+
+	static std::string       getAbsolutePath(const std::string& path);
+
 	static bool has_suffix(const std::string& s, const std::string& suffix);
 
 	/**

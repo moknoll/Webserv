@@ -14,11 +14,11 @@
 
 #include <string>
 
-#define LOG_DEBUG(msg)    Logger::getInstance().log(LOG_DEBUG, msg)
-#define LOG_INFO(msg)     Logger::getInstance().log(LOG_INFO, msg)
-#define LOG_WARNING(msg)  Logger::getInstance().log(LOG_WARNING, msg)
-#define LOG_ERROR(msg)    Logger::getInstance().log(LOG_ERROR, msg)
-#define LOG_CRITICAL(msg) Logger::getInstance().log(LOG_ERROR, msg)
+#define LOG_DEBUG(msg)    Logger::getInstance().log(LOG_DEBUG, msg, __FILE__, __LINE__, __FUNCTION__)
+#define LOG_INFO(msg)     Logger::getInstance().log(LOG_INFO, msg, __FILE__, __LINE__, __FUNCTION__)
+#define LOG_WARNING(msg)  Logger::getInstance().log(LOG_WARNING, msg, __FILE__, __LINE__, __FUNCTION__)
+#define LOG_ERROR(msg)    Logger::getInstance().log(LOG_ERROR, msg, __FILE__, __LINE__, __FUNCTION__)
+#define LOG_CRITICAL(msg) Logger::getInstance().log(LOG_ERROR, msg, __FILE__, __LINE__, __FUNCTION__)
 
 enum LogLevel
 {
@@ -38,14 +38,16 @@ class Logger
 
 	void           log(LogLevel           level,
 	                   const std::string& message,
-	                   const std::string& context = "");
+	                   const char*        file,
+	                   int                line,
+	                   const char*        function);
+
 	~Logger();
 
   private:
 	LogLevel                 currentLevel;
 
 	static const std::string _levelToString(LogLevel level);
-
 	static const std::string _getTimestamp();
 
 	Logger();

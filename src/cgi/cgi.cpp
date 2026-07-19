@@ -7,9 +7,11 @@
 #include <algorithm>
 #include <csignal>
 #include <cstddef>
+#include <cstdlib>
 #include <ctime>
 #include <fcntl.h>
 #include <string.h>
+#include <string>
 #include <sys/types.h>
 #include <unistd.h>
 
@@ -179,7 +181,8 @@ std::vector< std::string > buildCgiArgv(const HttpRequest& req, CgiContext& ctx)
 		ctx.error = HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	argv.push_back(req.getLocation().cgi_path);
+	std::string interp_path = ws::getAbsolutePath(req.getLocation().cgi_path);
+	argv.push_back(interp_path);
 	argv.push_back(path);
 	return argv;
 }
@@ -188,10 +191,19 @@ bool executeChild(CgiContext&                       ctx,
                   const std::vector< std::string >& args,
                   const std::vector< std::string >& env)
 {
+	std::string path_to_chdir = "./";
+	std::string script_name = args[1];
+	size_t      p = args[1].find_last_of('/');
+	if (p != std::string::npos)
+	{
+		path_to_chdir = args[1].substr(0, p);
+		script_name = args[1].substr(p + 1);
+	}
+
 	std::vector< char* > envp;
 	std::vector< char* > argv;
 	argv.push_back(const_cast< char* >(args[0].c_str()));
-	argv.push_back(const_cast< char* >(args[1].c_str()));
+	argv.push_back(const_cast< char* >(script_name.c_str()));
 	argv.push_back(NULL);
 
 	for (size_t i = 0; i < env.size(); ++i)
@@ -236,6 +248,9 @@ bool executeChild(CgiContext&                       ctx,
 		close(pipe_in[1]);
 		close(pipe_out[0]);
 		close(pipe_out[1]);
+
+		if (::chdir(path_to_chdir.c_str()) != 0)
+			LOG_ERROR("Error: chdir, connot change directory");
 
 		execve(argv[0], argv.data(), envp.data());
 		_exit(127);

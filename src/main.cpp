@@ -113,17 +113,8 @@ int main(int argc, char* argv[])
 		// ???????????????????????????????????????????????????????
 		std::vector< ServerConfig > configs = cfg_parser.getServers();
 
-		std::cout << "Parsed Configurations:" << std::endl;
-		for (size_t i = 0; i < configs.size(); i++)
-		{
-			std::cout << "Server " << i + 1 << ":" << std::endl;
-			std::cout << "  Port: " << configs[i].port << std::endl;
-			std::cout << "  Host: " << configs[i].host << std::endl;
-			std::cout << "  Root: " << configs[i].root << std::endl;
-			std::cout << "  Index: " << configs[i].index << std::endl;
-		}
-		// TODO: Use the parsed config to initialize and run the server
-
+		LOG_INFO("Web Server Starting...");
+		LOG_INFO("Press Ctrl+C to stop");
 		Core webserv(configs);
 		webserv.run();
 	}

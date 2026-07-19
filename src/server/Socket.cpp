@@ -25,14 +25,10 @@ Socket::Socket(const ServerConfig& config) :
 
 	this->host_ = config.host;
 	this->port_ = ws::to_string(config.port);
-	std::cout << "Config: host='" << this->host_ << "' port='" << this->port_
-	          << "'" << std::endl;
 
-	if ((status = getaddrinfo(
-	         this->host_.c_str(), this->port_.c_str(), &hints, &servinfo))
-	    != 0)
-		throw std::runtime_error(std::string("getaddrinfo failed: ")
-		                         + gai_strerror(status));
+	if ((status = getaddrinfo(this->host_.c_str(), this->port_.c_str(), &hints, &servinfo)) != 0)
+		throw std::runtime_error(std::string("getaddrinfo failed: ") + gai_strerror(status));
+	
 	this->fd_ = -1;
 
 	for (p = servinfo; p != NULL; p = p->ai_next)
@@ -40,8 +36,7 @@ Socket::Socket(const ServerConfig& config) :
 		if ((this->fd_ = socket(p->ai_family, p->ai_socktype, p->ai_protocol)))
 			if (this->fd_ == SOCKET_ERROR)
 				continue;
-		if ((setsockopt(this->fd_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)))
-		    == SOCKET_ERROR)
+		if ((setsockopt(this->fd_, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))) == SOCKET_ERROR)
 		{
 			close(this->fd_);
 			continue;

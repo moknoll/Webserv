@@ -11,9 +11,9 @@
 /* ************************************************************************** */
 
 #include "Logger.hpp"
-#include <cstddef>
 #include <ctime>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 Logger::~Logger() {}
@@ -24,7 +24,10 @@ Logger& Logger::getInstance()
 	return instance;
 }
 
-Logger::Logger() : currentLevel(LOG_INFO) {}
+Logger::Logger() :
+        currentLevel(LOG_INFO)
+{
+}
 
 void Logger::setLevel(LogLevel newLevel)
 {
@@ -33,28 +36,27 @@ void Logger::setLevel(LogLevel newLevel)
 
 void Logger::log(LogLevel           level,
                  const std::string& message,
-                 const std::string& context)
+                 const char*        file,
+                 int                line,
+                 const char*        function)
 {
 	if (level < this->currentLevel)
 		return;
 
-	std::string timestamp = _getTimestamp();
-	std::string strLevel = _levelToString(level);
+	std::string        timestamp = _getTimestamp();
+	std::string        strLevel = _levelToString(level);
 
-	if (context == "")
+	std::ostringstream oss;
+	oss << "[" << timestamp << "]  [" << strLevel << "]";
+
+	if (level == LOG_DEBUG || level == LOG_ERROR)
 	{
-		std::cout << "[ " << strLevel << " ] - [" << timestamp << "] - "
-		          << message << std::endl;
+		oss << " [" << file << ":" << line << ":" << function << "]";
 	}
-	else
-	{
-		// std::string st = "\"" + getmethod() + " " + geturi() + " "
-		//                + gethttpversion() + "\"";
-		//
-		// std::cout << "[ " << strLevel << " ] - [" << timestamp << "] - ["
-		//           << gethost() << "] - " << st << " - " << message
-		//           << std::endl;
-	}
+
+	oss << " " << message;
+
+	std::cout << oss.str() << std::endl;
 }
 
 const std::string Logger::_levelToString(LogLevel level)
@@ -66,7 +68,7 @@ const std::string Logger::_levelToString(LogLevel level)
 		case LOG_WARNING:  return "WARNING";
 		case LOG_ERROR:    return "ERROR";
 		case LOG_CRITICAL: return "CRITICAL";
-		default:       return "UNKNOWN";
+		default:           return "UNKNOWN";
 	}
 }
 

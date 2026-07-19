@@ -68,7 +68,6 @@ void ConfigParser::validateIPv4(const std::string& s)
 			end = s.size();
 
 		std::string part = s.substr(start, end - start);
-		std::cout << "IM HEAR\n";
 		validateNumber(part);
 
 		int num = std::atoi(part.c_str());

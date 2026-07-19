@@ -15,8 +15,10 @@
 #include <cstddef>
 #include <cstdlib>
 #include <ctime>
+#include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 bool ws::has_suffix(const std::string& s, const std::string& suffix)
 {
@@ -105,10 +107,11 @@ std::string ws::toUpperCase(const std::string& s)
 
 std::string ws::randString(size_t len)
 {
-	std::srand(std::time(0));
+	std::srand(std::time(NULL));
 
 	const char  char_set[] = "abcdefghijklmnopqrstuvwxyz"
-	                         "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	                         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	                         "0123456789";
 
 	const int   char_set_size = sizeof(char_set) - 1;
 
@@ -120,4 +123,63 @@ std::string ws::randString(size_t len)
 		rand_string += char_set[rand_index];
 	}
 	return rand_string;
+}
+
+std::string ws::getAbsolutePath(const std::string& path)
+{
+	std::string ret;
+	const char* pwd = std::getenv("PWD");
+
+	if (!path.empty() && path[0] == '/')
+		return path;
+
+	if (pwd)
+		ret = std::string(pwd) + '/' + path;
+
+	ret = ws::removeDots(ret);
+
+	if (ret.empty())
+		ret = "/";
+
+	return ret;
+}
+
+std::string ws::removeDots(const std::string& path)
+{
+	if (path.empty())
+		return path;
+
+	std::string                ret;
+	std::vector< std::string > v_path = strSplit(path, "/");
+	std::vector< std::string > v_norm;
+
+	bool                       trailingSlash = (path[path.size() - 1] == '/');
+
+	for (size_t i = 0; i < v_path.size(); ++i)
+	{
+		const std::string seg = v_path[i];
+
+		if (seg.empty() || seg == ".")
+			continue;
+
+		if (seg == "..")
+		{
+			if (!v_norm.empty())
+				v_norm.pop_back();
+			continue;
+		}
+
+		v_norm.push_back(seg);
+	}
+
+	for (size_t i = 0; i < v_norm.size(); ++i)
+	{
+		ret += "/";
+		ret += v_norm[i];
+	}
+
+	if (trailingSlash)
+		ret += "/";
+
+	return ret;
 }

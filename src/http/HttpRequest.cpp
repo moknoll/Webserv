@@ -13,6 +13,7 @@
 #include "HttpRequest.hpp"
 #include "../constants.hpp"
 #include "../lib/ws.hpp"
+#include "../logger/Logger.hpp"
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -227,7 +228,8 @@ void HttpRequest::parseChunked(std::string& raw_data)
 
 bool HttpRequest::saveBodyToTempFile(std::string& raw_data)
 {
-	body_temp_file_ = "./wsload_" + ws::randString();
+	if (body_temp_file_.empty())
+		body_temp_file_ = "/tmp/wsload_" + ws::randString(32);
 
 	if (fd_ == -1)
 	{
@@ -308,7 +310,8 @@ void HttpRequest::parse(std::string& raw_data)
 				std::string::size_type p = raw_data.find(' ');
 				if (p == std::string::npos)
 				{
-					if (raw_data.size() > MAX_METHOD_LEN)
+					if (raw_data.size() > MAX_METHOD_LEN
+					    || raw_data.find(CRLF) != std::string::npos)
 						fail(HTTP_BAD_REQUEST);
 					return;
 				}
@@ -323,8 +326,10 @@ void HttpRequest::parse(std::string& raw_data)
 				std::string::size_type p = raw_data.find(' ');
 				if (p == std::string::npos)
 				{
-					if (raw_data.size() - MAX_METHOD_LEN > MAX_URL_LEN)
+					if (raw_data.size() > MAX_URL_LEN)
 						fail(HTTP_URI_TOO_LONG);
+					if (raw_data.find(CRLF) != std::string::npos)
+						fail(HTTP_BAD_REQUEST);
 					return;
 				}
 
@@ -336,6 +341,8 @@ void HttpRequest::parse(std::string& raw_data)
 			}
 			case sw_version:
 			{
+				if (raw_data.size() < std::strlen(HTTP_VERSION) + 4)
+					return;
 				std::string::size_type p = raw_data.find(CRLF);
 				if (p == std::string::npos)
 				{
@@ -345,13 +352,15 @@ void HttpRequest::parse(std::string& raw_data)
 				}
 
 				this->http_version_ = raw_data.substr(0, p);
-				if (raw_data.compare(p + 2, 2, CRLF) == 0)
+				raw_data.erase(0, p + CRLF_LEN);
+
+				if (this->http_version_ != "HTTP/1.1"
+				    || (raw_data.compare(0, 2, CRLF) == 0))
 				{
-					state_ = sw_done;
+					fail(HTTP_BAD_REQUEST);
 					return;
 				}
 
-				raw_data.erase(0, p + CRLF_LEN);
 				state_ = sw_headers;
 				break;
 			}
@@ -382,6 +391,9 @@ void HttpRequest::resolveURI()
 		fail(HTTP_BAD_REQUEST);
 		return;
 	}
+
+	// remove dots from uri
+	this->uri_ = ws::removeDots(uri_);
 
 	const Location* loc = FindMatchingUri_();
 	if (loc == NULL)

@@ -26,7 +26,7 @@ class HttpHandler
 	~HttpHandler();
 
 	HttpResponse handle(const HttpRequest& req);
-	HttpResponse makeStatusResponse(int status);
+	// HttpResponse makeStatusResponse(int status);
 	// std::string  getFileChunk();
 	void         reset();
 
@@ -50,8 +50,9 @@ class HttpHandler
 	std::string         buildUploadPath(const std::string&);
 	std::string         sanitizeFileName(const std::string&);
 	bool                validateUploadPath(const std::string&);
-	int                 openUploadFile(const std::string&, HttpResponse&);
-	bool                savePlainBody(const HttpRequest&, HttpResponse&);
+	int
+	openUploadFile(const HttpRequest& req, const std::string&, HttpResponse&);
+	bool savePlainBody(const HttpRequest&, HttpResponse&);
 	bool saveUploadedFileFromTemp(const HttpRequest&, HttpResponse&);
 };
 

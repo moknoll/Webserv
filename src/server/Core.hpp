@@ -63,6 +63,8 @@ class Core
 	FdInfo* getFdInfo(int fd);
 
 	Core();
+	Core(const Core& other);
+	Core& operator=(const Core& other);
 
   public:
 	Core(const std::vector< ServerConfig >& configs);
