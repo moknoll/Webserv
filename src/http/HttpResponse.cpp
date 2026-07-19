@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <unistd.h>
@@ -87,8 +88,9 @@ HttpResponse& HttpResponse::operator=(const HttpResponse& other)
 
 HttpResponse HttpResponse::error(const HttpRequest& req, int status)
 {
-	HttpResponse res(status);
-	std::string  content;
+	HttpResponse                 res(status);
+	std::string                  content;
+	std::map< int, std::string > error_pages = req.getConfig().error_pages;
 
 	if (status == HTTP_NOT_ALLOWED)
 	{
@@ -101,11 +103,19 @@ HttpResponse HttpResponse::error(const HttpRequest& req, int status)
 		}
 		res.setHeader("Allow", methods);
 	}
-	std::map< int, std::string >::const_iterator it =
-	    req.getConfig().error_pages.find(status);
-	if (it != req.getConfig().error_pages.end())
+
+	std::map< int, std::string >::const_iterator it = error_pages.find(status);
+	if (it != error_pages.end())
 	{
-		ws::readFile(it->second.c_str(), content);
+		int fd = open(it->second.c_str(), O_RDONLY);
+		if (fd != -1)
+		{
+			res.setFileFd(fd);
+			size_t cl = ws::getFileSize(it->second.c_str());
+			res.setHeader("Content-Length", ws::to_string(cl));
+			res.setFullResponse("", ws::getFileExtension(it->second));
+			return res;
+		}
 	}
 
 	if (content.empty())

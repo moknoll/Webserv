@@ -80,9 +80,7 @@ void Core::run()
 				continue;
 			throw std::runtime_error("Poll failed");
 		}
-		// if (ret == 0) // What to do
 
-		// ckeckTimeOutClient();
 		for (size_t i = 0; i < poll_fds_.size(); i++)
 		{
 			pollfd& pfd = poll_fds_[i];
@@ -106,6 +104,7 @@ void Core::run()
 		checkCGIProcesses();
 		checkClientTimeouts();
 	}
+	LOG_INFO("Server shotdown");
 }
 
 void Core::acceptNewClient_(const Server& server)

@@ -53,6 +53,7 @@ def print_html_header(title="Upload file"):
 <head>
     <meta charset="utf-8">
     <title>{title}</title>
+    <link rel="stylesheet" href="/py-scripts/style.css">
     <style>
         body {{ font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }}
         .success {{ color: green; background: #d4edda; padding: 15px; border-radius: 5px; }}
@@ -67,7 +68,23 @@ def print_html_header(title="Upload file"):
         .file-item {{ padding: 5px 0; border-bottom: 1px solid #eee; }}
     </style>
 </head>
+    
 <body>
+
+<div class="background">
+    <nav class="navbar">
+		<div class="logo">
+			<a href="/">Webserv</a>
+		</div>
+		<ul class="nav-links">
+			<li><a href="/cgi-bin/helloCGI.py">Home</a></li>
+			<li><a href="/cgi-bin/upload.py">Upload</a></li>
+			<li><a href="/cgi-bin/form-handler.py">Form handler</a></li>
+			<li><a href="/cgi-bin/session_management.py">Session management</a></li>
+			<li><a href="https://github.com/">GitHub</a></li>
+		</ul>
+	</nav>
+</div>
     <h1>📤 Upload file</h1>
 """)
 

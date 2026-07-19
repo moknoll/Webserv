@@ -1,7 +1,6 @@
 #include "ConfigParser.hpp"
 #include <cctype>
 #include <cstdlib>
-#include <iostream>
 #include <stdexcept>
 
 // ---------------- OCF ----------------

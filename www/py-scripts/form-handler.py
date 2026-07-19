@@ -5,41 +5,89 @@ import sys
 import os
 import json
 
-form = cgi.FieldStorage()
+form_data = cgi.FieldStorage()
 filename = "message.json"
 
-name = form.getvalue("name")
-email = form.getvalue("email")
-message = form.getvalue("message")
+name = form_data.getvalue("name")
+email = form_data.getvalue("email")
+message = form_data.getvalue("message")
 
-obj = {"name": name, "email": email, "message": message}
+list_of_users = []
 
-if os.path.exists(filename):
-	try:
-		with open(filename, "r") as file:
-			data = json.load(file)
-	except json.JSONDecodeError:
-		data =[]
-else:
-	data = []
+try:
+    with open(filename, "r", encoding='utf-8') as f:
+        list_of_users = json.load(f)
+except FileNotFoundError:
+    list_of_users = []
 
-if in data 
-	data.append(obj)
-
-with open(filename, "w") as file:
-	json.dump(data, file, indent=4)
+if name and email and message:
+    obj = {"name": name, "email": email, "message": message}
+    list_of_users.append(obj)
+    with open(filename, "w", encoding='utf-8') as file:
+        json.dump(list_of_users, file, indent=4, ensure_ascii=False)
 
 
-body = f"""<html>
-<body>
-<h1>New Data added!</h1>
-<p>Name: {name}</p>
-<p>Email: {email}</p>
-<p>Message: {message}</p>
-</body>
-</html>"""
+form_html = f"""
+    <div class="box">
+        <h1>Please, fill out the fields</h1>
+        <form action="/cgi-bin/form-handler.py" method="POST">
+            <input type="text" name="name" placeholder="Name" required>
+            <input type="text" name="email" placeholder="Email" required>
+            <input type="text" name="message" placeholder="Message" required>
+            <br><br>
+            <input type='submit' value='Submit'> 
+        </form>
+        <br><br>
+    </div>
+"""
 
-print(f"Content-type: text/html\r")
-print(f"Content-Length: {len(body)}\r")
-print("\r")
+table_html = ""
+if list_of_users:
+    table_rows = ""
+    for user in list_of_users:
+        table_rows += f"<tr><td>{user.get('name')}</td><td>{user.get('email')}</td><td>{user.get('message')}</td></tr>"
+    
+    table_html = f"""
+    <table border="1" style="margin-top: 20px; width: 100%; border-collapse: collapse;">
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Message</th>
+        </tr>
+        {table_rows}
+    </table>
+    """
+
+body = f"""
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="UTF-8">
+    <title>Session Example</title>
+    <link rel="stylesheet" href="/py-scripts/style.css">
+    </head>
+
+    <body>
+        <nav class="navbar">
+            <div class="logo">
+                <a href="/">Webserv</a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/cgi-bin/helloCGI.py">Home</a></li>
+                <li><a href="/cgi-bin/upload.py">Upload</a></li>
+                <li><a href="/cgi-bin/form-handler.py">Form handler</a></li>
+                <li><a href="/cgi-bin/session_management.py">Session management</a></li>
+                <li><a href="https://github.com/">GitHub</a></li>
+            </ul>
+        </nav>
+        {form_html}
+        {table_html}
+    </body>
+    </html>
+    """
+
+print("Content-Type: text/html\r")
+print(f"Content-Length: {len(body.encode('utf-8'))}\r")
+print('\r')
+
 sys.stdout.write(body)
