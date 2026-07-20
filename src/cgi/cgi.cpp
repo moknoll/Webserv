@@ -297,7 +297,7 @@ void executeCGI(const HttpRequest& req, CgiContext& ctx)
 	}
 
 	fcntl(ctx.stdout_pipe, F_SETFL, O_NONBLOCK);
-	if (req.getMethod() == "POST")
+	if (req.getMethod() == "POST" && req.getReceivedBytes() > 0)
 	{
 		ctx.request_body.open(req.getBodyTempFileName().c_str(),
 		                      std::ios::in | std::ios::binary);

@@ -54,7 +54,7 @@ Socket::Socket(const ServerConfig& config) :
 	}
 
 	if (p == NULL)
-		throw std::runtime_error("Could not bind to" + host_ + ":" + port_);
+		throw std::runtime_error("Could not bind to " + host_ + ":" + port_);
 
 	freeaddrinfo(servinfo);
 	if (listen(this->fd_, BACKLOG) == SOCKET_ERROR)
