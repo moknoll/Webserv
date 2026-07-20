@@ -70,6 +70,5 @@ class Core
 	Core(const std::vector< ServerConfig >& configs);
 	~Core();
 
-	void run(); // main loop for accepting and handling clients
-	            // Server* findServerByFd(int serverFd);
+	void run(); 
 };

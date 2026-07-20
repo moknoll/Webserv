@@ -14,6 +14,7 @@
 #include <string>
 #include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 
 CgiContext::CgiContext()
 {
@@ -161,14 +162,21 @@ static std::vector< std::string > buildEnv(const HttpRequest& req)
 
 std::vector< std::string > buildCgiArgv(const HttpRequest& req, CgiContext& ctx)
 {
+	std::vector< std::string > argv;
 	std::string path = req.getPath();
-	size_t      ext_pos = path.find(".py");
-	if (ext_pos != std::string::npos)
-		path = path.substr(0, ext_pos + 3);
+	std::string	extention = req.getLocation().cgi_extension;
+	size_t      ext_pos = path.find(extention);
+	if (ext_pos == std::string::npos)
+	{
+		LOG_DEBUG("CGI SCRIPT NOT FOUND: handle like static file");
+		ctx.error = ERR_CGI_SCRIPT_NOT_FOUND;
+		return argv;
+
+	}
+	path = path.substr(0, ext_pos + 3);
 
 	PathInfo path_info = ws::checkPath(path);
 	PathInfo cgi_path_info = ws::checkPath(req.getLocation().cgi_path);
-	std::vector< std::string > argv;
 	if (!path_info.exists && !path_info.readable)
 	{
 		LOG_DEBUG("Path to cgi script: " + path);

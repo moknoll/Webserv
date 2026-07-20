@@ -5,7 +5,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
-#include <iostream>
 #include <netdb.h>
 #include <string>
 #include <unistd.h>
@@ -52,9 +51,8 @@ Socket::Socket(const ServerConfig& config) :
 			continue;
 		}
 		break;
-		std::cout << "sock_fd" << this->fd_ << std::endl;
-		std::cout << "Setup complete" << std::endl;
 	}
+
 	if (p == NULL)
 		throw std::runtime_error("Could not bind to" + host_ + ":" + port_);
 

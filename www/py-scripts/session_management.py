@@ -48,7 +48,7 @@ form = f"""
     <div class="box">
     <h1>Hello {first_name if first_name else "Guest" }!</h1>
     {"<h3>Your cookie is working.</h3>" if first_name else "<h2>Enter your name</h2>"}
-        <form action="/cgi-bin/session_management.py" method="POST">
+        <form action="/cgi-bin/py/session_management.py" method="POST">
             <input type="text" name="first_name">
             <br><br>
             <input type='submit' value={'Change name' if first_name else 'Submit'}> 
@@ -73,10 +73,10 @@ body = f"""
                 <a href="/">Webserv</a>
             </div>
             <ul class="nav-links">
-                <li><a href="/cgi-bin/helloCGI.py">Home</a></li>
-                <li><a href="/cgi-bin/upload.py">Upload</a></li>
-                <li><a href="/cgi-bin/form-handler.py">Form handler</a></li>
-                <li><a href="/cgi-bin/session_management.py">Session management</a></li>
+                <li><a href="/cgi-bin/py/helloCGI.py">Home</a></li>
+                <li><a href="/cgi-bin/py/upload.py">Upload</a></li>
+                <li><a href="/cgi-bin/py/form-handler.py">Form handler</a></li>
+                <li><a href="/cgi-bin/py/session_management.py">Session management</a></li>
                 <li><a href="https://github.com/">GitHub</a></li>
             </ul>
         </nav>

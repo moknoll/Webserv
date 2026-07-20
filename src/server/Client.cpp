@@ -5,6 +5,7 @@
 #include "../lib/ws.hpp"
 #include "../logger/Logger.hpp"
 
+#include <csignal>
 #include <cstddef>
 #include <cstdlib>
 #include <ctime>
@@ -26,7 +27,6 @@ Client::Client(int fd, const ServerConfig& config) :
         state_(HTTP_RECV),
         request(config),
         response()
-// handler(config),
 {
 }
 
@@ -34,40 +34,50 @@ Client::~Client()
 {
 	close(fd_);
 	safeClosePipeFds_();
+	if (state_ == CGI_STATE && cgi_ctx_.pid != -1)
+	{
+		kill(cgi_ctx_.pid, SIGKILL);
+	}
 }
 
 void Client::processRequest()
 {
 	if (request.getStatus())
 	{
+		response = HttpResponse::error(request, request.getStatus());
 		keep_alive_ = false;
 		state_ = HTTP_SEND;
-		response = HttpResponse::error(request, request.getStatus());
+		return;
+	}
+
+	if (!isAllowedMethod(request.getLocation(), request.getMethod()))
+	{
+		response = HttpResponse::error(request, HTTP_NOT_ALLOWED);
+		state_ = HTTP_SEND;
 		return;
 	}
 
 	if (request.getLocation().has_cgi)
 	{
 		executeCGI(request, cgi_ctx_);
-		// request_body_fd_ = cgi_ctx_.request_body_fd;
 
-		cgi_output_buf.clear();
-
-		if (cgi_ctx_.error)
+		if (!cgi_ctx_.error)
 		{
-			response = HttpResponse::error(request, cgi_ctx_.error);
-			state_ = HTTP_SEND;
-			keep_alive_ = false;
+			state_ = CGI_STATE;
 			return;
 		}
-		state_ = CGI_STATE;
+		if (cgi_ctx_.error != ERR_CGI_SCRIPT_NOT_FOUND)
+		{
+			response = HttpResponse::error(request, cgi_ctx_.error);
+			keep_alive_ = false;
+			state_ = HTTP_SEND;
+			return;
+		}
 	}
-	else
-	{
-		HttpHandler h(config_);
-		response = h.handle(request);
-		state_ = HTTP_SEND;
-	}
+
+	HttpHandler h(config_);
+	response = h.handle(request);
+	state_ = HTTP_SEND;
 }
 
 std::string Client::serialize()
@@ -150,8 +160,7 @@ void Client::buildCGIResponse()
 			content_length = ws::stosize(value);
 		}
 	}
-	LOG_DEBUG("Body size: " + ws::to_string(body.size()));
-	LOG_DEBUG("Content lenght: " + ws::to_string(content_length));
+
 	if (!body.empty() && !have_content_type)
 	{
 		response = HttpResponse::error(request, HTTP_BAD_GATEWAY);
@@ -175,7 +184,6 @@ void Client::parseRequest(const char* buffer, size_t size)
 
 void Client::reset()
 {
-	// handler.reset();
 	resetCgiContext(cgi_ctx_);
 	request.reset();
 	response.reset();
@@ -317,6 +325,17 @@ bool Client::writeCgiInput(int pipe_fd)
 		return true;
 	}
 
+	return false;
+}
+
+bool Client::isAllowedMethod(const Location&    loc,
+                             const std::string& method) const
+{
+	for (size_t i = 0; i < loc.allowed_methods.size(); i++)
+	{
+		if (method == loc.allowed_methods[i])
+			return true;
+	}
 	return false;
 }
 

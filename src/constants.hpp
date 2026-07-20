@@ -73,4 +73,6 @@
 #define HTTP_GATEWAY_TIME_OUT                504
 #define HTTP_INSUFFICIENT_STORAGE            507
 
+#define ERR_CGI_SCRIPT_NOT_FOUND             42
+
 #endif /*  _HTTP_CONSTANTS_ */

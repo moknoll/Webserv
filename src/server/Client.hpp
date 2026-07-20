@@ -42,16 +42,16 @@ class Client
 
 	void        reset();
 
-	void        processRequest(); // buildResponse()
+	void        processRequest();
 	std::string serialize();
 	void        parseRequest(const char* buffer, size_t size);
 
-	std::string getResponseBuffer() const;                  // ??????????
-	std::string getRequestBuffer() const;                   // ???????????
+	std::string getResponseBuffer() const;
+	std::string getRequestBuffer() const;
 	bool        isRequestComplete() const;
 	bool        isKeepAlive() const;
-	void        setSendBuffer(const std::string& response); // ???????
-	void        setRecvBuffer(const std::string& request);  // ??????????
+	void        setSendBuffer(const std::string& response);
+	void        setRecvBuffer(const std::string& request);
 	void        setState(enum STATE state);
 
 	int         getClientFd() const;
@@ -59,6 +59,7 @@ class Client
 	CgiContext  getCGIContext() const;
 	time_t      getLastActivity() const;
 	void        updateLastActivity();
+	bool isAllowedMethod(const Location& loc, const std::string& method) const;
 
   private:
 	static const size_t MAX_CGI_BUFFER;
@@ -74,8 +75,6 @@ class Client
 
 	HttpRequest         request;
 	HttpResponse        response;
-	// HttpHandler         handler;
-	// time_t last_activity_;
 
 	Client();
 	Client(const Client& other);

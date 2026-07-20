@@ -26,8 +26,6 @@ class HttpHandler
 	~HttpHandler();
 
 	HttpResponse handle(const HttpRequest& req);
-	// HttpResponse makeStatusResponse(int status);
-	// std::string  getFileChunk();
 	void         reset();
 
   private:
@@ -35,16 +33,10 @@ class HttpHandler
 
 	const ServerConfig& config_;
 	Location            loc_;
-	// int                 error_;
-	// std::string         upload_file_path_;
 
 	HttpResponse        handleGET(const HttpRequest& req);
 	HttpResponse        handlePOST(const HttpRequest& req);
 	HttpResponse        handleDELETE(const HttpRequest& req);
-
-	// std::vector< std::string > getListOfFiles(const std::string& path);
-	// HttpResponse makeDirectoryListingResponse(const std::string& path,
-	//                                           const std::string& uri);
 
 	bool                isAllowedMethod(const std::string&) const;
 	std::string         buildUploadPath(const std::string&);

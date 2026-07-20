@@ -221,16 +221,6 @@ std::string HttpResponse::nextChunk()
 	return buffer;
 }
 
-/*
- * HTTP/1.1 200 OK\r\n
- * Server: webserv\r\n
- * Date: Fri, 21 Apr 2026 12:52:34 GMT\r\n
- * Content-Length: 555\r\n
- * Content-Type: text/html\r\n
- *
- * <html><body>Some text</body></html>
- */
-
 std::string HttpResponse::toString() const
 {
 	if (status_ == 0)

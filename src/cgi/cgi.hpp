@@ -19,7 +19,6 @@ struct CgiContext
 	bool         pipe_stdout_eof;
 	bool         procese_reaped;
 	bool         cgi_timed_out;
-	// int          request_body_fd;
 	std::fstream request_body;
 
 	CgiContext();

@@ -104,7 +104,7 @@ void Core::run()
 		checkCGIProcesses();
 		checkClientTimeouts();
 	}
-	LOG_INFO("Server shotdown");
+	LOG_INFO("Server shutdown");
 }
 
 void Core::acceptNewClient_(const Server& server)
@@ -127,7 +127,7 @@ void Core::acceptNewClient_(const Server& server)
 	fd_infos_[newClientFd].client = client;
 	fd_infos_[newClientFd].type = FD_CLIENT;
 
-	LOG_INFO("New client connected: (fd: " + ws::to_string(newClientFd) + ")");
+	LOG_DEBUG("New client connected: (fd: " + ws::to_string(newClientFd) + ")");
 	LOG_DEBUG("Size of poll fds: " + ws::to_string(poll_fds_.size()));
 	LOG_DEBUG("Size of fd_infos_: " + ws::to_string(fd_infos_.size()));
 }

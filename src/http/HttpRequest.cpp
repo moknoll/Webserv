@@ -238,6 +238,7 @@ bool HttpRequest::saveBodyToTempFile(std::string& raw_data)
 		           0755);
 		if (fd_ == -1)
 		{
+			LOG_ERROR("Error: open body_temp_file_");
 			fail(HTTP_INTERNAL_SERVER_ERROR);
 			return false;
 		}
@@ -248,6 +249,7 @@ bool HttpRequest::saveBodyToTempFile(std::string& raw_data)
 		ssize_t n = write(fd_, raw_data.data(), raw_data.size());
 		if (n == -1)
 		{
+			LOG_ERROR("Error: write to body_temp_file_");
 			close(fd_);
 			fd_ = -1;
 			fail(HTTP_INTERNAL_SERVER_ERROR);
@@ -360,7 +362,6 @@ void HttpRequest::parse(std::string& raw_data)
 					fail(HTTP_BAD_REQUEST);
 					return;
 				}
-
 				state_ = sw_headers;
 				break;
 			}
@@ -377,7 +378,7 @@ void HttpRequest::parse(std::string& raw_data)
 				parseHeaderLines(raw_data.substr(0, p + CRLF_LEN));
 				processHeaderFields();
 				raw_data.erase(0, p + CRLF_LEN + CRLF_LEN);
-				state_ = method_ != "POST" ? sw_done : sw_almost_done;
+				state_ = method_ == "GET" ? sw_done : sw_almost_done;
 			}
 			break;
 		}

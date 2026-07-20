@@ -38,6 +38,4 @@ class ConfigParser
 	void                               parse();
 	const std::vector< ServerConfig >& getServers() const;
 
-	//void debugPrint() const;
-
 };
